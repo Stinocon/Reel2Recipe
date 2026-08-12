@@ -258,15 +258,15 @@ def lingua_del_parlato(args) -> str | None:
 
 
 def comando_export(args) -> int:
-    from . import percorsi
+    from . import paths
     from .documenti import ErroreDocumento, scrivi_markdown, scrivi_pdf
     from .mela import scrivi_melarecipe, scrivi_melarecipes
     from .store import Libreria
 
-    # Senza --out la destinazione la decide `percorsi.py`, come per tutto il resto: il
+    # Senza --out la destinazione la decide `paths.py`, come per tutto il resto: il
     # predefinito era una quarta copia cablata di quel fatto, per giunta RELATIVA — dentro
     # il container avrebbe scritto accanto al codice invece che sul volume persistente.
-    destinazione = Path(args.out) if args.out else percorsi.cartella_export()
+    destinazione = Path(args.out) if args.out else paths.export_folder()
     formati = list(dict.fromkeys(args.format))   # senza duplicati, nell'ordine dato
 
     def scrivi_una(ricetta, formato: str) -> Path:

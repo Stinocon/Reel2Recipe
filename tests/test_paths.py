@@ -10,28 +10,28 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from reel2recipe import percorsi
+from reel2recipe import paths
 from reel2recipe.store import Libreria, percorso_predefinito
 
 
 def test_predefinito_e_accanto_al_repo(monkeypatch):
     monkeypatch.delenv("R2R_WORKSPACE", raising=False)
-    assert percorsi.cartella_workspace() == percorsi.RADICE_REPO / "workspace"
+    assert paths.workspace_folder() == paths.REPO_ROOT / "workspace"
 
 
 def test_variabile_sposta_la_radice(monkeypatch, tmp_path):
     monkeypatch.setenv("R2R_WORKSPACE", str(tmp_path / "dati"))
-    assert percorsi.cartella_workspace() == tmp_path / "dati"
-    assert percorsi.cartella_media() == tmp_path / "dati" / "media"
-    assert percorsi.cartella_export() == tmp_path / "dati" / "export"
-    assert percorsi.percorso_database() == tmp_path / "dati" / "ricette.db"
+    assert paths.workspace_folder() == tmp_path / "dati"
+    assert paths.media_folder() == tmp_path / "dati" / "media"
+    assert paths.export_folder() == tmp_path / "dati" / "export"
+    assert paths.database_path() == tmp_path / "dati" / "ricette.db"
 
 
 def test_variabile_vuota_non_conta(monkeypatch):
     """Una variabile impostata a stringa vuota è un errore di configurazione, non una scelta:
     finirebbe per puntare alla directory corrente, ovunque essa sia."""
     monkeypatch.setenv("R2R_WORKSPACE", "   ")
-    assert percorsi.cartella_workspace() == percorsi.RADICE_REPO / "workspace"
+    assert paths.workspace_folder() == paths.REPO_ROOT / "workspace"
 
 
 def test_la_libreria_segue_la_variabile(monkeypatch, tmp_path):

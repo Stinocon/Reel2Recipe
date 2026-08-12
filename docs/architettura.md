@@ -244,7 +244,7 @@ uno strumento che assiste senza pretendere di essere infallibile.
 
 ### 10. Una sola decisione su dove vivono i dati
 
-`percorsi.py` decide la radice di `workspace/` per tutti: libreria, media scaricati, export.
+`paths.py` decide la radice di `workspace/` per tutti: libreria, media scaricati, export.
 Prima la stessa riga (`parents[2] / "workspace"`) compariva identica in `store.py`,
 `pipeline.py` e `api.py` — tre copie di un fatto solo, cioè tre occasioni di divergere.
 

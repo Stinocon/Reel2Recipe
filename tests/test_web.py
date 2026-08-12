@@ -18,9 +18,9 @@ import re
 import pytest
 
 from reel2recipe import api, pipeline
-from reel2recipe.percorsi import RADICE_REPO
+from reel2recipe.paths import REPO_ROOT
 
-CARTELLA_WEB = RADICE_REPO / "web"
+CARTELLA_WEB = REPO_ROOT / "web"
 INDEX = (CARTELLA_WEB / "index.html").read_text(encoding="utf-8")
 I18N = (CARTELLA_WEB / "i18n.js").read_text(encoding="utf-8")
 

@@ -1,10 +1,10 @@
-"""audio.py — estrazione della traccia audio dal video, con ffmpeg.
+"""audio.py — pulling the audio track out of the video, with ffmpeg.
 
-Whisper vuole un WAV mono a 16 kHz: è il formato su cui il modello è stato addestrato, e
-darglielo già pronto evita un ricampionamento interno e qualche errore di trascrizione.
+Whisper wants a mono WAV at 16 kHz: it is the format the model was trained on, and handing
+it over ready-made avoids an internal resampling and a few transcription errors.
 
-`ffmpeg` è un binario di sistema, non un pacchetto Python: se manca, il messaggio d'errore
-deve dire come installarlo, non limitarsi a un FileNotFoundError.
+`ffmpeg` is a system binary, not a Python package: if it is missing, the error message has
+to say how to install it rather than settle for a FileNotFoundError.
 """
 
 from __future__ import annotations
@@ -13,111 +13,111 @@ import shutil
 import subprocess
 from pathlib import Path
 
-FREQUENZA_WHISPER = 16_000
+WHISPER_SAMPLE_RATE = 16_000
 
 
-class ErroreAudio(RuntimeError):
+class AudioError(RuntimeError):
     pass
 
 
-def ffmpeg_disponibile() -> bool:
+def ffmpeg_available() -> bool:
     return shutil.which("ffmpeg") is not None
 
 
-def _pretendi_ffmpeg() -> str:
-    percorso = shutil.which("ffmpeg")
-    if not percorso:
-        raise ErroreAudio(
-            "ffmpeg non è installato: senza non si può estrarre l'audio dai video.\n"
+def _require_ffmpeg() -> str:
+    path = shutil.which("ffmpeg")
+    if not path:
+        raise AudioError(
+            "ffmpeg is not installed: without it the audio cannot be pulled out of videos.\n"
             "  macOS:  brew install ffmpeg\n"
             "  Linux:  sudo apt install ffmpeg\n"
-            "Oppure esegui ./install.sh, che se ne occupa da sé."
+            "Or run ./install.sh, which takes care of it by itself."
         )
-    return percorso
+    return path
 
 
-def durata_s(percorso: Path | str) -> float | None:
-    """Durata del media in secondi, via ffprobe. `None` se non determinabile —
-    è un'informazione accessoria, non deve far fallire nulla."""
+def duration_s(path: Path | str) -> float | None:
+    """Duration of the media in seconds, via ffprobe. `None` when it cannot be determined —
+    it is incidental information and must not make anything fail."""
     ffprobe = shutil.which("ffprobe")
     if not ffprobe:
         return None
     try:
-        esito = subprocess.run(
+        outcome = subprocess.run(
             [ffprobe, "-v", "error", "-show_entries", "format=duration",
-             "-of", "default=noprint_wrappers=1:nokey=1", str(percorso)],
+             "-of", "default=noprint_wrappers=1:nokey=1", str(path)],
             capture_output=True, text=True, timeout=30, check=True,
         )
-        return float(esito.stdout.strip())
+        return float(outcome.stdout.strip())
     except (subprocess.SubprocessError, ValueError):
         return None
 
 
-def estrai_audio(percorso_media: Path | str, cartella_uscita: Path | str | None = None) -> Path:
-    """Estrae l'audio in WAV 16 kHz mono. Se il file è già un WAV con quelle
-    caratteristiche non rifà il lavoro.
+def extract_audio(media_path: Path | str, output_folder: Path | str | None = None) -> Path:
+    """Extracts the audio as 16 kHz mono WAV. If the file is already a WAV with those
+    characteristics, the work is not redone.
 
-    Ritorna il percorso del WAV prodotto.
+    Returns the path of the WAV produced.
     """
-    ffmpeg = _pretendi_ffmpeg()
-    percorso_media = Path(percorso_media)
-    if not percorso_media.is_file():
-        raise ErroreAudio(f"File non trovato: {percorso_media}")
+    ffmpeg = _require_ffmpeg()
+    media_path = Path(media_path)
+    if not media_path.is_file():
+        raise AudioError(f"File not found: {media_path}")
 
-    cartella = Path(cartella_uscita) if cartella_uscita else percorso_media.parent
-    cartella.mkdir(parents=True, exist_ok=True)
-    destinazione = cartella / f"{percorso_media.stem}.16k.wav"
+    folder = Path(output_folder) if output_folder else media_path.parent
+    folder.mkdir(parents=True, exist_ok=True)
+    destination = folder / f"{media_path.stem}.16k.wav"
 
-    if destinazione.is_file() and destinazione.stat().st_size > 0:
-        return destinazione   # già estratto in una esecuzione precedente
+    if destination.is_file() and destination.stat().st_size > 0:
+        return destination   # already extracted on an earlier run
 
-    comando = [
+    command = [
         ffmpeg, "-nostdin", "-y",
-        "-i", str(percorso_media),
-        "-vn",                       # scarta il video: qui serve solo la voce
+        "-i", str(media_path),
+        "-vn",                       # drop the video: only the voice is wanted here
         "-ac", "1",                  # mono
-        "-ar", str(FREQUENZA_WHISPER),
+        "-ar", str(WHISPER_SAMPLE_RATE),
         "-c:a", "pcm_s16le",
-        str(destinazione),
+        str(destination),
     ]
-    esito = subprocess.run(comando, capture_output=True, text=True)
-    if esito.returncode != 0:
-        coda = "\n".join(esito.stderr.strip().splitlines()[-5:])
-        raise ErroreAudio(f"ffmpeg non è riuscito a estrarre l'audio da {percorso_media.name}:\n{coda}")
-    if not destinazione.is_file() or destinazione.stat().st_size == 0:
-        raise ErroreAudio(
-            f"{percorso_media.name} non contiene una traccia audio utilizzabile. "
-            "Se la ricetta è tutta nella didascalia si può procedere lo stesso."
+    outcome = subprocess.run(command, capture_output=True, text=True)
+    if outcome.returncode != 0:
+        tail = "\n".join(outcome.stderr.strip().splitlines()[-5:])
+        raise AudioError(f"ffmpeg could not extract the audio from {media_path.name}:\n{tail}")
+    if not destination.is_file() or destination.stat().st_size == 0:
+        raise AudioError(
+            f"{media_path.name} holds no usable audio track. "
+            "If the recipe is all in the caption, it is still possible to carry on."
         )
-    return destinazione
+    return destination
 
 
-def estrai_copertina(percorso_video: Path | str, cartella_uscita: Path | str | None = None,
-                     istante_s: float = 1.0) -> Path | None:
-    """Un fotogramma da usare come copertina della ricetta in Mela.
+def extract_cover(video_path: Path | str, output_folder: Path | str | None = None,
+                  at_second: float = 1.0) -> Path | None:
+    """A frame to use as the recipe's cover in Mela.
 
-    Serve solo quando yt-dlp non ha già salvato l'anteprima. Fallisce in silenzio
-    (ritorna `None`): un'immagine mancante non è un motivo per perdere una ricetta.
+    Only needed when yt-dlp has not already saved the thumbnail. Fails silently (returns
+    `None`): a missing image is no reason to lose a recipe.
     """
-    if not ffmpeg_disponibile():
+    if not ffmpeg_available():
         return None
-    percorso_video = Path(percorso_video)
-    cartella = Path(cartella_uscita) if cartella_uscita else percorso_video.parent
-    cartella.mkdir(parents=True, exist_ok=True)
-    destinazione = cartella / f"{percorso_video.stem}.copertina.jpg"
+    video_path = Path(video_path)
+    folder = Path(output_folder) if output_folder else video_path.parent
+    folder.mkdir(parents=True, exist_ok=True)
+    destination = folder / f"{video_path.stem}.copertina.jpg"
 
-    if destinazione.is_file():
-        return destinazione
+    if destination.is_file():
+        return destination
 
-    comando = [
+    command = [
         shutil.which("ffmpeg"), "-nostdin", "-y",
-        "-ss", str(istante_s), "-i", str(percorso_video),
+        "-ss", str(at_second), "-i", str(video_path),
         "-frames:v", "1",
-        "-vf", "scale=640:-1",       # sufficiente per una copertina, tiene basso il peso
+        "-vf", "scale=640:-1",       # enough for a cover, and keeps the weight down
         "-q:v", "4",
-        str(destinazione),
+        str(destination),
     ]
-    esito = subprocess.run(comando, capture_output=True, text=True)
-    if esito.returncode != 0 or not destinazione.is_file():
+    outcome = subprocess.run(command, capture_output=True, text=True)
+    if outcome.returncode != 0 or not destination.is_file():
         return None
-    return destinazione
+    return destination
