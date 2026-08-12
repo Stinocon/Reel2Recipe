@@ -59,16 +59,16 @@ def comando_cook(args) -> int:
                 sorgente, _avanzamento_cli,
                 cookies_da_browser=args.cookies,
                 backend_asr=args.asr, lingua_audio=lingua_del_parlato(args),
-                modello_llm=args.modello,
+                modello_llm=args.model,
                 salta_audio=args.no_audio, url_ollama=args.ollama,
                 **assi_di_uscita(args),
             )
         else:
             esito = pipeline.da_file(
-                sorgente, didascalia=args.didascalia or "",
+                sorgente, didascalia=args.caption or "",
                 su_avanzamento=_avanzamento_cli,
                 backend_asr=args.asr, lingua_audio=lingua_del_parlato(args),
-                modello_llm=args.modello,
+                modello_llm=args.model,
                 salta_audio=args.no_audio, url_ollama=args.ollama,
                 **assi_di_uscita(args),
             )
@@ -90,15 +90,15 @@ def comando_cook(args) -> int:
     print(ok(f"\n✓ {ricetta.titolo}") + spento(f"  ({esito.modello})"))
     _stampa_ricetta(ricetta)
 
-    if not args.no_salva:
+    if not args.no_save:
         with Libreria(args.db) as lib:
             identificativo = lib.salva(ricetta)
-        print(spento(f"\n  Salvata in libreria con id {identificativo}."))
+        print(spento(f"\n  Saved to the library with id {identificativo}."))
 
     if args.export:
         from .mela import scrivi_melarecipe
         percorso = scrivi_melarecipe(ricetta, args.export)
-        print(ok(f"  Esportata: {percorso}"))
+        print(ok(f"  Exported: {percorso}"))
 
     return 0
 
@@ -111,7 +111,7 @@ def _stampa_ricetta(ricetta) -> None:
                                 f"{ricetta.tempo_totale_min()} min" if ricetta.tempo_totale_min() else None) if d]
         print(spento("  " + " · ".join(dettagli)))
 
-    print("\n  " + _c("Ingredienti", "1"))
+    print("\n  " + _c("Ingredients", "1"))
     for gruppo in ricetta.gruppi:
         if gruppo and len([g for g in ricetta.gruppi if g]) > 0 and len(ricetta.gruppi) > 1:
             print(spento(f"    — {gruppo} —"))
@@ -120,12 +120,12 @@ def _stampa_ricetta(ricetta) -> None:
                 riga = f"    {i.riga_mela()}"
                 print(avviso(riga) if i.quantita.provenienza in PROVENIENZE_INCERTE else riga)
 
-    print("\n  " + _c("Procedimento", "1"))
+    print("\n  " + _c("Method", "1"))
     for n, passo in enumerate(ricetta.procedimento, 1):
         print(f"    {n}. {passo}")
 
     if ricetta.lacune:
-        print("\n  " + avviso("Da verificare"))
+        print("\n  " + avviso("To check"))
         for l in ricetta.lacune:
             print(avviso(f"    • {l}"))
 
@@ -142,10 +142,10 @@ def comando_batch(args) -> int:
     elif sorgente.suffix == ".txt":
         lavori = [("url", u) for u in acquire.leggi_elenco_url(sorgente)]
     else:
-        print(errore("Per il batch serve una cartella di file o un .txt di URL (uno per riga)."))
+        print(errore("Batch needs a folder of files, or a .txt of URLs (one per line)."))
         return 1
 
-    print(f"In coda: {len(lavori)} elemento/i.\n")
+    print(f"Queued: {len(lavori)} item(s).\n")
     riuscite, ricette = 0, []
     with Libreria(args.db) as lib:
         for indice, (tipo, elemento) in enumerate(lavori, 1):
@@ -163,7 +163,7 @@ def comando_batch(args) -> int:
                                             url_ollama=args.ollama,
                                             **assi_di_uscita(args))
             except pipeline.NonEUnaRicetta as e:
-                print(avviso(f"  ⚠ saltato: {e}\n"))
+                print(avviso(f"  ⚠ skipped: {e}\n"))
                 continue
             except Exception as e:
                 print(errore(f"  ✗ {type(e).__name__}: {e}\n"))
@@ -175,11 +175,11 @@ def comando_batch(args) -> int:
                 riuscite += 1
                 print(ok(f"  ✓ {esito.ricetta.titolo}\n"))
 
-    print(f"\nFatto: {ok(str(riuscite))} riuscite su {len(lavori)}.")
+    print(f"\nDone: {ok(str(riuscite))} succeeded out of {len(lavori)}.")
     if ricette and args.export:
         from .mela import scrivi_melarecipes
         percorso = scrivi_melarecipes(ricette, args.export)
-        print(ok(f"Esportate insieme in {percorso}"))
+        print(ok(f"Exported together to {percorso}"))
     return 0 if riuscite else 1
 
 
@@ -187,14 +187,15 @@ def comando_list(args) -> int:
     from .store import Libreria
 
     with Libreria(args.db) as lib:
-        voci = lib.elenca(cerca=args.cerca)
+        voci = lib.elenca(cerca=args.search)
 
     if not voci:
-        print(spento("Libreria vuota." if not args.cerca else f"Nessun risultato per «{args.cerca}»."))
+        print(spento("The library is empty." if not args.search
+                     else f"No results for «{args.search}»."))
         return 0
 
     for v in voci:
-        marchio = avviso(" (da rivedere)") if v["ha_incertezze"] else ""
+        marchio = avviso(" (to review)") if v["ha_incertezze"] else ""
         dettagli = " · ".join(str(x) for x in (v["autore"], v["porzioni"],
                               f"{v['tempo_totale_min']} min" if v["tempo_totale_min"] else None) if x)
         print(f"{_c(str(v['id']).rjust(4), '1')}  {v['titolo']}{marchio}")
@@ -212,17 +213,20 @@ def comando_elimina(args) -> int:
     with Libreria(args.db) as lib:
         ricetta = lib.leggi(args.id)
         if not ricetta:
-            print(errore(f"Nessuna ricetta con id {args.id}."))
+            print(errore(f"No recipe with id {args.id}."))
             return 1
 
-        if not args.si:
-            risposta = input(f"Eliminare «{ricetta.titolo}»? Non è reversibile. [s/N] ").strip().lower()
-            if risposta not in ("s", "si", "sì", "y", "yes"):
-                print(spento("Annullato."))
+        if not args.yes:
+            # Le risposte affermative restano accettate in entrambe le lingue: chi ha usato
+            # questo comando per mesi digita «s» senza pensarci, e un «s» non riconosciuto
+            # qui non annulla un errore — annulla una cancellazione voluta.
+            risposta = input(f"Delete «{ricetta.titolo}»? This cannot be undone. [y/N] ").strip().lower()
+            if risposta not in ("y", "yes", "s", "si", "sì"):
+                print(spento("Cancelled."))
                 return 0
 
         lib.elimina(args.id)
-    print(ok(f"✓ «{ricetta.titolo}» eliminata dal ricettario."))
+    print(ok(f"✓ «{ricetta.titolo}» deleted from the library."))
     return 0
 
 
@@ -234,8 +238,8 @@ def assi_di_uscita(args) -> dict:
     scrive `--lingua en --sistema metrico` e ottiene inglese con i grammi, che è la
     combinazione che userebbe davvero.
     """
-    lingua = getattr(args, "lingua", "it")
-    sistema = getattr(args, "sistema", None)
+    lingua = getattr(args, "language", "it")
+    sistema = getattr(args, "system", None)
     if sistema is None:
         sistema = "imperiale" if lingua == "en" else "metrico"
     return {"lingua": lingua, "sistema": sistema}
@@ -249,7 +253,7 @@ def lingua_del_parlato(args) -> str | None:
     italiana, ed è anzi il caso più comune. Dedurla dalla lingua richiesta in uscita
     significherebbe dire a Whisper una cosa falsa ogni volta che si traduce.
     """
-    scelta = getattr(args, "lingua_parlato", "auto")
+    scelta = getattr(args, "spoken_language", "auto")
     return None if scelta == "auto" else scelta
 
 
@@ -263,7 +267,7 @@ def comando_export(args) -> int:
     # predefinito era una quarta copia cablata di quel fatto, per giunta RELATIVA — dentro
     # il container avrebbe scritto accanto al codice invece che sul volume persistente.
     destinazione = Path(args.out) if args.out else percorsi.cartella_export()
-    formati = list(dict.fromkeys(args.formato))   # senza duplicati, nell'ordine dato
+    formati = list(dict.fromkeys(args.format))   # senza duplicati, nell'ordine dato
 
     def scrivi_una(ricetta, formato: str) -> Path:
         if formato == "markdown":
@@ -273,10 +277,10 @@ def comando_export(args) -> int:
         return scrivi_melarecipe(ricetta, destinazione)
 
     with Libreria(args.db) as lib:
-        if args.tutte:
+        if args.all:
             ricette = lib.tutte()
             if not ricette:
-                print(spento("Libreria vuota: niente da esportare."))
+                print(spento("The library is empty: nothing to export."))
                 return 0
             for formato in formati:
                 try:
@@ -284,18 +288,18 @@ def comando_export(args) -> int:
                         # Solo Mela ha un formato per più ricette insieme: uno zip che si
                         # importa in un colpo. Markdown e PDF sono un file per ricetta.
                         percorso = scrivi_melarecipes(ricette, destinazione / "libreria")
-                        print(ok(f"✓ {len(ricette)} ricette in {percorso}"))
+                        print(ok(f"✓ {len(ricette)} recipes in {percorso}"))
                     else:
                         for ricetta in ricette:
                             scrivi_una(ricetta, formato)
-                        print(ok(f"✓ {len(ricette)} ricette in {formato} dentro {destinazione}"))
+                        print(ok(f"✓ {len(ricette)} recipes as {formato} in {destinazione}"))
                 except ErroreDocumento as e:
                     print(errore(str(e)))
                     return 1
         else:
             ricetta = lib.leggi(args.id)
             if not ricetta:
-                print(errore(f"Nessuna ricetta con id {args.id}."))
+                print(errore(f"No recipe with id {args.id}."))
                 return 1
             for formato in formati:
                 try:
@@ -310,47 +314,47 @@ def comando_serve(args) -> int:
     try:
         import uvicorn
     except ImportError:
-        print(errore("L'interfaccia web richiede le dipendenze «api». Installa con:"))
+        print(errore("The web interface needs the «api» dependencies. Install them with:"))
         print("  uv sync --extra api")
         return 1
     from .api import crea_app
 
-    print(ok(f"\n  Reel2Recipe — interfaccia su http://{args.host}:{args.porta}\n"))
-    print(spento("  Ctrl+C per fermare.\n"))
+    print(ok(f"\n  Reel2Recipe — interface on http://{args.host}:{args.port}\n"))
+    print(spento("  Ctrl+C to stop.\n"))
     uvicorn.run(crea_app(db=args.db, url_ollama=args.ollama),
-                host=args.host, port=args.porta, log_level="warning")
+                host=args.host, port=args.port, log_level="warning")
     return 0
 
 
 def comando_check(args) -> int:
     from . import pipeline
 
-    print(_c("Componenti di Reel2Recipe\n", "1"))
+    print(_c("Reel2Recipe components\n", "1"))
     stato = pipeline.controlla_ambiente(args.ollama)
 
     def riga(etichetta: str, pronto: bool, dettaglio: str = "") -> None:
         segno = ok("✓") if pronto else errore("✗")
         print(f"  {segno} {etichetta}" + (spento(f"  {dettaglio}") if dettaglio else ""))
 
-    riga("ffmpeg (estrazione audio)", stato["ffmpeg"],
-         "" if stato["ffmpeg"] else "manca → brew install ffmpeg")
-    riga("yt-dlp (scaricamento reel)", stato["yt_dlp"],
-         "" if stato["yt_dlp"] else "manca → uv sync")
-    riga("Trascrizione locale (Whisper)", stato["asr_pronto"],
+    riga("ffmpeg (audio extraction)", stato["ffmpeg"],
+         "" if stato["ffmpeg"] else "missing → brew install ffmpeg")
+    riga("yt-dlp (reel download)", stato["yt_dlp"],
+         "" if stato["yt_dlp"] else "missing → uv sync")
+    riga("Local transcription (Whisper)", stato["asr_pronto"],
          ", ".join(stato["asr_backend"]) if stato["asr_backend"]
-         else "manca → uv sync --extra asr")
-    riga("Ollama (LLM locale)", stato["ollama_attivo"],
-         "" if stato["ollama_attivo"] else "spento → ollama serve")
-    riga("Modelli LLM", bool(stato["modelli_llm"]),
+         else "missing → uv sync --extra asr")
+    riga("Ollama (local LLM)", stato["ollama_attivo"],
+         "" if stato["ollama_attivo"] else "down → ollama serve")
+    riga("LLM models", bool(stato["modelli_llm"]),
          ", ".join(stato["modelli_llm"]) if stato["modelli_llm"]
-         else f"nessuno → ollama pull {stato['modello_consigliato']}")
+         else f"none → ollama pull {stato['modello_consigliato']}")
 
     print()
     if stato["pronto"]:
-        print(ok("  Tutto pronto per estrarre ricette.") if stato["asr_pronto"]
-              else avviso("  Pronto per le didascalie; per il parlato installa Whisper (uv sync --extra asr)."))
+        print(ok("  Everything is ready to extract recipes.") if stato["asr_pronto"]
+              else avviso("  Ready for captions; for speech install Whisper (uv sync --extra asr)."))
         return 0
-    print(errore("  Manca qualcosa di essenziale. Esegui ./install.sh per sistemare tutto."))
+    print(errore("  Something essential is missing. Run ./install.sh to sort it out."))
     return 1
 
 
@@ -360,72 +364,98 @@ def comando_check(args) -> int:
 
 
 def _parser() -> argparse.ArgumentParser:
+    """La superficie pubblica del programma, in inglese.
+
+    Ogni nome porta con sé il suo vecchio nome italiano come **alias**, e non è una
+    cortesia: `--porta` compare nella riga con cui l'add-on Home Assistant avvia il
+    server, che vive in un altro repository. Quella riga ha già ucciso l'add-on una volta
+    (argparse esce con codice 2, s6 riavvia all'infinito, l'Ingress risponde 502 senza
+    nominare la causa). Un alias costa una stringa e rende la rinomina impossibile da
+    sbagliare; toglierlo si può fare più avanti, deliberatamente e su entrambi i repo.
+    """
     p = argparse.ArgumentParser(
         prog="r2r",
-        description="Reel2Recipe — estrae ricette dai reel e le porta in Mela. Tutto in locale.",
+        description="Reel2Recipe — extracts recipes from reels and takes them to Mela. All local.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p.add_argument("--version", action="version", version=f"Reel2Recipe {__version__}")
-    p.add_argument("--db", default=None, help="percorso del database (default: workspace/ricette.db)")
-    p.add_argument("--ollama", default="http://localhost:11434", help="URL del server Ollama")
+    p.add_argument("--db", default=None,
+                   help="path to the database (default: workspace/ricette.db)")
+    p.add_argument("--ollama", default="http://localhost:11434", help="URL of the Ollama server")
 
     sub = p.add_subparsers(dest="comando", required=True)
 
-    c = sub.add_parser("cook", help="estrae una ricetta da un reel (url o file)")
-    c.add_argument("sorgente", help="URL del reel oppure percorso di un file video/audio")
-    c.add_argument("--didascalia", help="testo del post, per i file locali senza metadati")
+    c = sub.add_parser("cook", help="extract a recipe from a reel (url or file)")
+    c.add_argument("sorgente", metavar="SOURCE",
+                   help="URL of the reel, or path to a video/audio file")
+    c.add_argument("--caption", "--didascalia", dest="caption",
+                   help="text of the post, for local files without metadata")
     c.add_argument("--asr", default="auto", choices=["auto", "mlx", "faster-whisper"],
-                   help="backend di trascrizione")
-    c.add_argument("--lingua-parlato", default="auto", choices=["auto", "it", "en"],
-                   help="lingua parlata nel reel (default: auto, la riconosce Whisper)")
-    c.add_argument("--modello", help="modello Ollama da usare (default: il migliore installato)")
+                   help="transcription backend")
+    c.add_argument("--spoken-language", "--lingua-parlato", dest="spoken_language",
+                   default="auto", choices=["auto", "it", "en"],
+                   help="language spoken in the reel (default: auto, Whisper detects it)")
+    c.add_argument("--model", "--modello", dest="model",
+                   help="Ollama model to use (default: the best one installed)")
     c.add_argument("--cookies", metavar="BROWSER",
-                   help="usa i cookie del browser (chrome/safari/firefox) per i reel privati")
-    c.add_argument("--no-audio", action="store_true", help="salta la trascrizione, usa solo la didascalia")
-    c.add_argument("--lingua", default="it", choices=["it", "en"],
-                   help="lingua della ricetta prodotta (default: it)")
-    c.add_argument("--sistema", default=None, choices=["metrico", "imperiale"],
-                   help="sistema di misura (default: metrico con --lingua it, imperiale con en)")
-    c.add_argument("--no-salva", action="store_true", help="non salvare in libreria")
-    c.add_argument("--export", metavar="CARTELLA", help="esporta subito il .melarecipe in questa cartella")
+                   help="use the browser's cookies (chrome/safari/firefox) for private reels")
+    c.add_argument("--no-audio", action="store_true",
+                   help="skip transcription, use the caption only")
+    c.add_argument("--language", "--lingua", dest="language",
+                   default="it", choices=["it", "en"],
+                   help="language of the recipe produced (default: it)")
+    c.add_argument("--system", "--sistema", dest="system",
+                   default=None, choices=["metrico", "imperiale"],
+                   help="measurement system (default: metric with --language it, imperial with en)")
+    c.add_argument("--no-save", "--no-salva", dest="no_save", action="store_true",
+                   help="do not save to the library")
+    c.add_argument("--export", metavar="FOLDER",
+                   help="export the .melarecipe to this folder straight away")
     c.set_defaults(func=comando_cook)
 
-    b = sub.add_parser("batch", help="lavora molti reel in serie")
-    b.add_argument("sorgente", help="cartella di file oppure .txt con un URL per riga")
+    b = sub.add_parser("batch", help="process many reels in a row")
+    b.add_argument("sorgente", metavar="SOURCE",
+                   help="folder of files, or a .txt with one URL per line")
     b.add_argument("--asr", default="auto", choices=["auto", "mlx", "faster-whisper"])
-    b.add_argument("--lingua-parlato", default="auto", choices=["auto", "it", "en"])
-    b.add_argument("--lingua", default="it", choices=["it", "en"])
-    b.add_argument("--sistema", default=None, choices=["metrico", "imperiale"])
-    b.add_argument("--export", metavar="PERCORSO", help="esporta tutto in un unico .melarecipes")
+    b.add_argument("--spoken-language", "--lingua-parlato", dest="spoken_language",
+                   default="auto", choices=["auto", "it", "en"])
+    b.add_argument("--language", "--lingua", dest="language",
+                   default="it", choices=["it", "en"])
+    b.add_argument("--system", "--sistema", dest="system",
+                   default=None, choices=["metrico", "imperiale"])
+    b.add_argument("--export", metavar="PATH", help="export everything to a single .melarecipes")
     b.set_defaults(func=comando_batch)
 
-    l = sub.add_parser("list", help="elenca o cerca nella libreria")
-    l.add_argument("--cerca", help="cerca fra titoli, ingredienti e procedimenti")
+    l = sub.add_parser("list", help="list or search the library")
+    l.add_argument("--search", "--cerca", dest="search",
+                   help="search across titles, ingredients and methods")
     l.set_defaults(func=comando_list)
 
-    e = sub.add_parser("export", help="esporta in formato Mela")
-    e.add_argument("id", nargs="?", type=int, help="id della ricetta da esportare")
-    e.add_argument("--tutte", action="store_true", help="esporta l'intera libreria in un .melarecipes")
+    e = sub.add_parser("export", help="export in Mela format")
+    e.add_argument("id", nargs="?", type=int, help="id of the recipe to export")
+    e.add_argument("--all", "--tutte", dest="all", action="store_true",
+                   help="export the whole library as one .melarecipes")
     e.add_argument("--out", default=None,
-                   help="cartella di destinazione (default: la cartella export del workspace)")
-    e.add_argument("--formato", nargs="+", choices=("mela", "markdown", "pdf"),
-                   default=["mela"], metavar="FORMATO",
-                   help="mela (predefinito), markdown, pdf — se ne possono chiedere più d'uno")
+                   help="destination folder (default: the workspace export folder)")
+    e.add_argument("--format", "--formato", dest="format", nargs="+",
+                   choices=("mela", "markdown", "pdf"),
+                   default=["mela"], metavar="FORMAT",
+                   help="mela (default), markdown, pdf — more than one can be asked for")
     e.set_defaults(func=comando_export)
 
-    d = sub.add_parser("elimina", help="elimina una ricetta dal ricettario")
-    d.add_argument("id", type=int, help="id della ricetta da eliminare")
-    d.add_argument("--si", action="store_true", help="non chiedere conferma")
+    d = sub.add_parser("delete", aliases=["elimina"], help="delete a recipe from the library")
+    d.add_argument("id", type=int, help="id of the recipe to delete")
+    d.add_argument("--yes", "--si", dest="yes", action="store_true", help="do not ask for confirmation")
     d.set_defaults(func=comando_elimina)
 
-    s = sub.add_parser("serve", help="avvia l'interfaccia web")
+    s = sub.add_parser("serve", help="start the web interface")
     s.add_argument("--host", default="127.0.0.1")
-    # 8500 e non 8000: la porta di default di uvicorn è quasi sempre già occupata da
+    # 8500 e non 8000: la porta predefinita di uvicorn è quasi sempre già occupata da
     # qualcos'altro sulla macchina di sviluppo.
-    s.add_argument("--porta", type=int, default=8500)
+    s.add_argument("--port", "--porta", dest="port", type=int, default=8500)
     s.set_defaults(func=comando_serve)
 
-    k = sub.add_parser("check", help="verifica che i componenti siano pronti")
+    k = sub.add_parser("check", help="verify that the components are ready")
     k.set_defaults(func=comando_check)
 
     return p
@@ -433,13 +463,13 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    if getattr(args, "comando", None) == "export" and not args.tutte and args.id is None:
-        print(errore("Indica l'id della ricetta, oppure usa --tutte."))
+    if getattr(args, "comando", None) == "export" and not args.all and args.id is None:
+        print(errore("Give the recipe id, or use --all."))
         return 1
     try:
         return args.func(args)
     except KeyboardInterrupt:
-        print(spento("\nInterrotto."))
+        print(spento("\nInterrupted."))
         return 130
 
 

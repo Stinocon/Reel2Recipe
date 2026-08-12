@@ -10,11 +10,13 @@
 # build, a differenza di progetti con frontend compilati: `web/` è HTML/CSS/JS statico che
 # l'API serve direttamente.
 #
-# Uso:  bash tools/serve.sh                (porta sovrascrivibile con R2R_PORTA)
+# Uso:  bash tools/serve.sh                (porta sovrascrivibile con R2R_PORT)
 set -uo pipefail   # niente -e: l'avvio della sessione non deve fallire per un curl andato male
 
 RADICE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PORTA="${R2R_PORTA:-8500}"
+# R2R_PORTA resta accettata: e' il nome che aveva prima della rinomina all'inglese, e
+# puo' essere gia' esportata in una shell aperta o in un file di ambiente locale.
+PORTA="${R2R_PORT:-${R2R_PORTA:-8500}}"
 
 if curl -sf --connect-timeout 2 --max-time 4 "http://127.0.0.1:${PORTA}/api/stato" >/dev/null 2>&1; then
   echo "[web] già attiva su http://localhost:${PORTA}"
