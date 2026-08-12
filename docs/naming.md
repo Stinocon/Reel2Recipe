@@ -42,12 +42,15 @@ delicate code in the project (`AGENTS.md §3`) — and it is 1270 lines. It want
 that starts on it, not the tail of one that has been doing something else all day.
 
 1. **Done:** `asr.py` (the reference for how prose is handled), `percorsi.py` → `paths.py`,
-   `audio.py`, `acquire.py`. All leaves: nothing but the standard library below them.
+   `audio.py`, `acquire.py` — all leaves — and `store.py`, whose SQL schema and listing keys
+   stay Italian as *format* (the reason is in its docstring).
 2. **Next, on a fresh session:** `units.py`, then `recipe.py`. Highest risk, and everything
    downstream depends on the names they settle. `recipe.py` is where the compatibility net
    for `from_dict` goes in, in the same commit as the field renames.
-3. **Then, once each:** `store.py`, `mela.py`, `documenti.py`, `extract.py`, `pipeline.py`,
-   `api.py`, `cli.py` (internals only — its public surface is already English).
+3. **Then, once each:** `mela.py`, `documenti.py` → `documents.py`, `extract.py`,
+   `pipeline.py`, `api.py`, `cli.py` (internals only — its public surface is already
+   English). Every one of these reads `Recipe`'s fields, which is why they come after it and
+   not before: converting one now buys a second pass over the same file for nothing.
 4. **Last:** `web/app.js` in the same commit as the `Recipe` field renames it reads, then
    the `data/*.yaml` keys with their loader, then `docs/`.
 
@@ -70,6 +73,7 @@ destructive migration this migration is avoiding.
 | `quantita_raw`, `unita_raw` | the JSON schema the local model answers with (`extract.py`) — changing it means re-running the model gate |
 | `unita.yaml`, `densita.yaml`, `vaghe.yaml`, `ricette.db` | file names |
 | the keys inside `data/*.yaml` | renamed in their own step, together with their loader |
+| the SQL table and column names in `store.py` | written inside every database on disk; renaming them means `ALTER TABLE` over live data |
 
 The Python *names* around them change; the strings do not. Where a value is user-facing, add
 the English spelling as a synonym rather than replacing it — as the CLI does with `--porta`
