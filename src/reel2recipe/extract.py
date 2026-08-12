@@ -35,9 +35,14 @@ import httpx
 
 URL_OLLAMA_PREDEFINITO = "http://localhost:11434"
 
-# Modelli, in ordine di preferenza. Qwen2.5 è multilingue, se la cava bene con l'italiano
-# e rispetta gli schemi JSON; il 14b è più accurato sugli elenchi lunghi di ingredienti,
-# il 7b è più che sufficiente e molto più rapido.
+# Modelli, in ordine di preferenza. Qwen2.5 è multilingue, se la cava bene con l'italiano e
+# rispetta gli schemi JSON.
+#
+# Il primo della lista è quello da consigliare, ed è il 14b. Qui c'era scritto che il 7b «è
+# più che sufficiente e molto più rapido»: la seconda metà è vera, la prima no. Su reel veri
+# il 7b perde i gruppi di ingredienti e inventa le dosi — che è precisamente il danno che §3
+# e §4 esistono per impedire, e non lo compensa nessuna velocità. Resta in lista come ripiego
+# per chi ha solo quello installato, non come alternativa equivalente.
 MODELLI_PREFERITI = ("qwen2.5:14b", "qwen2.5:7b-instruct", "qwen2.5:7b", "llama3.1:8b", "mistral")
 
 # Cinque minuti bastano su un Mac con GPU. Su una CPU senza acceleratore — il caso

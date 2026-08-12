@@ -80,9 +80,16 @@ async function aggiornaStato() {
     if (!s.pronto) {
       pallino.className = 'pallino ko';
       testo.textContent = s.ollama_attivo ? 'nessun modello LLM' : 'Ollama spento';
+      // Il messaggio non dà per scontato di girare su una macchina di sviluppo: dentro
+      // l'add-on Home Assistant non c'è una shell dove digitare `ollama pull`, e il modello
+      // se lo scarica l'add-on da solo — dire «esegui» lì è un consiglio che non si può
+      // seguire. Prima si dichiara lo stato, poi il comando, per chi ha dove darlo.
       $('#cook-nota').textContent = s.ollama_attivo
-        ? 'Nessun modello installato. Esegui: ollama pull qwen2.5:7b-instruct'
-        : 'Ollama non è attivo. Avvialo con: ollama serve — oppure esegui ./install.sh';
+        ? `Nessun modello di linguaggio disponibile. Se l'installazione è appena avvenuta `
+          + `può essere ancora in scaricamento: sono diversi GB e il registro lo dice. `
+          + `Su un'installazione locale: ollama pull ${s.modello_consigliato}`
+        : `Ollama non risponde. Nell'add-on parte da solo, quindi conviene guardare il `
+          + `registro; su un'installazione locale avvialo con: ollama serve`;
       $('#cook-nota').classList.add('errore');
     } else if (!s.asr_pronto) {
       pallino.className = 'pallino parziale';
