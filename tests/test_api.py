@@ -87,6 +87,21 @@ def test_cook_inoltra_le_opzioni_di_lavorazione(client, spia):
     assert ricevuti["salta_audio"] is True
 
 
+def test_cook_non_dichiara_una_lingua_del_parlato_che_non_sa(client, spia):
+    """Senza una scelta esplicita, a Whisper non si dice nulla: la riconosce da sé.
+
+    Non basta che `asr.LINGUA_PREDEFINITA` sia `None` — l'API deve anche non inventarsi
+    un valore per conto suo, per esempio deducendolo dalla lingua richiesta in uscita.
+    """
+    client.post("/api/cook", json={"url": "https://esempio.test/reel/1", "lingua": "en"})
+    assert spia()["lingua_audio"] is None
+
+
+def test_cook_inoltra_la_lingua_del_parlato_forzata(client, spia):
+    client.post("/api/cook", json={"url": "https://esempio.test/reel/1", "lingua_audio": "en"})
+    assert spia()["lingua_audio"] == "en"
+
+
 def test_cook_senza_url_e_rifiutato(client):
     assert client.post("/api/cook", json={"url": "   "}).status_code == 422
 
@@ -103,7 +118,8 @@ def test_cook_file_inoltra_tutte_le_opzioni(client, spia):
     risposta = client.post(
         "/api/cook-file",
         params={"backend_asr": "faster-whisper", "modello_llm": "qwen2.5:14b",
-                "salta_audio": "true", "lingua": "en", "didascalia": "una prova"},
+                "salta_audio": "true", "lingua": "en", "lingua_audio": "it",
+                "didascalia": "una prova"},
         files={"file": ("reel.mp4", b"non un video vero", "video/mp4")},
     )
     assert risposta.status_code == 200
@@ -115,6 +131,7 @@ def test_cook_file_inoltra_tutte_le_opzioni(client, spia):
     assert ricevuti["didascalia"] == "una prova"
     assert ricevuti["lingua"] == "en"
     assert ricevuti["sistema"] == "imperiale"
+    assert ricevuti["lingua_audio"] == "it"
 
 
 def test_cook_file_ripulisce_il_temporaneo(client, spia):

@@ -91,6 +91,10 @@ class RichiestaCook(BaseModel):
     modello_llm: str | None = None
     salta_audio: bool = False
     cookies_da_browser: str | None = None
+    # La lingua PARLATA nel reel, che riguarda l'ingresso e non l'uscita. `None` significa
+    # «la riconosce Whisper», ed è il predefinito: dedurla dalla lingua richiesta in uscita
+    # significherebbe dichiarare una lingua falsa ogni volta che si traduce.
+    lingua_audio: str | None = None
     # I due assi di uscita. Se il sistema non è chiesto segue la lingua, ma resta
     # sovrascrivibile: inglese con i grammi è una combinazione reale.
     lingua: str = "it"
@@ -141,7 +145,7 @@ def crea_app(db: str | None = None, url_ollama: str = "http://localhost:11434") 
     @app.post("/api/cook-file")
     async def cook_file(file: UploadFile, didascalia: str = "",
                         backend_asr: str = "auto", modello_llm: str | None = None,
-                        salta_audio: bool = False,
+                        salta_audio: bool = False, lingua_audio: str | None = None,
                         lingua: str = "it", sistema: str | None = None) -> dict:
         """Come sopra, ma da un file caricato dalla pagina (trascina-e-rilascia).
 
@@ -157,7 +161,8 @@ def crea_app(db: str | None = None, url_ollama: str = "http://localhost:11434") 
 
         richiesta = RichiestaCook(
             didascalia=didascalia, backend_asr=backend_asr, modello_llm=modello_llm,
-            salta_audio=salta_audio, lingua=lingua, sistema=sistema,
+            salta_audio=salta_audio, lingua_audio=lingua_audio,
+            lingua=lingua, sistema=sistema,
         )
         lavoro = registro.nuovo()
         threading.Thread(
@@ -315,7 +320,8 @@ def _esegui_da_url(registro: RegistroLavori, lavoro: Lavoro, richiesta: Richiest
         esito = pipeline.da_url(
             richiesta.url, _avanzamento(registro, lavoro),
             cookies_da_browser=richiesta.cookies_da_browser,
-            backend_asr=richiesta.backend_asr, modello_llm=richiesta.modello_llm,
+            backend_asr=richiesta.backend_asr, lingua_audio=richiesta.lingua_audio,
+            modello_llm=richiesta.modello_llm,
             salta_audio=richiesta.salta_audio, url_ollama=url_ollama,
             **richiesta.assi(),
         )
@@ -332,7 +338,8 @@ def _esegui_da_file(registro: RegistroLavori, lavoro: Lavoro, percorso: Path,
         esito = pipeline.da_file(
             percorso, didascalia=richiesta.didascalia or "",
             su_avanzamento=_avanzamento(registro, lavoro), url_ollama=url_ollama,
-            backend_asr=richiesta.backend_asr, modello_llm=richiesta.modello_llm,
+            backend_asr=richiesta.backend_asr, lingua_audio=richiesta.lingua_audio,
+            modello_llm=richiesta.modello_llm,
             salta_audio=richiesta.salta_audio,
             **richiesta.assi(),
         )

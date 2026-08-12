@@ -58,7 +58,8 @@ def comando_cook(args) -> int:
             esito = pipeline.da_url(
                 sorgente, _avanzamento_cli,
                 cookies_da_browser=args.cookies,
-                backend_asr=args.asr, modello_llm=args.modello,
+                backend_asr=args.asr, lingua_audio=lingua_del_parlato(args),
+                modello_llm=args.modello,
                 salta_audio=args.no_audio, url_ollama=args.ollama,
                 **assi_di_uscita(args),
             )
@@ -66,7 +67,8 @@ def comando_cook(args) -> int:
             esito = pipeline.da_file(
                 sorgente, didascalia=args.didascalia or "",
                 su_avanzamento=_avanzamento_cli,
-                backend_asr=args.asr, modello_llm=args.modello,
+                backend_asr=args.asr, lingua_audio=lingua_del_parlato(args),
+                modello_llm=args.modello,
                 salta_audio=args.no_audio, url_ollama=args.ollama,
                 **assi_di_uscita(args),
             )
@@ -152,11 +154,13 @@ def comando_batch(args) -> int:
             try:
                 if tipo == "url":
                     esito = pipeline.da_url(elemento, _avanzamento_cli,
-                                            backend_asr=args.asr, url_ollama=args.ollama,
+                                            backend_asr=args.asr, lingua_audio=lingua_del_parlato(args),
+                                            url_ollama=args.ollama,
                                             **assi_di_uscita(args))
                 else:
                     esito = pipeline.lavora(elemento, _avanzamento_cli,
-                                            backend_asr=args.asr, url_ollama=args.ollama,
+                                            backend_asr=args.asr, lingua_audio=lingua_del_parlato(args),
+                                            url_ollama=args.ollama,
                                             **assi_di_uscita(args))
             except pipeline.NonEUnaRicetta as e:
                 print(avviso(f"  ⚠ saltato: {e}\n"))
@@ -235,6 +239,18 @@ def assi_di_uscita(args) -> dict:
     if sistema is None:
         sistema = "imperiale" if lingua == "en" else "metrico"
     return {"lingua": lingua, "sistema": sistema}
+
+
+def lingua_del_parlato(args) -> str | None:
+    """La lingua da dichiarare a Whisper, oppure `None` per fargliela riconoscere.
+
+    **Non è un asse di uscita e non segue `--lingua`.** È la lingua *parlata nel reel*,
+    che è un fatto dell'ingresso: un reel inglese può benissimo produrre una ricetta
+    italiana, ed è anzi il caso più comune. Dedurla dalla lingua richiesta in uscita
+    significherebbe dire a Whisper una cosa falsa ogni volta che si traduce.
+    """
+    scelta = getattr(args, "lingua_parlato", "auto")
+    return None if scelta == "auto" else scelta
 
 
 def comando_export(args) -> int:
@@ -360,6 +376,8 @@ def _parser() -> argparse.ArgumentParser:
     c.add_argument("--didascalia", help="testo del post, per i file locali senza metadati")
     c.add_argument("--asr", default="auto", choices=["auto", "mlx", "faster-whisper"],
                    help="backend di trascrizione")
+    c.add_argument("--lingua-parlato", default="auto", choices=["auto", "it", "en"],
+                   help="lingua parlata nel reel (default: auto, la riconosce Whisper)")
     c.add_argument("--modello", help="modello Ollama da usare (default: il migliore installato)")
     c.add_argument("--cookies", metavar="BROWSER",
                    help="usa i cookie del browser (chrome/safari/firefox) per i reel privati")
@@ -375,6 +393,7 @@ def _parser() -> argparse.ArgumentParser:
     b = sub.add_parser("batch", help="lavora molti reel in serie")
     b.add_argument("sorgente", help="cartella di file oppure .txt con un URL per riga")
     b.add_argument("--asr", default="auto", choices=["auto", "mlx", "faster-whisper"])
+    b.add_argument("--lingua-parlato", default="auto", choices=["auto", "it", "en"])
     b.add_argument("--lingua", default="it", choices=["it", "en"])
     b.add_argument("--sistema", default=None, choices=["metrico", "imperiale"])
     b.add_argument("--export", metavar="PERCORSO", help="esporta tutto in un unico .melarecipes")

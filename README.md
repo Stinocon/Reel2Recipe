@@ -137,9 +137,20 @@ uv run r2r cook <url> --lingua en --sistema metrico  # inglese, ma con grammi e 
 uv run r2r cook <url> --sistema imperiale            # italiano, ma con cup e once
 ```
 
-Nell'interfaccia web ci sono due selettori nelle *Opzioni*. Il sistema, se non lo scegli,
-segue la lingua (italiano → metrico, inglese → imperiale), ma puoi incrociarli: un inglese o
-un australiano legge in inglese e cucina in grammi.
+Nell'interfaccia web gli stessi due selettori stanno nelle *Opzioni*. Il sistema, se non lo
+scegli, segue la lingua (italiano → metrico, inglese → imperiale), ma puoi incrociarli: un
+inglese o un australiano legge in inglese e cucina in grammi.
+
+C'è poi un terzo asse che non c'entra con questi due, perché riguarda l'**ingresso**: la
+lingua *parlata* nel reel, che serve a Whisper per trascrivere. Di base non gliela si dichiara
+affatto — la riconosce da sé, che è la cosa che sa fare — e questo è ciò che permette di
+lavorare un reel inglese e ottenerne una ricetta italiana. Non segue la lingua di uscita,
+perché tradurre è il caso normale. Si può forzare quando il riconoscimento sbaglia, per
+esempio su un audio molto corto o rumoroso:
+
+```bash
+uv run r2r cook <url> --lingua-parlato en    # è parlato in inglese, non indovinare
+```
 
 La differenza fra i due assi è netta. Il **sistema** cambia i numeri e lo fa il codice, in
 modo deterministico: "1 cup di farina" diventa 120 g in metrico e resta "1 cup" in imperiale,
