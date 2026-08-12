@@ -123,30 +123,36 @@ Puoi anche **trascinare un video** direttamente nella pagina.
 uv run r2r cook https://www.instagram.com/reel/XXXXX/
 
 # Da un file già salvato, con la didascalia incollata
-uv run r2r cook ~/Video/reel.mp4 --didascalia "1 cup farina, 2 uova..."
+uv run r2r cook ~/Video/reel.mp4 --caption "1 cup farina, 2 uova..."
 
 # Molti reel in serie: una cartella di video, o un .txt con un URL per riga
 uv run r2r batch ~/Video/reel-da-lavorare/ --export workspace/export/
 # (i file audio che Reel2Recipe estrae da sé vengono saltati: niente doppie lavorazioni)
 
 # Cerca nel ricettario
-uv run r2r list --cerca "zucchine"
+uv run r2r list --search "zucchine"
 
 # Esporta
 uv run r2r export 42                    # una ricetta, per Mela
-uv run r2r export --tutte               # l'intero ricettario in un .melarecipes
-uv run r2r export 42 --formato pdf      # oppure markdown, o più formati insieme
-uv run r2r export 42 --formato markdown pdf mela
+uv run r2r export --all                 # l'intero ricettario in un .melarecipes
+uv run r2r export 42 --format pdf       # oppure markdown, o più formati insieme
+uv run r2r export 42 --format markdown pdf mela
 
-# Elimina una ricetta dal ricettario (chiede conferma; --si per saltarla)
-uv run r2r elimina 42
+# Elimina una ricetta dal ricettario (chiede conferma; --yes per saltarla)
+uv run r2r delete 42
 ```
+
+> **I nomi dei comandi e delle opzioni sono in inglese**, come il resto della superficie
+> pubblica. I vecchi nomi italiani restano accettati come alias — `--lingua`, `--sistema`,
+> `--didascalia`, `--modello`, `--cerca`, `--formato`, `--tutte`, `--si`, `--porta` e il
+> comando `elimina`, oltre alla variabile `R2R_PORTA` — quindi quello che hai già scritto o
+> messo in uno script continua a funzionare.
 
 ### Se non usi Mela
 
 `.melarecipe` è il formato migliore *se* hai Mela. Altrimenti la stessa ricetta esce in
 **Markdown** (si apre ovunque e resta modificabile) o in **PDF** (si stampa e si manda),
-dalla riga di comando con `--formato` o dai bottoni sotto la scheda nell'interfaccia web.
+dalla riga di comando con `--format` o dai bottoni sotto la scheda nell'interfaccia web.
 
 Tutti e tre i formati riportano anche le **lacune** e le quantità che sono stime nostre: un
 PDF pulito che nascondesse le incertezze sarebbe più bello e più pericoloso. Il Markdown non
@@ -167,9 +173,9 @@ chi cucina in una lingua e vive in un'altra è anzi quella giusta.
 Da riga di comando l'interfaccia non c'è, quindi gli assi sono due e partono dalla ricetta:
 
 ```bash
-uv run r2r cook <url> --lingua en                    # ricetta in inglese, misure imperiali
-uv run r2r cook <url> --lingua en --sistema metrico  # inglese, ma con grammi e ml
-uv run r2r cook <url> --sistema imperiale            # italiano, ma con cup e once
+uv run r2r cook <url> --language en                    # ricetta in inglese, misure imperiali
+uv run r2r cook <url> --language en --system metrico   # inglese, ma con grammi e ml
+uv run r2r cook <url> --system imperiale               # italiano, ma con cup e once
 ```
 
 Nell'interfaccia web gli stessi due selettori stanno nelle *Opzioni*, e di base seguono
@@ -185,7 +191,7 @@ perché tradurre è il caso normale. Si può forzare quando il riconoscimento sb
 esempio su un audio molto corto o rumoroso:
 
 ```bash
-uv run r2r cook <url> --lingua-parlato en    # è parlato in inglese, non indovinare
+uv run r2r cook <url> --spoken-language en    # è parlato in inglese, non indovinare
 ```
 
 La differenza fra i due assi è netta. Il **sistema** cambia i numeri e lo fa il codice, in
@@ -232,7 +238,7 @@ Poche, e servono tutte a far girare il prodotto dove i percorsi predefiniti non 
 | `R2R_WORKSPACE` | Sposta la radice dei dati (libreria, media, export). Predefinito: `workspace/` accanto al repo |
 | `R2R_COOKIES` | File di cookie in formato Netscape per i reel che richiedono l'accesso. Non viene mai modificato: se ne usa una copia temporanea, cancellata a fine scaricamento |
 | `R2R_TIMEOUT_LLM` | Secondi concessi al modello per una risposta — solo la cifra. Predefinito 300: da alzare su CPU senza acceleratore |
-| `R2R_PORTA` | Porta dell'interfaccia avviata da `tools/serve.sh`. Predefinito 8500 |
+| `R2R_PORT` | Porta dell'interfaccia avviata da `tools/serve.sh`. Predefinito 8500. Il vecchio `R2R_PORTA` viene ancora letto |
 
 ### Home Assistant
 

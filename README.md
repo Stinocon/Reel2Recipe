@@ -126,34 +126,35 @@ You can also **drag a video** straight onto the page.
 uv run r2r cook https://www.instagram.com/reel/XXXXX/
 
 # From a file you already have, with the caption pasted in
-uv run r2r cook ~/Videos/reel.mp4 --didascalia "1 cup flour, 2 eggs..."
+uv run r2r cook ~/Videos/reel.mp4 --caption "1 cup flour, 2 eggs..."
 
 # Many reels in a row: a folder of videos, or a .txt with one URL per line
 uv run r2r batch ~/Videos/reels-to-process/ --export workspace/export/
 # (audio files Reel2Recipe extracted itself are skipped: no double processing)
 
 # Search the library
-uv run r2r list --cerca "courgettes"
+uv run r2r list --search "courgettes"
 
 # Export
 uv run r2r export 42                    # one recipe, for Mela
-uv run r2r export --tutte               # the whole library as one .melarecipes
-uv run r2r export 42 --formato pdf      # or markdown, or several formats at once
-uv run r2r export 42 --formato markdown pdf mela
+uv run r2r export --all                 # the whole library as one .melarecipes
+uv run r2r export 42 --format pdf       # or markdown, or several formats at once
+uv run r2r export 42 --format markdown pdf mela
 
-# Delete a recipe from the library (asks for confirmation; --si skips it)
-uv run r2r elimina 42
+# Delete a recipe from the library (asks for confirmation; --yes skips it)
+uv run r2r delete 42
 ```
 
-> The command names and options are Italian, like the rest of the codebase. They are the
-> project's own vocabulary and they are not going to change under you; the *output* is what
-> follows `--lingua`.
+> **If you used the older Italian names**, they still work: `--lingua`, `--sistema`,
+> `--didascalia`, `--modello`, `--cerca`, `--formato`, `--tutte`, `--si`, `--porta` and the
+> `elimina` command are kept as aliases, and so is the `R2R_PORTA` variable. Nothing you have
+> already typed or scripted breaks.
 
 ### If you do not use Mela
 
 `.melarecipe` is the best format *if* you have Mela. Otherwise the same recipe comes out as
 **Markdown** (opens anywhere and stays editable) or **PDF** (prints and sends), from the
-command line with `--formato` or from the buttons under the recipe card in the web interface.
+command line with `--format` or from the buttons under the recipe card in the web interface.
 
 All three formats also carry the **gaps** and the amounts that are our own estimates: a clean
 PDF that hid the uncertainties would be prettier and more dangerous. Markdown needs nothing;
@@ -175,9 +176,9 @@ There is no interface on the command line, so there the axes are two and start f
 recipe:
 
 ```bash
-uv run r2r cook <url> --lingua en                    # recipe in English, imperial units
-uv run r2r cook <url> --lingua en --sistema metrico  # English, but grams and ml
-uv run r2r cook <url> --sistema imperiale            # Italian, but cups and ounces
+uv run r2r cook <url> --language en                    # recipe in English, imperial units
+uv run r2r cook <url> --language en --system metrico   # English, but grams and ml
+uv run r2r cook <url> --system imperiale               # Italian, but cups and ounces
 ```
 
 In the web interface the same two selectors live under *Options*, and by default follow the
@@ -193,7 +194,7 @@ does not follow the output language, because translating is the normal case. You
 when detection gets it wrong, for instance on very short or noisy audio:
 
 ```bash
-uv run r2r cook <url> --lingua-parlato en    # it is spoken in English, do not guess
+uv run r2r cook <url> --spoken-language en    # it is spoken in English, do not guess
 ```
 
 The difference between the two output axes is sharp. The **system** changes the numbers and
@@ -241,7 +242,7 @@ Few, and all of them exist to run the product where the default paths do not sui
 | `R2R_WORKSPACE` | Moves the data root (library, media, exports). Default: `workspace/` next to the repo |
 | `R2R_COOKIES` | Netscape-format cookie file for reels that require signing in. It is never modified: a temporary copy is used and deleted when the download ends |
 | `R2R_TIMEOUT_LLM` | Seconds granted to the model for one answer — the number alone. Default 300: raise it on a CPU without an accelerator |
-| `R2R_PORTA` | Port for the interface started by `tools/serve.sh`. Default 8500 |
+| `R2R_PORT` | Port for the interface started by `tools/serve.sh`. Default 8500. The old `R2R_PORTA` is still read |
 
 ### Home Assistant
 
