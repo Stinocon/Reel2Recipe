@@ -28,7 +28,7 @@ is mandatory.
    loses the reasoning is worse than the Italian it replaced.
 2. Update every caller, plus the tests that name it.
 3. `./check.sh` green **before** moving to the next module. Never leave a half-renamed tree.
-4. Leaves first, `units.py` and `recipe.py` last: everything depends on them.
+4. Follow the order below, and update it when working on it teaches you something.
 
 ### Order — revised after the first four modules
 
