@@ -1,0 +1,446 @@
+/* Reel2Recipe — foglio di stile.
+ *
+ * Estetica "cucina accogliente": tonalità calde di crema e terracotta, un accento
+ * verde-erba, tipografia con una serif per i titoli. Niente dipendenze esterne, niente
+ * framework: tutto qui dentro, così l'interfaccia funziona anche offline.
+ * Chiaro e scuro entrambi supportati.
+ */
+
+:root {
+  --crema: #faf6f0;
+  --crema-scura: #f2ebe0;
+  --carta: #ffffff;
+  --inchiostro: #2b2420;
+  --inchiostro-tenue: #6b5d52;
+  --terracotta: #d9714e;
+  --terracotta-scura: #c05a38;
+  --erba: #6a8f5f;
+  --erba-chiara: #e8f0e2;
+  --oro: #e0a458;
+  --bordo: #e6ddd0;
+  --ombra: 0 4px 20px rgba(80, 60, 40, 0.08);
+  --ombra-forte: 0 12px 40px rgba(80, 60, 40, 0.16);
+  --raggio: 16px;
+  --raggio-piccolo: 10px;
+  --serif: 'Georgia', 'Times New Roman', serif;
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --crema: #1c1815;
+    --crema-scura: #16120f;
+    --carta: #26211d;
+    --inchiostro: #f0e9e0;
+    --inchiostro-tenue: #a89a8c;
+    --erba-chiara: #223020;
+    --bordo: #3a332c;
+    --ombra: 0 4px 20px rgba(0, 0, 0, 0.3);
+    --ombra-forte: 0 12px 40px rgba(0, 0, 0, 0.5);
+  }
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* Le icone dell'interfaccia (Material Symbols incorporate, v. icone.js e NOTICE.md).
+   `currentColor` nel loro fill fa il resto: seguono il colore del testo che le circonda,
+   quindi non serve una variante per ogni contesto. `display: block` toglie lo spazio che
+   il browser riserva sotto un elemento inline, che le disallineerebbe dal testo. */
+.ic { display: block; flex-shrink: 0; }
+
+/* L'attributo `hidden` deve vincere sempre. Il browser lo implementa con
+   `[hidden] { display: none }`, che ha la stessa specificità di un selettore di classe:
+   una regola come `.modale { display: flex }`, venendo dopo, lo annullerebbe e mostrerebbe
+   l'elemento all'avvio. È già successo con il pannello opzioni e con i due overlay, che
+   sfocavano l'intera pagina col loro backdrop-filter. */
+[hidden] { display: none !important; }
+
+body {
+  font-family: var(--sans);
+  color: var(--inchiostro);
+  background: var(--crema);
+  line-height: 1.55;
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+}
+
+.sfondo-decorativo {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(217, 113, 78, 0.07), transparent 42%),
+    radial-gradient(circle at 88% 18%, rgba(106, 143, 95, 0.07), transparent 42%),
+    radial-gradient(circle at 50% 100%, rgba(224, 164, 88, 0.05), transparent 55%);
+}
+
+/* ---------- Intestazione ---------- */
+
+.intestazione {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.marchio { display: flex; align-items: center; gap: 0.9rem; }
+.marchio-icona {
+  display: flex; align-items: center; justify-content: center;
+  width: 52px; height: 52px; border-radius: 14px; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--terracotta), var(--terracotta-scura));
+  color: #fff; box-shadow: 0 4px 14px rgba(217, 113, 78, 0.3);
+}
+.marchio h1 {
+  font-family: var(--serif);
+  font-size: 1.9rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.sottotitolo { color: var(--inchiostro-tenue); font-size: 0.92rem; }
+
+.stato-ambiente {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--inchiostro-tenue);
+  background: var(--carta);
+  padding: 0.45rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--bordo);
+  cursor: default;
+}
+.pallino {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--inchiostro-tenue);
+  transition: background 0.3s;
+}
+.pallino.ok { background: var(--erba); box-shadow: 0 0 0 3px var(--erba-chiara); }
+.pallino.parziale { background: var(--oro); }
+.pallino.ko { background: var(--terracotta); }
+
+main { max-width: 960px; margin: 0 auto; padding: 1rem 1.5rem 4rem; }
+
+/* ---------- Barra Cook ---------- */
+
+.pannello-cook {
+  background: var(--carta);
+  border: 1px solid var(--bordo);
+  border-radius: var(--raggio);
+  box-shadow: var(--ombra);
+  padding: 1.75rem;
+  margin-bottom: 2.5rem;
+}
+
+.cook-bara { display: flex; gap: 0.75rem; }
+
+.cook-input {
+  flex: 1;
+  font-size: 1.05rem;
+  padding: 0.95rem 1.15rem;
+  border: 2px solid var(--bordo);
+  border-radius: var(--raggio-piccolo);
+  background: var(--crema);
+  color: var(--inchiostro);
+  transition: border-color 0.2s, box-shadow 0.2s;
+  font-family: var(--sans);
+}
+.cook-input:focus {
+  outline: none;
+  border-color: var(--terracotta);
+  box-shadow: 0 0 0 4px rgba(217, 113, 78, 0.12);
+}
+.cook-input::placeholder { color: var(--inchiostro-tenue); }
+
+.btn-cook {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, var(--terracotta), var(--terracotta-scura));
+  border: none;
+  border-radius: var(--raggio-piccolo);
+  padding: 0 1.75rem;
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.2s, opacity 0.2s;
+  box-shadow: 0 4px 14px rgba(217, 113, 78, 0.3);
+  white-space: nowrap;
+}
+.btn-cook:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 7px 20px rgba(217, 113, 78, 0.4); }
+.btn-cook:active:not(:disabled) { transform: translateY(0); }
+.btn-cook:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn-cook-icona { display: flex; }
+.btn-cook.in-corso .btn-cook-icona { animation: sfrigola 0.8s infinite; }
+@keyframes sfrigola { 0%,100% { transform: rotate(-8deg); } 50% { transform: rotate(8deg); } }
+
+.cook-alternative {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.9rem;
+  font-size: 0.88rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.link-file { color: var(--inchiostro-tenue); cursor: pointer; }
+.link-file .sottolineato { color: var(--terracotta); text-decoration: underline; }
+.link-opzioni {
+  background: none; border: none; color: var(--inchiostro-tenue);
+  cursor: pointer; font-size: 0.88rem; font-family: var(--sans);
+}
+.link-opzioni:hover { color: var(--inchiostro); }
+
+.opzioni {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: 1.2rem;
+  padding-top: 1.2rem;
+  border-top: 1px dashed var(--bordo);
+}
+.opzioni label { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.82rem; color: var(--inchiostro-tenue); }
+.opzioni select {
+  padding: 0.55rem 0.7rem; border-radius: var(--raggio-piccolo);
+  border: 1px solid var(--bordo); background: var(--crema); color: var(--inchiostro);
+  font-family: var(--sans); font-size: 0.9rem;
+}
+.opt-check { flex-direction: row !important; align-items: center; gap: 0.5rem !important; grid-column: 1 / -1; }
+
+.cook-nota { margin-top: 0.9rem; font-size: 0.85rem; color: var(--inchiostro-tenue); min-height: 1.2em; }
+.cook-nota.errore { color: var(--terracotta-scura); }
+
+/* ---------- Rilascio file ---------- */
+
+.drop-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(217, 113, 78, 0.12);
+  backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+}
+.drop-messaggio {
+  font-family: var(--serif); font-size: 1.6rem; text-align: center;
+  color: var(--terracotta-scura); line-height: 1.8;
+  border: 3px dashed var(--terracotta); border-radius: 24px;
+  padding: 3rem 4rem; background: var(--carta);
+}
+/* L'icona sta su una riga sua, sopra il testo: centrata a mano perché `display: block`
+   della classe .ic la ancorerebbe a sinistra. */
+.drop-messaggio .ic { margin: 0 auto 0.4rem; }
+
+/* ---------- Avanzamento ---------- */
+
+.pannello-avanzamento {
+  background: var(--carta); border: 1px solid var(--bordo);
+  border-radius: var(--raggio); box-shadow: var(--ombra);
+  padding: 1.5rem 1.75rem; margin-bottom: 2.5rem;
+}
+.fasi { display: flex; flex-direction: column; gap: 0.75rem; }
+.fase {
+  display: flex; align-items: center; gap: 0.75rem;
+  font-size: 0.95rem; color: var(--inchiostro-tenue);
+  opacity: 0.5; transition: opacity 0.3s;
+}
+.fase.attiva { opacity: 1; color: var(--inchiostro); font-weight: 600; }
+.fase.fatta { opacity: 0.9; }
+.fase-icona {
+  width: 26px; height: 26px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--crema-scura); font-size: 0.85rem; flex-shrink: 0;
+}
+.fase.attiva .fase-icona {
+  background: var(--terracotta); color: #fff;
+  animation: pulsa 1.2s infinite;
+}
+.fase.fatta .fase-icona { background: var(--erba); color: #fff; }
+@keyframes pulsa { 0%,100% { box-shadow: 0 0 0 0 rgba(217,113,78,0.4); } 50% { box-shadow: 0 0 0 6px rgba(217,113,78,0); } }
+
+.btn-annulla {
+  margin-top: 1rem; background: none; border: 1px solid var(--bordo);
+  border-radius: var(--raggio-piccolo); padding: 0.5rem 1rem;
+  color: var(--inchiostro-tenue); cursor: pointer; font-family: var(--sans);
+}
+
+/* ---------- Scheda ricetta ---------- */
+
+.scheda-ricetta {
+  background: var(--carta); border: 1px solid var(--bordo);
+  border-radius: var(--raggio); box-shadow: var(--ombra-forte);
+  overflow: hidden; margin-bottom: 2.5rem;
+  animation: entra 0.4s ease;
+}
+@keyframes entra { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+.scheda-copertina { width: 100%; height: 220px; object-fit: cover; background: var(--crema-scura); }
+.scheda-corpo { padding: 1.75rem; }
+.scheda-titolo { font-family: var(--serif); font-size: 1.6rem; margin-bottom: 0.4rem; }
+.scheda-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--inchiostro-tenue); font-size: 0.88rem; margin-bottom: 1.2rem; }
+.scheda-meta span { display: inline-flex; align-items: center; gap: 0.3rem; }
+
+.badge-fonte {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  background: var(--erba-chiara); color: var(--erba);
+  padding: 0.2rem 0.7rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600;
+}
+
+.avviso-incertezze {
+  background: rgba(224, 164, 88, 0.14); border: 1px solid rgba(224, 164, 88, 0.35);
+  border-radius: var(--raggio-piccolo); padding: 0.85rem 1rem;
+  font-size: 0.88rem; margin-bottom: 1.4rem; color: var(--inchiostro);
+}
+.avviso-incertezze strong { color: var(--terracotta-scura); }
+
+.sezione-titolo {
+  font-family: var(--serif); font-size: 1.15rem; margin: 1.4rem 0 0.7rem;
+  padding-bottom: 0.35rem; border-bottom: 2px solid var(--crema-scura);
+}
+.gruppo-titolo { font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--terracotta); margin: 0.8rem 0 0.4rem; font-weight: 700; }
+
+.lista-ingredienti { list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }
+.ingrediente {
+  display: flex; align-items: baseline; gap: 0.5rem;
+  padding: 0.35rem 0; border-bottom: 1px dotted var(--bordo); font-size: 0.96rem;
+}
+.ingrediente .commento { color: var(--inchiostro-tenue); font-size: 0.85rem; }
+.ingrediente.incerta { background: rgba(224, 164, 88, 0.08); border-radius: 6px; padding-left: 0.5rem; }
+.tag-provenienza {
+  font-size: 0.68rem; padding: 0.1rem 0.45rem; border-radius: 999px;
+  background: var(--crema-scura); color: var(--inchiostro-tenue); white-space: nowrap;
+}
+.tag-provenienza.stima { background: rgba(224,164,88,0.2); color: var(--terracotta-scura); }
+
+.lista-procedimento { list-style: none; counter-reset: passo; display: flex; flex-direction: column; gap: 0.7rem; }
+.passo { display: flex; gap: 0.8rem; font-size: 0.96rem; }
+.passo::before {
+  counter-increment: passo; content: counter(passo);
+  flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--erba-chiara); color: var(--erba);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 0.85rem;
+}
+
+.lista-lacune { list-style: none; display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.5rem; }
+.lacuna { font-size: 0.86rem; color: var(--inchiostro-tenue); padding-left: 1.2rem; position: relative; }
+/* Il marcatore è l'icona «warning» delle Material Symbols come data URI: in CSS non si
+   può chiamare la funzione JS delle icone, e un data URI resta comunque offline.
+   Il colore è fissato qui perché un'immagine di sfondo non eredita `color`. */
+.lacuna::before {
+  content: ''; position: absolute; left: 0; top: 0.15rem;
+  width: 0.95rem; height: 0.95rem;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'%3E%3Cpath fill='%23e0a458' d='m40-120 440-760 440 760H40Zm138-80h604L480-720 178-200Zm302-40q17 0 28.5-11.5T520-280q0-17-11.5-28.5T480-320q-17 0-28.5 11.5T440-280q0 17 11.5 28.5T480-240Zm-40-120h80v-200h-80v200Zm40-100Z'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+
+.scheda-azioni { display: flex; gap: 0.75rem; margin-top: 1.8rem; flex-wrap: wrap; }
+
+/* ---------- Pulsanti ---------- */
+
+.btn-primario, .btn-secondario, .btn-testo, .btn-pericolo {
+  font-family: var(--sans); font-size: 0.92rem; font-weight: 600;
+  border-radius: var(--raggio-piccolo); padding: 0.7rem 1.2rem; cursor: pointer;
+  transition: all 0.15s; border: 1px solid transparent;
+  /* inline-flex perché ogni pulsante porta la sua icona accanto al testo: allineate al
+     centro e con uno spazio proprio, invece di dipendere dalla riga di testo. */
+  display: inline-flex; align-items: center; gap: 0.45rem;
+}
+.btn-primario { background: var(--erba); color: #fff; box-shadow: 0 3px 10px rgba(106,143,95,0.3); }
+.btn-primario:hover { background: #5c7d52; transform: translateY(-1px); }
+.btn-secondario { background: var(--crema); color: var(--inchiostro); border-color: var(--bordo); }
+.btn-secondario:hover { border-color: var(--terracotta); color: var(--terracotta); }
+.btn-testo { background: none; color: var(--inchiostro-tenue); padding: 0.7rem 0.5rem; }
+.btn-testo:hover { color: var(--terracotta); }
+
+/* L'unica azione distruttiva dell'interfaccia. Sobria a riposo — non deve attirare il
+   dito — e rossa solo al passaggio, quando l'intenzione è già espressa. */
+.btn-pericolo { background: none; color: var(--inchiostro-tenue); border-color: var(--bordo); }
+.btn-pericolo:hover { background: var(--terracotta-scura); border-color: var(--terracotta-scura); color: #fff; }
+
+/* ---------- Libreria ---------- */
+
+.libreria-testata { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.3rem; flex-wrap: wrap; }
+.libreria-testata h2 { font-family: var(--serif); font-size: 1.5rem; }
+.libreria-azioni { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+.cerca {
+  padding: 0.6rem 1rem; border: 1px solid var(--bordo); border-radius: var(--raggio-piccolo);
+  background: var(--carta); color: var(--inchiostro); font-family: var(--sans); font-size: 0.9rem; min-width: 200px;
+}
+.cerca:focus { outline: none; border-color: var(--terracotta); }
+
+.griglia-ricette { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1.2rem; }
+.carta-ricetta {
+  background: var(--carta); border: 1px solid var(--bordo); border-radius: var(--raggio);
+  overflow: hidden; cursor: pointer; transition: transform 0.15s, box-shadow 0.2s;
+  display: flex; flex-direction: column;
+}
+.carta-ricetta:hover { transform: translateY(-3px); box-shadow: var(--ombra-forte); }
+.carta-copertina {
+  height: 130px; background: var(--crema-scura); background-size: cover; background-position: center;
+  display: flex; align-items: center; justify-content: center;
+  /* Il segnaposto per le ricette senza copertina: presente ma discreto, non deve
+     competere col titolo sotto. */
+  color: var(--bordo);
+}
+.carta-corpo { padding: 0.9rem 1rem; flex: 1; display: flex; flex-direction: column; gap: 0.35rem; }
+.carta-titolo { font-family: var(--serif); font-size: 1.05rem; line-height: 1.3; }
+.carta-meta { font-size: 0.78rem; color: var(--inchiostro-tenue); margin-top: auto; display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.carta-badge-incerta { color: var(--oro); display: inline-flex; align-items: center; gap: 0.25rem; }
+
+.libreria-vuota { text-align: center; color: var(--inchiostro-tenue); padding: 3rem 1rem; font-size: 0.95rem; }
+
+/* ---------- Modale ---------- */
+
+.modale {
+  position: fixed; inset: 0; z-index: 200; background: rgba(43, 36, 32, 0.5);
+  backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 1.5rem;
+}
+.modale-contenuto {
+  background: var(--carta); border-radius: var(--raggio); box-shadow: var(--ombra-forte);
+  max-width: 640px; width: 100%; max-height: 88vh; overflow-y: auto; padding: 1.75rem;
+}
+.campo-modifica { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.9rem; }
+.campo-modifica label { font-size: 0.8rem; color: var(--inchiostro-tenue); font-weight: 600; }
+.campo-modifica input, .campo-modifica textarea {
+  padding: 0.6rem 0.75rem; border: 1px solid var(--bordo); border-radius: var(--raggio-piccolo);
+  background: var(--crema); color: var(--inchiostro); font-family: var(--sans); font-size: 0.92rem; resize: vertical;
+}
+.campo-modifica textarea { min-height: 140px; line-height: 1.6; }
+.suggerimento-modifica { font-size: 0.78rem; color: var(--inchiostro-tenue); margin-bottom: 1rem; }
+
+/* ---------- Toast ---------- */
+
+.toast {
+  position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%);
+  background: var(--inchiostro); color: var(--crema);
+  padding: 0.75rem 1.4rem; border-radius: 999px; box-shadow: var(--ombra-forte);
+  font-size: 0.9rem; z-index: 300; animation: entra 0.3s ease;
+}
+.toast.errore { background: var(--terracotta-scura); }
+
+/* ---------- Piè di pagina ---------- */
+
+.pie-pagina {
+  text-align: center; padding: 2rem 1.5rem 3rem; color: var(--inchiostro-tenue);
+  font-size: 0.82rem; display: flex; flex-direction: column; gap: 0.7rem;
+  max-width: 640px; margin: 0 auto;
+}
+.pie-pagina strong { color: var(--terracotta); }
+/* L'avvertenza è la cosa che conta di più qui dentro: chi porta la ricetta in cucina deve
+   sapere che l'estrazione è automatica. Leggibile, non nascosta in un grigio da nota legale. */
+.pie-avvertenza { font-size: 0.8rem; line-height: 1.6; opacity: 0.9; }
+.pie-collegamenti a { color: var(--inchiostro-tenue); text-decoration: underline; text-underline-offset: 2px; }
+.pie-collegamenti a:hover { color: var(--terracotta); }
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 600px) {
+  .cook-bara { flex-direction: column; }
+  .btn-cook { padding: 0.85rem; justify-content: center; }
+  .opzioni { grid-template-columns: 1fr; }
+  .marchio h1 { font-size: 1.6rem; }
+  main { padding: 0.5rem 1rem 3rem; }
+}

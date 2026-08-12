@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reel2Recipe — dai reel al ricettario</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- Favicon: la stessa icona del marchio (Material Symbols "skillet", v. NOTICE.md),
+       incorporata come data URI. Nessuna richiesta di rete, coerente col resto. -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=&apos;http://www.w3.org/2000/svg&apos; viewBox=&apos;0 -960 960 960&apos;%3E%3Cpath fill=&apos;%23d9714e&apos; d=&apos;M177-560q14-36 4.5-64T149-680q-33-40-43.5-75.5T102-840h78q-8 38-2.5 62t28.5 52q38 46 48.5 81.5t.5 84.5h-78Zm160 0q14-36 5-64t-32-56q-33-40-44-75.5t-4-84.5h78q-8 38-2.5 62t28.5 52q38 46 48.5 81.5t.5 84.5h-78Zm160 0q14-36 5-64t-32-56q-33-40-44-75.5t-4-84.5h78q-8 38-2.5 62t28.5 52q38 46 48.5 81.5t.5 84.5h-78ZM200-160q-50 0-85-35t-35-85v-200h561q5-34 27-59.5t54-36.5l185-62 25 76-185 62q-12 4-19.5 14.5T720-462v182q0 50-35 85t-85 35H200Zm0-80h400q17 0 28.5-11.5T640-280v-120H160v120q0 17 11.5 28.5T200-240Zm200-80Z&apos;/%3E%3C/svg%3E" />
+</head>
+<body>
+  <div class="sfondo-decorativo" aria-hidden="true"></div>
+
+  <header class="intestazione">
+    <div class="marchio">
+      <span class="marchio-icona" data-icona="padella" data-icona-dim="30"></span>
+      <div>
+        <h1>Reel2Recipe</h1>
+        <p class="sottotitolo">Dai reel di cucina al tuo ricettario. Tutto sul tuo computer.</p>
+      </div>
+    </div>
+    <div class="stato-ambiente" id="stato-ambiente" title="Stato dei componenti locali">
+      <span class="pallino" id="pallino-stato"></span>
+      <span id="testo-stato">verifica…</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- ---------- La barra Cook ---------- -->
+    <section class="pannello-cook" id="pannello-cook">
+      <div class="cook-bara">
+        <input
+          type="url"
+          id="input-url"
+          class="cook-input"
+          placeholder="Incolla il link di un reel di cucina…"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button id="btn-cook" class="btn-cook">
+          <span class="btn-cook-testo">Cook</span>
+          <span class="btn-cook-icona" data-icona="padella"></span>
+        </button>
+      </div>
+
+      <div class="cook-alternative">
+        <label class="link-file" for="input-file">
+          <input type="file" id="input-file" accept="video/*,audio/*" hidden />
+          oppure trascina qui un video, o <span class="sottolineato">scegli un file</span>
+        </label>
+        <button class="link-opzioni" id="btn-opzioni" type="button">Opzioni ▾</button>
+      </div>
+
+      <div class="opzioni" id="opzioni" hidden>
+        <label>
+          Trascrizione
+          <select id="opt-asr">
+            <option value="auto">Automatica (consigliata)</option>
+            <option value="mlx">Accelerata (Mac Apple Silicon)</option>
+            <option value="faster-whisper">Portabile (CPU)</option>
+          </select>
+        </label>
+        <label>
+          Modello di linguaggio
+          <select id="opt-modello"><option value="">Il migliore installato</option></select>
+        </label>
+        <label>
+          Lingua della ricetta
+          <select id="opt-lingua">
+            <option value="it">Italiano</option>
+            <option value="en">English</option>
+          </select>
+        </label>
+        <label>
+          Misure
+          <select id="opt-sistema">
+            <option value="">Come la lingua</option>
+            <option value="metrico">Metriche (g, ml)</option>
+            <option value="imperiale">Imperiali (cup, oz)</option>
+          </select>
+        </label>
+        <label class="opt-check">
+          <input type="checkbox" id="opt-no-audio" />
+          Usa solo la didascalia (salta l'audio)
+        </label>
+      </div>
+
+      <p class="cook-nota" id="cook-nota"></p>
+    </section>
+
+    <!-- ---------- Zona di rilascio file ---------- -->
+    <div class="drop-overlay" id="drop-overlay" hidden>
+      <div class="drop-messaggio">
+        <span data-icona="carica" data-icona-dim="40"></span><br />Rilascia qui il video del reel
+      </div>
+    </div>
+
+    <!-- ---------- Avanzamento ---------- -->
+    <section class="pannello-avanzamento" id="pannello-avanzamento" hidden>
+      <div class="fasi" id="fasi"></div>
+      <button class="btn-annulla" id="btn-annulla" hidden>Annulla</button>
+    </section>
+
+    <!-- ---------- Scheda ricetta ---------- -->
+    <section class="scheda-ricetta" id="scheda-ricetta" hidden></section>
+
+    <!-- ---------- Libreria ---------- -->
+    <section class="libreria" id="libreria">
+      <div class="libreria-testata">
+        <h2>Il tuo ricettario</h2>
+        <div class="libreria-azioni">
+          <input type="search" id="input-cerca" class="cerca" placeholder="Cerca fra le ricette…" />
+          <button class="btn-secondario" id="btn-export-tutte">Esporta tutto per Mela</button>
+        </div>
+      </div>
+      <div class="griglia-ricette" id="griglia-ricette"></div>
+      <p class="libreria-vuota" id="libreria-vuota" hidden>
+        Il ricettario è vuoto. Incolla il link di un reel qui sopra e premi Cook per iniziare.
+      </p>
+    </section>
+  </main>
+
+  <footer class="pie-pagina">
+    <p>
+      Interamente locale · nessuna IA online · nessun dato lascia il computer ·
+      esporta in <strong>Mela</strong>, PDF e Markdown
+    </p>
+    <p class="pie-avvertenza">
+      Le quantità convertite vengono da tabelle verificate, ma l'estrazione è automatica:
+      <strong>controlla la ricetta prima di cucinarla.</strong>
+      Le lacune sono sempre dichiarate, mai riempite a caso.
+    </p>
+    <p class="pie-collegamenti">
+      <a href="https://github.com/Stinocon/Reel2Recipe" target="_blank" rel="noopener noreferrer">Codice sorgente</a>
+      ·
+      <a href="https://github.com/Stinocon/Reel2Recipe/blob/main/docs/condizioni-uso.md" target="_blank" rel="noopener noreferrer">Condizioni d'uso</a>
+      ·
+      <a href="https://github.com/Stinocon/Reel2Recipe/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">Licenza MIT</a>
+    </p>
+  </footer>
+
+  <!-- Modale di modifica ricetta -->
+  <div class="modale" id="modale" hidden>
+    <div class="modale-contenuto" id="modale-contenuto"></div>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

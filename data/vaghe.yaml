@@ -1,0 +1,182 @@
+# vaghe.yaml — le misure "a occhio" della cucina, in italiano e in inglese.
+#
+# "q.b.", "un pizzico", "un filo d'olio", "una noce di burro" non sono unità di misura:
+# sono convenzioni linguistiche. Non hanno un valore esatto, ma hanno un valore *tipico*,
+# e ignorarle significherebbe buttare via metà degli ingredienti di un reel.
+#
+# Ogni voce qui dentro produce una quantità con provenienza `stimato:vaghe`, che
+# l'interfaccia e l'export segnalano come stima. Non vengono mai presentate come dati
+# certi: sono un aiuto, non una misurazione.
+#
+# `senza_quantita: true` significa che l'espressione non esprime affatto una quantità
+# ("q.b."): in quel caso non si stima nulla, si conserva la dicitura.
+#
+# ---------------------------------------------------------------------------------
+# PERCHÉ LA NOTA NON STA IN TABELLA
+#
+# La nota che spiega la stima ("un pizzico ≈ 0,5 g") non si scrive qui: si compone dal
+# valore effettivo. Scritta a mano dipenderebbe dalla lingua, mentre il numero dipende dal
+# sistema — e le due cose divergono: in metrico/inglese si otteneva "0,5 g (a pinch is about
+# 1/8 tsp)", una nota che contraddice il numero che accompagna. Qui resta solo il nome
+# dell'espressione per lingua, che è l'unica parte non deducibile.
+#
+# PERCHÉ IL VALORE È DICHIARATO PER SISTEMA
+#
+# Un pizzico in grammi è 0,5; convertirlo meccanicamente in once darebbe 0,018 oz, che non
+# è una misura che qualcuno esegua. In inglese un pizzico si scrive "1/8 tsp", e quello è il
+# dato giusto — non il risultato di una divisione. Quindi il valore tipico si dichiara per
+# ciascun sistema, come si fa per le densità: il numero sta in tabella, non in un calcolo
+# che lo rovina.
+#
+# aggiornato: 2026-07-24
+
+espressioni:
+
+  # ---- non esprimono una quantità -------------------------------------------
+  "q.b.":
+    senza_quantita: true
+    resa:
+      it: "q.b."
+      en: "to taste"
+    alias: [qb, "q b", quanto basta, a piacere, a piacimento, to taste, as needed]
+  "quanto serve":
+    senza_quantita: true
+    resa:
+      it: "q.b."
+      en: "as needed"
+    alias: [al bisogno, se necessario, as required]
+
+  # ---- piccole quantità di condimento ---------------------------------------
+  "un pizzico":
+    nome:
+      it: "un pizzico"
+      en: "a pinch"
+    valore:
+      metrico: {quantita: 0.5, unita: g}
+      imperiale: {quantita: 0.125, unita: tsp}
+    alias: [pizzico, un pizzico di, a pinch, pinch]
+  "una presa":
+    nome:
+      it: "una presa"
+      en: "a pinch"
+    valore:
+      metrico: {quantita: 1.0, unita: g}
+      imperiale: {quantita: 0.25, unita: tsp}
+    alias: [presa, una presa di]
+  "una punta":
+    nome:
+      it: "una punta"
+      en: "a knife tip"
+    valore:
+      metrico: {quantita: 0.5, unita: g}
+      imperiale: {quantita: 0.125, unita: tsp}
+    alias: [punta di coltello, una punta di, knife tip]
+
+  # ---- grassi e liquidi versati a occhio ------------------------------------
+  "un filo":
+    nome:
+      it: "un filo"
+      en: "a drizzle"
+    valore:
+      metrico: {quantita: 5.0, unita: ml}
+      imperiale: {quantita: 1.0, unita: tsp}
+    alias: [filo, un filo di, un giro, un giro di, a drizzle, drizzle]
+  "una noce":
+    nome:
+      it: "una noce"
+      en: "a knob"
+    valore:
+      metrico: {quantita: 10.0, unita: g}
+      imperiale: {quantita: 2.0, unita: tsp}
+    alias: [noce, una noce di, noce di burro, a knob, knob of butter]
+  "un bicchiere":
+    nome:
+      it: "un bicchiere"
+      en: "a glass"
+    valore:
+      metrico: {quantita: 200.0, unita: ml}
+      imperiale: {quantita: 0.75, unita: cup}
+    alias: [bicchiere, un bicchiere di, bicchiere d'acqua, a glass, glass]
+  "mezzo bicchiere":
+    nome:
+      it: "mezzo bicchiere"
+      en: "half a glass"
+    valore:
+      metrico: {quantita: 100.0, unita: ml}
+      imperiale: {quantita: 0.375, unita: cup}
+    alias: [mezzo bicchiere di, half a glass]
+  "una tazza":
+    nome:
+      it: "una tazza"
+      en: "a mug"
+    valore:
+      metrico: {quantita: 240.0, unita: ml}
+      imperiale: {quantita: 1.0, unita: cup}
+    alias: [tazza, una tazza di, tazzina, a mug, mug]
+
+  # ---- quantità a manciate ---------------------------------------------------
+  "una manciata":
+    nome:
+      it: "una manciata"
+      en: "a handful"
+    valore:
+      metrico: {quantita: 30.0, unita: g}
+      imperiale: {quantita: 0.25, unita: cup}
+    alias: [manciata, una manciata di, a handful, handful]
+  "un mazzetto":
+    nome:
+      it: "un mazzetto"
+      en: "a bunch"
+    valore:
+      metrico: {quantita: 20.0, unita: g}
+      imperiale: {quantita: 0.75, unita: oz}
+    alias: [mazzetto, un mazzetto di, un ciuffo, ciuffo, un mazzo, a bunch, bunch]
+
+  # ---- pezzi contati ---------------------------------------------------------
+  "uno spicchio":
+    nome:
+      it: "uno spicchio"
+      en: "a clove"
+    valore:
+      metrico: {quantita: 5.0, unita: g}
+      imperiale: {quantita: 1.0, unita: tsp}
+    alias: [spicchio, uno spicchio di, clove, a clove]
+  "una fetta":
+    nome:
+      it: "una fetta"
+      en: "a slice"
+    valore:
+      metrico: {quantita: 25.0, unita: g}
+      imperiale: {quantita: 1.0, unita: oz}
+    alias: [fetta, una fetta di, slice, a slice]
+
+  # ---- moltiplicatori di conteggio (non producono peso) ----------------------
+  # Diventano un numero puro applicato all'unità che segue, o al conteggio dei pezzi.
+  "un paio":
+    moltiplicatore: 2
+    alias: [paio, un paio di, a couple, a couple of]
+  "una dozzina":
+    moltiplicatore: 12
+    alias: [dozzina, una dozzina di, dozen, a dozen]
+
+# Espressioni che indicano quantità genuinamente indeterminata: non si stima,
+# si dichiara la lacuna e si conserva il testo.
+indeterminate:
+  - qualche
+  - alcuni
+  - alcune
+  - un po'
+  - un po
+  - poco
+  - poca
+  - abbondante
+  - a volonta
+  - circa
+  - vari
+  - varie
+  - some
+  - a few
+  - several
+  - plenty
+  - about
+  - roughly
