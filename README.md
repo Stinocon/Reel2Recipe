@@ -2,72 +2,102 @@
   <img src="docs/brand/banner.svg" alt="Reel2Recipe" width="860">
 </p>
 
+<p align="center">
+  <strong>English</strong> · <a href="README.it.md">Italiano</a>
+</p>
+
 # Reel2Recipe
 
-> **Da leggere prima.** Progetto **personale**, pubblicato così com'è e **senza garanzie**:
-> non è un prodotto finito né commerciale, e non lo diventerà. È scritto in gran parte **con
-> un assistente IA**, sotto guida e revisione umana — era anche il punto.
+> **Read this first.** A **personal** project, published as is and **with no warranty**: it
+> is not a finished product, not a commercial one, and it will not become either. It was
+> written in large part **with an AI assistant**, under human guidance and review — that was
+> part of the point.
 >
-> L'estrazione è automatica e può sbagliare. Il progetto è costruito per rendere visibili le
-> incertezze invece di nasconderle, ma **rileggi la ricetta prima di cucinarla**, soprattutto
-> pesi e tempi; e se hai allergie, torna alla fonte originale, che è sempre citata.
-> Dettagli in [`docs/condizioni-uso.md`](docs/condizioni-uso.md).
+> Extraction is automatic and can get things wrong. The project is built to make its
+> uncertainties visible rather than hide them, but **read the recipe before you cook it**,
+> weights and times above all; and if you have allergies, go back to the original source,
+> which is always cited. Details in [`docs/condizioni-uso.md`](docs/condizioni-uso.md)
+> (Italian).
 
-**Dai reel di cucina di Instagram a un ricettario ordinato, importabile in [Mela](https://mela.recipes).**
-Incolli un link, premi *Cook*, e ottieni una ricetta pulita — con gli ingredienti in grammi
-e millilitri, il procedimento in italiano e la fonte originale sempre citata.
+**From Instagram cooking reels to a tidy recipe book you can import into
+[Mela](https://mela.recipes).** Paste a link, press *Cook*, and you get a clean recipe —
+ingredients in grams and millilitres, the method rewritten in your own words, and the
+original source always credited.
 
-Nato da un problema concreto: si salvano decine di ricette su Instagram e poi non si
-ritrovano più. Reel2Recipe le estrae, le rende ricercabili e le porta nell'app che usi
-davvero per cucinare.
+It came from a concrete problem: you save dozens of recipes on Instagram and then never find
+them again. Reel2Recipe extracts them, makes them searchable, and moves them into the app you
+actually cook from.
 
-> **Tutto succede sul tuo computer.** Nessuna intelligenza artificiale online, nessun
-> abbonamento, nessuna chiave API, nessun dato che lascia la macchina. Se un domani smetti
-> di pagare qualsiasi servizio, Reel2Recipe continua a funzionare esattamente come prima.
+> **Everything happens on your own computer.** No online AI, no subscription, no API key, no
+> data leaving the machine. If you stop paying for every service you have, Reel2Recipe keeps
+> working exactly as before.
+
+## Languages
+
+**Italian and English, on both sides of the tool.**
+
+- **The interface** is available in both. The switch is in the top right of the page; the
+  choice is remembered, and on first open it follows your browser's language.
+- **The recipes** can be produced in either language, independently of the interface, and in
+  either **metric** or **imperial** units.
+- **The source reel** can be spoken in either language, and you do not have to say which:
+  Whisper detects it. An English reel can become an Italian recipe, and the other way round.
+
+The three are separate axes, described under
+[Language and measurement system](#language-and-measurement-system). Be aware of one honest
+limitation before you rely on it: translating **ingredient names** is the least reliable part
+of the whole chain — see [the note on limits](#honesty-about-the-limits). The numbers stay
+right; it is the words that slip.
+
+> **A note on this documentation.** This README and the add-on's are kept in English and
+> Italian. The technical documents under [`docs/`](docs/) are in **Italian only** — they
+> explain the *why* behind code whose comments are in Italian, and keeping two copies in step
+> would guarantee that one of them ends up lying. The legal documents are authoritative in
+> Italian, with a non-binding English summary at the top.
 
 ---
 
-## Cosa fa, in breve
+## What it does, briefly
 
-1. **Prende un reel** — da un link, da un file video che hai già salvato, o da un'intera
-   cartella (modalità batch, per smaltire l'arretrato).
-2. **Legge tutto** — la didascalia del post e il parlato del video (trascritto con Whisper,
-   in locale).
-3. **Ricostruisce la ricetta** — con un modello di linguaggio locale (via [Ollama](https://ollama.com)):
-   titolo, ingredienti, procedimento, porzioni e tempo di cottura. Il tempo di *preparazione*
-   si estrae solo quando la fonte lo dichiara in modo netto: costringere il modello a
-   riempirlo lo portava a inventarlo, e un tempo mancante è meno dannoso di uno sbagliato.
-4. **Converte le quantità** — "1 cup di farina" diventa "120 g", "2 tbsp d'olio" diventa
-   "2 cucchiai (≈ 30 ml)". La conversione è **deterministica**, basata su tabelle di densità
-   verificate, non indovinata dal modello (v. [Il principio](#il-principio-che-conta)).
-5. **Archivia e cerca** — tutte le ricette in un ricettario locale ricercabile.
-6. **Esporta per Mela** — in formato `.melarecipe`, con gruppi di ingredienti, tempi e link
-   alla fonte.
+1. **Takes a reel** — from a link, from a video file you already saved, or from a whole
+   folder (batch mode, for working through the backlog).
+2. **Reads everything** — the post's caption and the speech in the video (transcribed with
+   Whisper, locally).
+3. **Reconstructs the recipe** — with a local language model (via
+   [Ollama](https://ollama.com)): title, ingredients, method, servings and cooking time.
+   *Preparation* time is only extracted when the source states it plainly: forcing the model
+   to fill it in made it invent one, and a missing time does less harm than a wrong one.
+4. **Converts the amounts** — "1 cup of flour" becomes "120 g", "2 tbsp of oil" becomes
+   "2 tbsp (≈ 30 ml)". The conversion is **deterministic**, based on verified density tables,
+   not guessed by the model (see [The principle that matters](#the-principle-that-matters)).
+5. **Files and searches** — every recipe in a searchable local library.
+6. **Exports for Mela** — as `.melarecipe`, with ingredient groups, times and a link back to
+   the source.
 
 ---
 
-## Installazione
+## Installation
 
-Serve **[uv](https://docs.astral.sh/uv/)** (il resto lo installa lo script).
-Da terminale, nella cartella del progetto:
+You need **[uv](https://docs.astral.sh/uv/)** (the script installs the rest).
+In a terminal, inside the project folder:
 
 ```bash
 ./install.sh
 ```
 
-Lo script controlla e, dove può, installa da sé tutto il necessario:
+The script checks and, where it can, installs everything needed by itself:
 
-| Componente | A cosa serve | Obbligatorio? |
+| Component | What it is for | Required? |
 |---|---|---|
-| **uv** | gestore del progetto Python | sì |
-| **Ollama** + un modello | il "cervello" che struttura la ricetta | sì |
-| **ffmpeg** | estrae l'audio dai video | per il parlato (senza, usi le didascalie) |
-| **Whisper** (locale) | trascrive il parlato | per il parlato |
+| **uv** | the Python project manager | yes |
+| **Ollama** + a model | the "brain" that structures the recipe | yes |
+| **ffmpeg** | pulls the audio out of videos | for speech (without it, captions only) |
+| **Whisper** (local) | transcribes the speech | for speech |
 
-Dove non può installare da solo (per esempio se manca Homebrew su macOS), lo script ti dice
-esattamente cosa fare. Puoi rilanciarlo quante volte vuoi: è idempotente.
+Where it cannot install something on its own (for instance if Homebrew is missing on macOS)
+it tells you exactly what to do. You can run it as many times as you like: it is idempotent.
 
-Per controllare in ogni momento cosa è pronto:
+To check at any time what is ready:
 
 ```bash
 uv run r2r check
@@ -75,266 +105,278 @@ uv run r2r check
 
 ---
 
-## Uso
+## Usage
 
-### Interfaccia web (consigliata)
+### Web interface (recommended)
 
 ```bash
 uv run r2r serve
 ```
 
-Poi apri **http://localhost:8500**. Incolla il link di un reel nella barra, premi *Cook*, e
-segui l'estrazione fase per fase. Quando la ricetta è pronta puoi **correggerla a mano**
-(il modello propone, tu hai l'ultima parola), salvarla nel ricettario o scaricarla per Mela.
+Then open **http://localhost:8500**. Paste a reel's link in the bar, press *Cook*, and follow
+the extraction phase by phase. When the recipe is ready you can **correct it by hand** (the
+model proposes, you have the last word), save it to the library or download it for Mela.
 
-Puoi anche **trascinare un video** direttamente nella pagina.
+You can also **drag a video** straight onto the page.
 
-### Da terminale
+### From the terminal
 
 ```bash
-# Estrai una ricetta da un link e salvala in libreria
+# Extract a recipe from a link and save it to the library
 uv run r2r cook https://www.instagram.com/reel/XXXXX/
 
-# Da un file già salvato, con la didascalia incollata
-uv run r2r cook ~/Video/reel.mp4 --didascalia "1 cup farina, 2 uova..."
+# From a file you already have, with the caption pasted in
+uv run r2r cook ~/Videos/reel.mp4 --didascalia "1 cup flour, 2 eggs..."
 
-# Molti reel in serie: una cartella di video, o un .txt con un URL per riga
-uv run r2r batch ~/Video/reel-da-lavorare/ --export workspace/export/
-# (i file audio che Reel2Recipe estrae da sé vengono saltati: niente doppie lavorazioni)
+# Many reels in a row: a folder of videos, or a .txt with one URL per line
+uv run r2r batch ~/Videos/reels-to-process/ --export workspace/export/
+# (audio files Reel2Recipe extracted itself are skipped: no double processing)
 
-# Cerca nel ricettario
-uv run r2r list --cerca "zucchine"
+# Search the library
+uv run r2r list --cerca "courgettes"
 
-# Esporta
-uv run r2r export 42                    # una ricetta, per Mela
-uv run r2r export --tutte               # l'intero ricettario in un .melarecipes
-uv run r2r export 42 --formato pdf      # oppure markdown, o più formati insieme
+# Export
+uv run r2r export 42                    # one recipe, for Mela
+uv run r2r export --tutte               # the whole library as one .melarecipes
+uv run r2r export 42 --formato pdf      # or markdown, or several formats at once
 uv run r2r export 42 --formato markdown pdf mela
 
-# Elimina una ricetta dal ricettario (chiede conferma; --si per saltarla)
+# Delete a recipe from the library (asks for confirmation; --si skips it)
 uv run r2r elimina 42
 ```
 
-### Se non usi Mela
+> The command names and options are Italian, like the rest of the codebase. They are the
+> project's own vocabulary and they are not going to change under you; the *output* is what
+> follows `--lingua`.
 
-`.melarecipe` è il formato migliore *se* hai Mela. Altrimenti la stessa ricetta esce in
-**Markdown** (si apre ovunque e resta modificabile) o in **PDF** (si stampa e si manda),
-dalla riga di comando con `--formato` o dai bottoni sotto la scheda nell'interfaccia web.
+### If you do not use Mela
 
-Tutti e tre i formati riportano anche le **lacune** e le quantità che sono stime nostre: un
-PDF pulito che nascondesse le incertezze sarebbe più bello e più pericoloso. Il Markdown non
-richiede nulla; il PDF usa `reportlab`, che `./install.sh` installa da sé (a mano:
+`.melarecipe` is the best format *if* you have Mela. Otherwise the same recipe comes out as
+**Markdown** (opens anywhere and stays editable) or **PDF** (prints and sends), from the
+command line with `--formato` or from the buttons under the recipe card in the web interface.
+
+All three formats also carry the **gaps** and the amounts that are our own estimates: a clean
+PDF that hid the uncertainties would be prettier and more dangerous. Markdown needs nothing;
+the PDF uses `reportlab`, which `./install.sh` installs by itself (by hand:
 `uv sync --extra doc`).
 
-### Lingua e sistema di misura
+### Language and measurement system
 
-**L'interfaccia è bilingue**, italiano e inglese. Il selettore sta in testata, in alto a
-destra: la scelta viene ricordata, e alla prima apertura si parte dalla lingua del browser.
+**The interface is bilingual**, Italian and English. The switch sits in the header, top
+right: the choice is remembered, and on first open it starts from your browser's language.
 
-Da quella scelta scende una catena di tre anelli, ciascuno con il precedente come ripiego:
-l'**interfaccia** decide la lingua della **ricetta**, che decide il **sistema di misura**.
-Chi non tocca nulla ottiene un insieme coerente; chi vuole incrociarli può farlo a ogni
-anello — interfaccia in inglese e ricette in italiano è una combinazione legittima, e per
-chi cucina in una lingua e vive in un'altra è anzi quella giusta.
+From that choice a chain of three links descends, each falling back to the one before it: the
+**interface** decides the **recipe**'s language, which decides the **measurement system**.
+Change nothing and you get a coherent set; cross them at any link if you want to — an English
+interface with Italian recipes is a legitimate combination, and for someone who cooks in one
+language and lives in another it is the right one.
 
-Da riga di comando l'interfaccia non c'è, quindi gli assi sono due e partono dalla ricetta:
-
-```bash
-uv run r2r cook <url> --lingua en                    # ricetta in inglese, misure imperiali
-uv run r2r cook <url> --lingua en --sistema metrico  # inglese, ma con grammi e ml
-uv run r2r cook <url> --sistema imperiale            # italiano, ma con cup e once
-```
-
-Nell'interfaccia web gli stessi due selettori stanno nelle *Opzioni*, e di base seguono
-l'anello che li precede. Il sistema, se non lo scegli, segue la lingua (italiano → metrico,
-inglese → imperiale), ma puoi incrociarli: un inglese o un australiano legge in inglese e
-cucina in grammi.
-
-C'è poi un terzo asse che non c'entra con questi due, perché riguarda l'**ingresso**: la
-lingua *parlata* nel reel, che serve a Whisper per trascrivere. Di base non gliela si dichiara
-affatto — la riconosce da sé, che è la cosa che sa fare — e questo è ciò che permette di
-lavorare un reel inglese e ottenerne una ricetta italiana. Non segue la lingua di uscita,
-perché tradurre è il caso normale. Si può forzare quando il riconoscimento sbaglia, per
-esempio su un audio molto corto o rumoroso:
+There is no interface on the command line, so there the axes are two and start from the
+recipe:
 
 ```bash
-uv run r2r cook <url> --lingua-parlato en    # è parlato in inglese, non indovinare
+uv run r2r cook <url> --lingua en                    # recipe in English, imperial units
+uv run r2r cook <url> --lingua en --sistema metrico  # English, but grams and ml
+uv run r2r cook <url> --sistema imperiale            # Italian, but cups and ounces
 ```
 
-La differenza fra i due assi è netta. Il **sistema** cambia i numeri e lo fa il codice, in
-modo deterministico: "1 cup di farina" diventa 120 g in metrico e resta "1 cup" in imperiale,
-scritto a frazioni ("2 1/2 cup"), come su un misurino. La **lingua** cambia le parole. Le
-etichette delle misure, le sezioni degli export e i messaggi sono sempre tradotti; i nomi
-degli ingredienti e il procedimento li traduce il modello locale al momento dell'estrazione,
-ed è la parte meno solida — vedi la nota qui sotto.
+In the web interface the same two selectors live under *Options*, and by default follow the
+link above them. The system, if you do not choose one, follows the language (Italian →
+metric, English → imperial), but you can cross them: an English or Australian cook reads in
+English and weighs in grams.
 
-> **Onestà sui limiti.** La traduzione dei nomi e del procedimento è la parte meno affidabile,
-> ed è l'unica non deterministica dell'intero percorso. Su una fonte **già italiana** la
-> qualità è ottima. Su una fonte **inglese** i nomi degli ingredienti sbagliano con una certa
-> regolarità: `berries` è diventato "fragole", `flax seeds` "semi di lecithia" (parola
-> inesistente), `a pinch` "una pizzetta". Una didascalia **bilingue** peggiora le cose, perché
-> il modello pesca da entrambe le lingue: da un post inglese-tedesco è uscito "dinkel fette".
-> **Verso l'inglese**, da un testo tutto italiano, `qwen2.5:14b` tende a restare ancorato
-> all'italiano: traduce il titolo ma non sempre l'elenco.
+Then there is a further axis with nothing to do with those two, because it concerns the
+**input**: the language *spoken* in the reel, which Whisper needs in order to transcribe. By
+default it is not declared at all — Whisper detects it, which is the thing it natively does —
+and that is what lets you process an English reel and get an Italian recipe out of it. It
+does not follow the output language, because translating is the normal case. You can force it
+when detection gets it wrong, for instance on very short or noisy audio:
+
+```bash
+uv run r2r cook <url> --lingua-parlato en    # it is spoken in English, do not guess
+```
+
+The difference between the two output axes is sharp. The **system** changes the numbers and
+the code does it, deterministically: "1 cup of flour" becomes 120 g in metric and stays
+"1 cup" in imperial, written as fractions ("2 1/2 cup"), the way a measuring cup works. The
+**language** changes the words. Unit labels, export section headings and messages are always
+translated; ingredient names and the method are translated by the local model at extraction
+time, and that is the weakest part — see the note below.
+
+#### Honesty about the limits
+
+> Translating names and the method is the least reliable part, and the only
+> non-deterministic step in the whole path. On an **already Italian** source the quality is
+> very good. On an **English** source ingredient names go wrong with some regularity:
+> `berries` became "fragole" (strawberries), `flax seeds` became "semi di lecithia" (not a
+> word), `a pinch` became "una pizzetta". A **bilingual** caption makes it worse, because the
+> model draws on both languages: an English-German post produced "dinkel fette". **Towards
+> English**, from an entirely Italian text, `qwen2.5:14b` tends to stay anchored to Italian:
+> it translates the title but not always the list.
 >
-> In tutti questi casi **le quantità restano corrette**: sbagliano le parole, non i numeri.
-> È la ragione per cui la conversione non è affidata al modello, e per cui la revisione prima
-> dell'export non è un ripiego ma parte del flusso.
+> In every one of these cases **the amounts stay correct**: the words slip, the numbers do
+> not. It is the reason conversion is not entrusted to the model, and why reviewing before
+> export is part of the flow rather than a fallback.
 
-### Reel privati
+### Private reels
 
-Per i reel che richiedono l'accesso, passa i cookie del browser in cui hai effettuato il login:
+For reels that require you to be signed in, pass the cookies of the browser you signed in
+with:
 
 ```bash
-uv run r2r cook <url> --cookies chrome    # o safari, firefox
+uv run r2r cook <url> --cookies chrome    # or safari, firefox
 ```
 
-Dove un browser non c'è — dentro un container, per esempio — esporta i cookie in formato
-Netscape e indica il file con `R2R_COOKIES=/percorso/cookies.txt`. Se la variabile punta a un
-file che non esiste, l'errore lo dice subito invece di far fallire il download senza motivo
-apparente.
+Where there is no browser — inside a container, for instance — export the cookies in Netscape
+format and point at the file with `R2R_COOKIES=/path/cookies.txt`. If the variable points at
+a file that does not exist, the error says so straight away instead of letting the download
+fail for no apparent reason.
 
-### Variabili d'ambiente
+### Environment variables
 
-Poche, e servono tutte a far girare il prodotto dove i percorsi predefiniti non vanno bene.
+Few, and all of them exist to run the product where the default paths do not suit.
 
-| variabile | effetto |
+| variable | effect |
 |-----------|---------|
-| `R2R_WORKSPACE` | Sposta la radice dei dati (libreria, media, export). Predefinito: `workspace/` accanto al repo |
-| `R2R_COOKIES` | File di cookie in formato Netscape per i reel che richiedono l'accesso. Non viene mai modificato: se ne usa una copia temporanea, cancellata a fine scaricamento |
-| `R2R_TIMEOUT_LLM` | Secondi concessi al modello per una risposta — solo la cifra. Predefinito 300: da alzare su CPU senza acceleratore |
-| `R2R_PORTA` | Porta dell'interfaccia avviata da `tools/serve.sh`. Predefinito 8500 |
+| `R2R_WORKSPACE` | Moves the data root (library, media, exports). Default: `workspace/` next to the repo |
+| `R2R_COOKIES` | Netscape-format cookie file for reels that require signing in. It is never modified: a temporary copy is used and deleted when the download ends |
+| `R2R_TIMEOUT_LLM` | Seconds granted to the model for one answer — the number alone. Default 300: raise it on a CPU without an accelerator |
+| `R2R_PORTA` | Port for the interface started by `tools/serve.sh`. Default 8500 |
 
 ### Home Assistant
 
-C'è un add-on che fa girare tutto — interfaccia, Whisper e Ollama — su un server sempre
-acceso, con l'interfaccia nel pannello laterale:
-**[Stinocon/addons](https://github.com/Stinocon/addons/tree/master/reel2recipe)**. Serve una
-macchina amd64 con 16 GB di RAM: l'inferenza gira su CPU.
+There is an add-on that runs the whole thing — interface, Whisper and Ollama — on an
+always-on server, with the interface in the sidebar:
+**[Stinocon/addons](https://github.com/Stinocon/addons/tree/master/reel2recipe)**. It needs an
+amd64 machine with 16 GB of RAM: inference runs on the CPU.
 
 ---
 
-## Come importare in Mela
+## How to import into Mela
 
-Reel2Recipe produce file `.melarecipe` (una ricetta) o `.melarecipes` (più ricette, in uno
-zip). Per importarli:
+Reel2Recipe produces `.melarecipe` files (one recipe) or `.melarecipes` (several recipes, in
+a zip). To import them:
 
-1. Salva il file esportato dove Mela può raggiungerlo (AirDrop, iCloud Drive, email a te
-   stesso…).
-2. Aprilo su iPhone/iPad/Mac: Mela lo riconosce e propone l'importazione.
+1. Save the exported file somewhere Mela can reach it (AirDrop, iCloud Drive, an email to
+   yourself…).
+2. Open it on iPhone/iPad/Mac: Mela recognises it and offers to import.
 
-Il parser di Mela legge già le quantità in italiano, quindi gli ingredienti arrivano con la
-loro misura e i gruppi ("Per la base", "Per la crema") vengono rispettati. Il **link alla
-fonte** è sempre incluso, così puoi tornare al reel originale.
-
----
-
-## Il principio che conta
-
-Il pezzo di cui questo progetto va più fiero è la **conversione delle quantità**, ed è dove
-si distingue da un semplice "chiedi a un'IA di trascrivere la ricetta".
-
-Un modello di linguaggio a cui chiedi "quanti grammi sono una tazza di farina?" ti dà un
-numero *plausibile*. A volte 120, a volte 128, a volte 150 — e per lo zucchero magari
-ripete lo stesso numero della farina, che è sbagliato del **67%** (stesso volume, densità
-diverse). Il modello non sta calcolando: sta ricordando male.
-
-Reel2Recipe fa una cosa diversa:
-
-- Il modello riporta la quantità **esattamente come compare** nel reel ("1", "cup") e **non
-  la converte mai**.
-- La conversione la fa un modulo deterministico, con **tabelle di densità verificate** (una
-  per ingrediente). Ogni densità cita la fonte da cui viene — il database USDA FoodData
-  Central o la tabella dei pesi di King Arthur Baking — con il peso per cup da cui è
-  calcolata, così puoi andare a controllarla.
-- Se non conosciamo la densità di un ingrediente, la quantità **non viene convertita in
-  peso**: si conserva il volume e si dichiara la cosa. Non si inventa mai un numero.
-
-Il risultato: ogni quantità porta con sé la sua provenienza — *dichiarata* dal reel,
-*convertita* da tabella, o *stimata* (per le misure a occhio come "un pizzico"). Le stime
-sono sempre segnalate, così sai di quali fidarti. **Una lacuna dichiarata vale più di un
-numero inventato**: in cucina un peso sbagliato di cui non sai che è sbagliato fa danni.
-
-Le tabelle sono in [`data/`](data/) e sono leggibili e modificabili: se una densità non ti
-convince, la correggi lì — dichiarando la fonte, che i test pretendono.
+Mela's parser already reads amounts in both languages, so ingredients arrive with their
+measurement and groups ("For the base", "For the cream") are respected. The **link to the
+source** is always included, so you can go back to the original reel.
 
 ---
 
-## Cosa è lecito, cosa no
+## The principle that matters
 
-Reel2Recipe è pensato per **uso personale**, su contenuti che **tu hai già salvato**.
-Le condizioni rivolte a chi usa lo strumento stanno in
-[`docs/condizioni-uso.md`](docs/condizioni-uso.md); l'analisi giuridica che sta dietro alle
-scelte di progetto in [`docs/legale.md`](docs/legale.md). In breve:
+The piece this project is proudest of is the **conversion of amounts**, and it is where it
+differs from simply "asking an AI to transcribe the recipe".
 
-- **Gli elenchi di ingredienti non sono protetti da copyright**: estrarli e riformattarli è
-  lecito.
-- **Il testo descrittivo di un creator sì**: per questo Reel2Recipe *riformula* il
-  procedimento invece di copiarlo, e cita **sempre** la fonte originale.
-- **Scaricare un reel da Instagram viola i Termini d'Uso della piattaforma.** È il motivo
-  per cui questo strumento gira in locale, per uso personale: non è un servizio pubblico che
-  scarica per conto di altri. Se lo userai su reel altrui, fallo con buon senso e per te.
-- **I file scaricati restano sul tuo computer**: la cartella `workspace/` è esclusa da git e
-  non viene mai condivisa.
+Ask a language model "how many grams is a cup of flour?" and it gives you a *plausible*
+number. Sometimes 120, sometimes 128, sometimes 150 — and for sugar it may repeat the same
+number it gave for flour, which is wrong by **67%** (same volume, different densities). The
+model is not calculating: it is misremembering.
+
+Reel2Recipe does something else:
+
+- The model reports the amount **exactly as it appears** in the reel ("1", "cup") and **never
+  converts it**.
+- The conversion is done by a deterministic module, with **verified density tables** (one per
+  ingredient). Every density cites the source it comes from — the USDA FoodData Central
+  database or King Arthur Baking's weight chart — together with the per-cup weight it was
+  computed from, so you can go and check it.
+- If we do not know an ingredient's density, the amount **is not converted to weight**: the
+  volume is kept and the gap is declared. A number is never invented.
+
+The result: every amount carries its own provenance — *declared* by the reel, *converted*
+from a table, or *estimated* (for eyeball measures like "a pinch"). Estimates are always
+flagged, so you know which ones to trust. **A declared gap is worth more than an invented
+number**: in a kitchen, a wrong weight you don't know is wrong does real damage.
+
+The tables live in [`data/`](data/) and are readable and editable: if a density does not
+convince you, correct it there — declaring the source, which the tests insist on.
 
 ---
 
-## Struttura del progetto
+## What is allowed, and what is not
+
+Reel2Recipe is meant for **personal use**, on content **you have already saved**. The terms
+addressed to whoever uses the tool are in
+[`docs/condizioni-uso.md`](docs/condizioni-uso.md); the legal analysis behind the design
+decisions is in [`docs/legale.md`](docs/legale.md). Both are authoritative in Italian and
+open with an English summary. In short:
+
+- **Ingredient lists are not protected by copyright**: extracting and reformatting them is
+  lawful.
+- **A creator's descriptive prose is protected**: this is why Reel2Recipe *rewrites* the
+  method instead of copying it, and **always** cites the original source.
+- **Downloading a reel from Instagram breaches the platform's Terms of Use.** That is why
+  this tool runs locally, for personal use: it is not a public service downloading on
+  someone else's behalf. If you use it on other people's reels, do it sensibly and for
+  yourself.
+- **Downloaded files stay on your computer**: the `workspace/` folder is excluded from git
+  and is never shared.
+
+---
+
+## Project structure
 
 ```
-src/reel2recipe/     il codice
-  acquire.py         recupero del reel (URL, file, cartella)
-  audio.py           estrazione audio con ffmpeg
-  asr.py             trascrizione locale (Whisper) con fallback
-  extract.py         strutturazione con LLM locale (Ollama)
-  units.py           conversione deterministica delle quantità — il cuore del progetto
-  recipe.py          il modello di una ricetta
-  mela.py            export nel formato Mela
-  documenti.py       export in Markdown e PDF, per chi non usa Mela
-  store.py           il ricettario (SQLite + ricerca full-text)
-  percorsi.py        dove vivono i dati (una sola decisione, spostabile con R2R_WORKSPACE)
-  pipeline.py        la catena completa
-  api.py             l'interfaccia web
-  cli.py             i comandi da terminale
-data/                le tabelle di conversione (leggibili e modificabili)
-web/                 l'interfaccia (HTML/CSS/JS, senza build)
-  i18n.js            le parole dell'interfaccia, in italiano e in inglese
-  icone.js           le icone SVG, incorporate (nessun CDN)
-tools/               script di supporto (avvio di Ollama e dell'interfaccia, guard di confine)
-docs/                documentazione (architettura, aspetti legali)
-tests/               i test
-workspace/           i tuoi dati — mai condivisi (in .gitignore)
+src/reel2recipe/     the code
+  acquire.py         fetching the reel (URL, file, folder)
+  audio.py           audio extraction with ffmpeg
+  asr.py             local transcription (Whisper) with a fallback
+  extract.py         structuring with a local LLM (Ollama)
+  units.py           deterministic conversion of amounts — the heart of the project
+  recipe.py          the model of a recipe
+  mela.py            export in Mela's format
+  documenti.py       export to Markdown and PDF, for those without Mela
+  store.py           the recipe book (SQLite + full-text search)
+  percorsi.py        where the data lives (one decision, movable with R2R_WORKSPACE)
+  pipeline.py        the whole chain
+  api.py             the web interface
+  cli.py             the terminal commands
+data/                the conversion tables (readable and editable)
+web/                 the interface (HTML/CSS/JS, no build step)
+  i18n.js            the interface's words, in Italian and English
+  icone.js           the SVG icons, embedded (no CDN)
+tools/               support scripts (starting Ollama and the interface, boundary guards)
+docs/                documentation, in Italian (architecture, legal matters)
+tests/               the tests
+workspace/           your data — never shared (in .gitignore)
 ```
 
-Documentazione tecnica: [`docs/architettura.md`](docs/architettura.md).
+Technical documentation: [`docs/architettura.md`](docs/architettura.md) (Italian).
 
 ---
 
-## Domande frequenti
+## Frequently asked questions
 
-**Devo pagare qualcosa?** No. Tutto gira in locale ed è gratuito. L'unico costo è lo spazio
-su disco per il modello di Ollama (~5 GB) e per quello di Whisper (~1,5 GB), scaricati una
-volta sola.
+**Do I have to pay for anything?** No. It all runs locally and it is free. The only cost is
+disk space for the Ollama model (~5 GB) and the Whisper one (~1.5 GB), downloaded once.
 
-**Funziona senza connessione?** Dopo l'installazione, sì — tranne per scaricare un nuovo
-reel da un URL, che ovviamente richiede internet. Un reel già salvato si lavora offline.
+**Does it work offline?** After installation, yes — except for downloading a new reel from a
+URL, which obviously needs the internet. A reel you already have is processed offline.
 
-**Le ricette in altre lingue?** Un reel in inglese diventa una ricetta in italiano — nomi e
-procedimento tradotti, unità convertite, i Fahrenheit portati a Celsius. Puoi anche chiedere
-l'uscita in inglese o con le misure imperiali: vedi *[Lingua e sistema di misura](#lingua-e-sistema-di-misura)*.
+**What about recipes in other languages?** An English reel can become an Italian recipe or
+stay English, as you prefer — names and method translated, units converted, Fahrenheit
+brought to Celsius. Only Italian and English are supported as *output* languages; the spoken
+input can be anything Whisper recognises, though the further you get from those two the more
+the translation slips. See
+*[Language and measurement system](#language-and-measurement-system)*.
 
-**E se un reel non ha la ricetta scritta né detta chiaramente?** Reel2Recipe estrae ciò che
-può e **dichiara le lacune** invece di riempirle a caso. Poi puoi completare a mano.
+**What if a reel has no recipe written or clearly spoken?** Reel2Recipe extracts what it can
+and **declares the gaps** instead of filling them in at random. You can then complete it by
+hand.
 
 ---
 
-## Licenza
+## Licence
 
-Reel2Recipe è distribuito con licenza **MIT** (v. [`LICENSE`](LICENSE)): puoi usarlo,
-modificarlo e ridistribuirlo liberamente, anche per scopi commerciali, tenendo
-l'attribuzione.
+Reel2Recipe is distributed under the **MIT** licence (see [`LICENSE`](LICENSE)): you may use,
+modify and redistribute it freely, including commercially, keeping the attribution.
 
-Il materiale di terzi che il progetto include o usa — le icone Material Symbols incorporate
-nell'interfaccia, gli strumenti che vengono installati a parte, le fonti delle densità — è
-elencato in [`NOTICE.md`](NOTICE.md) con le rispettive licenze. Vale lo stesso criterio delle
-densità in `data/`: un'attribuzione che nessuno può verificare non è un'attribuzione.
+Third-party material the project includes or uses — the Material Symbols icons embedded in
+the interface, the tools installed separately, the density sources — is listed in
+[`NOTICE.md`](NOTICE.md) with the respective licences. The same criterion as the densities in
+`data/` applies: an attribution nobody can verify is not an attribution.
