@@ -25,7 +25,7 @@ from pathlib import Path
 
 from .mela import righe_ingredienti
 from .recipe import Ricetta, percorso_libero
-from .units import PROVENIENZE_INCERTE, sigla
+from .units import PROVENIENZE_INCERTE, sigla, testo_da
 
 # Le stringhe dei documenti, per lingua. Come in `mela.py`: poche e stabili, un dizionario
 # basta e si legge meglio di un meccanismo di traduzione.
@@ -71,8 +71,7 @@ TESTI = {
 
 def testo(lingua: str, chiave: str, **dati) -> str:
     """Una stringa del documento nella lingua della ricetta, con ripiego sull'italiano."""
-    catalogo = TESTI.get(sigla(lingua), TESTI["it"])
-    return catalogo.get(chiave, TESTI["it"][chiave]).format(**dati)
+    return testo_da(TESTI, lingua, chiave, **dati)
 
 ESTENSIONE_MARKDOWN = ".md"
 ESTENSIONE_PDF = ".pdf"

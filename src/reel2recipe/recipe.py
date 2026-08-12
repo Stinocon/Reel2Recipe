@@ -32,6 +32,7 @@ from .units import (
     converti_temperature_nel_testo,
     normalizza_ingrediente,
     sigla,
+    testo_da,
 )
 
 
@@ -270,8 +271,8 @@ def da_bozza(
             "en": {"metrico": "Temperatures converted to Celsius: ",
                    "imperiale": "Temperatures converted to Fahrenheit: "},
         }
-        per_lingua = intestazioni.get(sigla(lingua), intestazioni["it"])
-        note.append(per_lingua[sigla(sistema)] + ", ".join(dict.fromkeys(note_temperature)))
+        note.append(testo_da(intestazioni, lingua, sigla(sistema))
+                    + ", ".join(dict.fromkeys(note_temperature)))
 
     return Ricetta(
         lingua=sigla(lingua),

@@ -128,8 +128,16 @@ richiede nulla; il PDF usa `reportlab`, che `./install.sh` installa da sé (a ma
 
 ### Lingua e sistema di misura
 
-Di base Reel2Recipe lavora in **italiano** e col **sistema metrico**, ma i due assi sono
-indipendenti:
+**L'interfaccia è bilingue**, italiano e inglese. Il selettore sta in testata, in alto a
+destra: la scelta viene ricordata, e alla prima apertura si parte dalla lingua del browser.
+
+Da quella scelta scende una catena di tre anelli, ciascuno con il precedente come ripiego:
+l'**interfaccia** decide la lingua della **ricetta**, che decide il **sistema di misura**.
+Chi non tocca nulla ottiene un insieme coerente; chi vuole incrociarli può farlo a ogni
+anello — interfaccia in inglese e ricette in italiano è una combinazione legittima, e per
+chi cucina in una lingua e vive in un'altra è anzi quella giusta.
+
+Da riga di comando l'interfaccia non c'è, quindi gli assi sono due e partono dalla ricetta:
 
 ```bash
 uv run r2r cook <url> --lingua en                    # ricetta in inglese, misure imperiali
@@ -137,9 +145,10 @@ uv run r2r cook <url> --lingua en --sistema metrico  # inglese, ma con grammi e 
 uv run r2r cook <url> --sistema imperiale            # italiano, ma con cup e once
 ```
 
-Nell'interfaccia web gli stessi due selettori stanno nelle *Opzioni*. Il sistema, se non lo
-scegli, segue la lingua (italiano → metrico, inglese → imperiale), ma puoi incrociarli: un
-inglese o un australiano legge in inglese e cucina in grammi.
+Nell'interfaccia web gli stessi due selettori stanno nelle *Opzioni*, e di base seguono
+l'anello che li precede. Il sistema, se non lo scegli, segue la lingua (italiano → metrico,
+inglese → imperiale), ma puoi incrociarli: un inglese o un australiano legge in inglese e
+cucina in grammi.
 
 C'è poi un terzo asse che non c'entra con questi due, perché riguarda l'**ingresso**: la
 lingua *parlata* nel reel, che serve a Whisper per trascrivere. Di base non gliela si dichiara
@@ -289,6 +298,8 @@ src/reel2recipe/     il codice
   cli.py             i comandi da terminale
 data/                le tabelle di conversione (leggibili e modificabili)
 web/                 l'interfaccia (HTML/CSS/JS, senza build)
+  i18n.js            le parole dell'interfaccia, in italiano e in inglese
+  icone.js           le icone SVG, incorporate (nessun CDN)
 tools/               script di supporto (avvio di Ollama e dell'interfaccia, guard di confine)
 docs/                documentazione (architettura, aspetti legali)
 tests/               i test

@@ -33,8 +33,39 @@ from .mela import scrivi_melarecipe, scrivi_melarecipes, verso_melarecipe
 from .percorsi import RADICE_REPO, cartella_export
 from .recipe import Ricetta
 from .store import Libreria
+from .units import Catalogo, testo_da
 
 CARTELLA_WEB = RADICE_REPO / "web"
+
+
+# Gli errori che l'interfaccia mostra all'utente.
+#
+# Seguono la lingua **dell'interfaccia**, non quella della ricetta, e per questo il
+# parametro si chiama `lingua_ui`: su `/api/cook` esiste gia' un `lingua` e vuol dire
+# tutt'altro — la lingua in cui produrre la ricetta. Due nomi diversi perche' sono due
+# cose diverse, e chiamarle uguale sarebbe costato un difetto silenzioso appena i due
+# valori divergono.
+TESTI: Catalogo = {
+    "it": {
+        "serve_url": "Serve l'URL di un reel.",
+        "lavoro_sconosciuto": "Lavoro sconosciuto.",
+        "ricetta_non_trovata": "Ricetta non trovata.",
+        "formato_sconosciuto": "Formato «{formato}» sconosciuto: usa mela, markdown o pdf.",
+        "libreria_vuota": "Libreria vuota.",
+    },
+    "en": {
+        "serve_url": "The URL of a reel is required.",
+        "lavoro_sconosciuto": "Unknown job.",
+        "ricetta_non_trovata": "Recipe not found.",
+        "formato_sconosciuto": "Unknown format «{formato}»: use mela, markdown or pdf.",
+        "libreria_vuota": "The library is empty.",
+    },
+}
+
+
+def testo(lingua: str, chiave: str, **dati) -> str:
+    """Un errore dell'API nella lingua dell'interfaccia."""
+    return testo_da(TESTI, lingua, chiave, **dati)
 
 
 # --------------------------------------------------------------------------------------
@@ -135,7 +166,9 @@ def crea_app(db: str | None = None, url_ollama: str = "http://localhost:11434") 
     async def cook(richiesta: RichiestaCook) -> dict:
         """Avvia un'estrazione da URL. Ritorna subito un id da seguire via SSE."""
         if not richiesta.url or not richiesta.url.strip():
-            raise HTTPException(422, "Serve l'URL di un reel.")
+            # Qui la lingua dell'interfaccia non arriva: l'unico riferimento e' quello
+            # della ricetta, che nell'uso normale coincide perche' la segue.
+            raise HTTPException(422, testo(richiesta.lingua, "serve_url"))
         lavoro = registro.nuovo()
         threading.Thread(
             target=_esegui_da_url, args=(registro, lavoro, richiesta, url_ollama, db), daemon=True
@@ -173,11 +206,11 @@ def crea_app(db: str | None = None, url_ollama: str = "http://localhost:11434") 
         return {"job": lavoro.id}
 
     @app.get("/api/cook/{job}/eventi")
-    async def eventi(job: str) -> StreamingResponse:
+    async def eventi(job: str, lingua_ui: str = "it") -> StreamingResponse:
         """Flusso SSE con l'avanzamento di un lavoro."""
         lavoro = registro.get(job)
         if not lavoro:
-            raise HTTPException(404, "Lavoro sconosciuto.")
+            raise HTTPException(404, testo(lingua_ui, "lavoro_sconosciuto"))
 
         async def genera():
             while True:
@@ -197,31 +230,31 @@ def crea_app(db: str | None = None, url_ollama: str = "http://localhost:11434") 
             return lib.elenca(cerca=cerca)
 
     @app.get("/api/ricette/{id}")
-    def leggi(id: int) -> dict:
+    def leggi(id: int, lingua_ui: str = "it") -> dict:
         with libreria() as lib:
             ricetta = lib.leggi(id)
         if not ricetta:
-            raise HTTPException(404, "Ricetta non trovata.")
+            raise HTTPException(404, testo(lingua_ui, "ricetta_non_trovata"))
         d = ricetta.to_dict()
         d["id"] = id
         return d
 
     @app.put("/api/ricette/{id}")
-    def modifica(id: int, ricetta: dict) -> dict:
+    def modifica(id: int, ricetta: dict, lingua_ui: str = "it") -> dict:
         """Salva le correzioni manuali dell'utente. È il passaggio che rende affidabile
         l'export: l'LLM propone, l'utente corregge, e solo poi si esporta."""
         with libreria() as lib:
             if not lib.leggi(id):
-                raise HTTPException(404, "Ricetta non trovata.")
+                raise HTTPException(404, testo(lingua_ui, "ricetta_non_trovata"))
             ricetta.pop("id", None)
             lib.aggiorna(id, Ricetta.from_dict(ricetta))
         return {"ok": True}
 
     @app.delete("/api/ricette/{id}")
-    def elimina(id: int) -> dict:
+    def elimina(id: int, lingua_ui: str = "it") -> dict:
         with libreria() as lib:
             if not lib.elimina(id):
-                raise HTTPException(404, "Ricetta non trovata.")
+                raise HTTPException(404, testo(lingua_ui, "ricetta_non_trovata"))
         return {"ok": True}
 
     @app.post("/api/ricette")
@@ -234,7 +267,7 @@ def crea_app(db: str | None = None, url_ollama: str = "http://localhost:11434") 
     # ---- export ----------------------------------------------------------------------
 
     @app.get("/api/ricette/{id}/export")
-    def export_singolo(id: int, formato: str = "mela") -> FileResponse:
+    def export_singolo(id: int, formato: str = "mela", lingua_ui: str = "it") -> FileResponse:
         """Scarica una ricetta. `formato` è `mela` (predefinito), `markdown` o `pdf`.
 
         Il predefinito resta Mela perché è il formato che l'app importa; gli altri due
@@ -243,7 +276,7 @@ def crea_app(db: str | None = None, url_ollama: str = "http://localhost:11434") 
         with libreria() as lib:
             ricetta = lib.leggi(id)
         if not ricetta:
-            raise HTTPException(404, "Ricetta non trovata.")
+            raise HTTPException(404, testo(lingua_ui, "ricetta_non_trovata"))
 
         try:
             if formato == "markdown":
@@ -253,7 +286,7 @@ def crea_app(db: str | None = None, url_ollama: str = "http://localhost:11434") 
             elif formato == "mela":
                 percorso, tipo = scrivi_melarecipe(ricetta, cartella_export()), "application/json"
             else:
-                raise HTTPException(400, f"Formato «{formato}» sconosciuto: usa mela, markdown o pdf.")
+                raise HTTPException(400, testo(lingua_ui, "formato_sconosciuto", formato=formato))
         except ErroreDocumento as e:
             # Manca l'extra `doc`: è un problema di installazione, non della richiesta.
             raise HTTPException(503, str(e)) from e
@@ -261,11 +294,11 @@ def crea_app(db: str | None = None, url_ollama: str = "http://localhost:11434") 
         return FileResponse(percorso, media_type=tipo, filename=percorso.name)
 
     @app.get("/api/export")
-    def export_tutte() -> FileResponse:
+    def export_tutte(lingua_ui: str = "it") -> FileResponse:
         with libreria() as lib:
             ricette = lib.tutte()
         if not ricette:
-            raise HTTPException(404, "Libreria vuota.")
+            raise HTTPException(404, testo(lingua_ui, "libreria_vuota"))
         percorso = scrivi_melarecipes(ricette, cartella_export() / "libreria")
         return FileResponse(percorso, media_type="application/zip", filename=percorso.name)
 
