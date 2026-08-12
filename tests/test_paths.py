@@ -11,7 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from reel2recipe import paths
-from reel2recipe.store import Libreria, percorso_predefinito
+from reel2recipe.store import Library, default_path
 
 
 def test_predefinito_e_accanto_al_repo(monkeypatch):
@@ -37,7 +37,7 @@ def test_variabile_vuota_non_conta(monkeypatch):
 def test_la_libreria_segue_la_variabile(monkeypatch, tmp_path):
     """Il caso che conta davvero: il database nasce dove dice l'ambiente."""
     monkeypatch.setenv("R2R_WORKSPACE", str(tmp_path / "dati"))
-    assert percorso_predefinito() == tmp_path / "dati" / "ricette.db"
-    with Libreria() as lib:
-        assert Path(lib.percorso).is_file()
-        assert Path(lib.percorso).parent == tmp_path / "dati"
+    assert default_path() == tmp_path / "dati" / "ricette.db"
+    with Library() as lib:
+        assert Path(lib.path).is_file()
+        assert Path(lib.path).parent == tmp_path / "dati"

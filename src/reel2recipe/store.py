@@ -1,16 +1,23 @@
-"""store.py — la libreria delle ricette. SQLite con ricerca full-text.
+"""store.py — the recipe library. SQLite with full-text search.
 
-Questo modulo risolve il problema che ha fatto nascere il progetto: non "estrarre una
-ricetta", ma **ritrovarla sei mesi dopo**. Una ricetta estratta e poi persa in una cartella
-di export non è meglio di un reel salvato su Instagram.
+This module solves the problem the project was born from: not "extracting a recipe", but
+**finding it again six months later**. A recipe extracted and then lost in an export folder
+is no better than a reel saved on Instagram.
 
-Perché SQLite e non un file per ricetta: la ricerca. FTS5 permette di cercare "zucchine"
-o "senza glutine" fra titoli, ingredienti e procedimenti in un colpo solo, che è
-esattamente ciò che serve quando si apre il frigo e si vuole sapere cosa cucinare.
+Why SQLite and not one file per recipe: search. FTS5 makes it possible to look for
+"courgettes" or "gluten free" across titles, ingredients and methods in one go, which is
+exactly what is wanted when you open the fridge and want to know what to cook.
 
-Il database vive in `workspace/`, quindi fuori da git: contiene materiale di terzi. Dove sia
-davvero `workspace/` lo decide `paths.py` — nel container dell'addon è un volume
-persistente, non una cartella accanto al repo.
+The database lives in `workspace/`, so outside git: it holds third-party material. Where
+`workspace/` actually is, is `paths.py`'s decision — in the add-on's container it is a
+persistent volume, not a folder next to the repo.
+
+**The SQL below stays in Italian, deliberately.** Table and column names are not code, they
+are *format*: they are written inside every database already on a user's disk. Renaming them
+would mean an `ALTER TABLE` over live data, which is exactly the destructive migration this
+rename is built to avoid (see docs/naming.md). The same goes for the keys of the dictionary
+`list_` returns: they mirror the stored JSON, and they change when `Recipe`'s fields do, in
+one commit together with the frontend that reads them.
 """
 
 from __future__ import annotations
@@ -29,8 +36,8 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS ricette (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     titolo        TEXT NOT NULL,
-    dati          TEXT NOT NULL,          -- la Ricetta completa in JSON
-    url           TEXT,                   -- fonte, usata per la deduplica
+    dati          TEXT NOT NULL,          -- the whole Recipe as JSON
+    url           TEXT,                   -- source, used for deduplication
     autore        TEXT,
     piattaforma   TEXT,
     ha_incertezze INTEGER NOT NULL DEFAULT 0,
@@ -41,10 +48,10 @@ CREATE TABLE IF NOT EXISTS ricette (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ricette_url
     ON ricette(url) WHERE url IS NOT NULL;
 
--- Indice full-text. Tabella FTS5 standard (non "contentless"): mantiene una propria
--- copia del testo e in cambio supporta DELETE e UPDATE per rowid, che servono quando
--- una ricetta viene corretta o cancellata. La duplicazione del testo è irrilevante per
--- una libreria personale. `remove_diacritics 2` rende la ricerca insensibile agli accenti.
+-- Full-text index. A standard FTS5 table (not "contentless"): it keeps its own copy of the
+-- text and in exchange supports DELETE and UPDATE by rowid, which are needed when a recipe
+-- is corrected or removed. Duplicating the text is irrelevant for a personal library.
+-- `remove_diacritics 2` makes the search insensitive to accents.
 CREATE VIRTUAL TABLE IF NOT EXISTS ricette_fts USING fts5(
     titolo, ingredienti, procedimento, categorie,
     tokenize='unicode61 remove_diacritics 2'
@@ -52,68 +59,69 @@ CREATE VIRTUAL TABLE IF NOT EXISTS ricette_fts USING fts5(
 """
 
 
-class ErroreLibreria(RuntimeError):
+class LibraryError(RuntimeError):
     pass
 
 
-def _adesso() -> str:
+def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def percorso_predefinito() -> Path:
-    """`workspace/ricette.db`, accanto al repo e fuori da git — o dove dice `R2R_WORKSPACE`."""
+def default_path() -> Path:
+    """`workspace/ricette.db`, next to the repo and outside git — or wherever
+    `R2R_WORKSPACE` says."""
     return paths.database_path()
 
 
-class Libreria:
-    """Accesso alla libreria. Usabile come context manager."""
+class Library:
+    """Access to the library. Usable as a context manager."""
 
-    def __init__(self, percorso: Path | str | None = None):
-        self.percorso = Path(percorso) if percorso else percorso_predefinito()
-        self.percorso.parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(self.percorso)
+    def __init__(self, path: Path | str | None = None):
+        self.path = Path(path) if path else default_path()
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._conn = sqlite3.connect(self.path)
         self._conn.row_factory = sqlite3.Row
         self._conn.executescript(SCHEMA)
         self._conn.commit()
-        self._migra_fts_contentless()
+        self._migrate_contentless_fts()
 
-    def _migra_fts_contentless(self) -> None:
-        """Ricostruisce l'indice full-text se è rimasto nella vecchia forma «contentless».
+    def _migrate_contentless_fts(self) -> None:
+        """Rebuilds the full-text index if it is still in the old "contentless" shape.
 
-        Le prime versioni creavano `ricette_fts` con `content=''`, che non ammette DELETE:
-        eliminare o correggere una ricetta sollevava `cannot DELETE from contentless fts5
-        table`. Lo schema è stato corretto, ma `CREATE VIRTUAL TABLE IF NOT EXISTS` non
-        tocca una tabella che esiste già — quindi i database creati prima restavano rotti
-        in silenzio, e se ne accorgeva solo chi provava a cancellare qualcosa.
+        Early versions created `ricette_fts` with `content=''`, which does not allow
+        DELETE: removing or correcting a recipe raised `cannot DELETE from contentless
+        fts5 table`. The schema was fixed, but `CREATE VIRTUAL TABLE IF NOT EXISTS` does
+        not touch a table that already exists — so databases created before stayed broken
+        silently, and only someone trying to delete something would find out.
 
-        Si ricostruisce l'indice, non le ricette: i dati veri stanno in `ricette` e non si
-        toccano. Costa una reindicizzazione, una volta sola.
+        The index is rebuilt, not the recipes: the real data is in `ricette` and is not
+        touched. It costs one reindex, once.
         """
-        riga = self._conn.execute(
+        row = self._conn.execute(
             "SELECT sql FROM sqlite_master WHERE type='table' AND name='ricette_fts'"
         ).fetchone()
-        if not riga or "content=''" not in (riga["sql"] or ""):
+        if not row or "content=''" not in (row["sql"] or ""):
             return
 
-        with self._transazione() as c:
+        with self._transaction() as c:
             c.execute("DROP TABLE ricette_fts")
             c.executescript(SCHEMA)
             for r in c.execute("SELECT id, dati FROM ricette").fetchall():
-                self._indicizza(c, r["id"], Ricetta.from_dict(json.loads(r["dati"])))
+                self._index(c, r["id"], Ricetta.from_dict(json.loads(r["dati"])))
 
-    # ---- ciclo di vita ------------------------------------------------------------
+    # ---- lifecycle ----------------------------------------------------------------
 
-    def __enter__(self) -> "Libreria":
+    def __enter__(self) -> "Library":
         return self
 
     def __exit__(self, *_) -> None:
-        self.chiudi()
+        self.close()
 
-    def chiudi(self) -> None:
+    def close(self) -> None:
         self._conn.close()
 
     @contextmanager
-    def _transazione(self) -> Iterator[sqlite3.Connection]:
+    def _transaction(self) -> Iterator[sqlite3.Connection]:
         try:
             yield self._conn
             self._conn.commit()
@@ -121,99 +129,102 @@ class Libreria:
             self._conn.rollback()
             raise
 
-    # ---- scrittura ----------------------------------------------------------------
+    # ---- writing ------------------------------------------------------------------
 
-    def salva(self, ricetta: Ricetta, sovrascrivi: bool = True) -> int:
-        """Salva una ricetta e ritorna il suo id.
+    def save(self, recipe: Ricetta, overwrite: bool = True) -> int:
+        """Saves a recipe and returns its id.
 
-        Se esiste già una ricetta con lo stesso URL di origine, viene aggiornata invece
-        di crearne una seconda: reimportare lo stesso reel deve correggere la voce
-        esistente, non riempire la libreria di doppioni.
+        If a recipe with the same source URL already exists it is updated rather than
+        creating a second one: re-importing the same reel has to correct the existing
+        entry, not fill the library with duplicates.
         """
-        url = ricetta.fonte.url if ricetta.fonte else None
-        if url and (esistente := self.id_per_url(url)) is not None:
-            if not sovrascrivi:
-                return esistente
-            self.aggiorna(esistente, ricetta)
-            return esistente
+        url = recipe.fonte.url if recipe.fonte else None
+        if url and (existing := self.id_for_url(url)) is not None:
+            if not overwrite:
+                return existing
+            self.update(existing, recipe)
+            return existing
 
-        dati = ricetta.to_json(indent=None)
-        adesso = _adesso()
-        with self._transazione() as c:
-            cursore = c.execute(
+        data = recipe.to_json(indent=None)
+        now = _now()
+        with self._transaction() as c:
+            cursor = c.execute(
                 """INSERT INTO ricette (titolo, dati, url, autore, piattaforma,
                                         ha_incertezze, creata_il, aggiornata_il)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    ricetta.titolo, dati, url,
-                    ricetta.fonte.autore if ricetta.fonte else None,
-                    ricetta.fonte.piattaforma if ricetta.fonte else None,
-                    int(ricetta.ha_incertezze), adesso, adesso,
+                    recipe.titolo, data, url,
+                    recipe.fonte.autore if recipe.fonte else None,
+                    recipe.fonte.piattaforma if recipe.fonte else None,
+                    int(recipe.ha_incertezze), now, now,
                 ),
             )
-            identificativo = int(cursore.lastrowid)
-            self._indicizza(c, identificativo, ricetta)
-        return identificativo
+            identifier = int(cursor.lastrowid)
+            self._index(c, identifier, recipe)
+        return identifier
 
-    def aggiorna(self, identificativo: int, ricetta: Ricetta) -> None:
-        """Sostituisce una ricetta esistente — è ciò che accade quando l'utente
-        corregge a mano un ingrediente nell'interfaccia."""
-        with self._transazione() as c:
-            modificate = c.execute(
+    def update(self, identifier: int, recipe: Ricetta) -> None:
+        """Replaces an existing recipe — which is what happens when the user corrects an
+        ingredient by hand in the interface."""
+        with self._transaction() as c:
+            changed = c.execute(
                 """UPDATE ricette
                       SET titolo = ?, dati = ?, autore = ?, ha_incertezze = ?, aggiornata_il = ?
                     WHERE id = ?""",
                 (
-                    ricetta.titolo, ricetta.to_json(indent=None),
-                    ricetta.fonte.autore if ricetta.fonte else None,
-                    int(ricetta.ha_incertezze), _adesso(), identificativo,
+                    recipe.titolo, recipe.to_json(indent=None),
+                    recipe.fonte.autore if recipe.fonte else None,
+                    int(recipe.ha_incertezze), _now(), identifier,
                 ),
             ).rowcount
-            if not modificate:
-                raise ErroreLibreria(f"Nessuna ricetta con id {identificativo}")
-            c.execute("DELETE FROM ricette_fts WHERE rowid = ?", (identificativo,))
-            self._indicizza(c, identificativo, ricetta)
+            if not changed:
+                raise LibraryError(f"No recipe with id {identifier}")
+            c.execute("DELETE FROM ricette_fts WHERE rowid = ?", (identifier,))
+            self._index(c, identifier, recipe)
 
-    def elimina(self, identificativo: int) -> bool:
-        with self._transazione() as c:
-            eliminate = c.execute("DELETE FROM ricette WHERE id = ?", (identificativo,)).rowcount
-            c.execute("DELETE FROM ricette_fts WHERE rowid = ?", (identificativo,))
-        return bool(eliminate)
+    def delete(self, identifier: int) -> bool:
+        with self._transaction() as c:
+            deleted = c.execute("DELETE FROM ricette WHERE id = ?", (identifier,)).rowcount
+            c.execute("DELETE FROM ricette_fts WHERE rowid = ?", (identifier,))
+        return bool(deleted)
 
     @staticmethod
-    def _indicizza(c: sqlite3.Connection, identificativo: int, ricetta: Ricetta) -> None:
+    def _index(c: sqlite3.Connection, identifier: int, recipe: Ricetta) -> None:
         c.execute(
             "INSERT INTO ricette_fts (rowid, titolo, ingredienti, procedimento, categorie) "
             "VALUES (?, ?, ?, ?, ?)",
             (
-                identificativo,
-                ricetta.titolo,
-                " ".join(i.nome for i in ricetta.ingredienti),
-                " ".join(ricetta.procedimento),
-                " ".join(ricetta.categorie),
+                identifier,
+                recipe.titolo,
+                " ".join(i.nome for i in recipe.ingredienti),
+                " ".join(recipe.procedimento),
+                " ".join(recipe.categorie),
             ),
         )
 
-    # ---- lettura ------------------------------------------------------------------
+    # ---- reading ------------------------------------------------------------------
 
-    def leggi(self, identificativo: int) -> Ricetta | None:
-        riga = self._conn.execute(
-            "SELECT dati FROM ricette WHERE id = ?", (identificativo,)
+    def read(self, identifier: int) -> Ricetta | None:
+        row = self._conn.execute(
+            "SELECT dati FROM ricette WHERE id = ?", (identifier,)
         ).fetchone()
-        return Ricetta.from_dict(json.loads(riga["dati"])) if riga else None
+        return Ricetta.from_dict(json.loads(row["dati"])) if row else None
 
-    def id_per_url(self, url: str) -> int | None:
-        riga = self._conn.execute("SELECT id FROM ricette WHERE url = ?", (url,)).fetchone()
-        return int(riga["id"]) if riga else None
+    def id_for_url(self, url: str) -> int | None:
+        row = self._conn.execute("SELECT id FROM ricette WHERE url = ?", (url,)).fetchone()
+        return int(row["id"]) if row else None
 
-    def elenca(self, cerca: str | None = None, limite: int = 200, scarto: int = 0) -> list[dict]:
-        """Elenco sintetico per la libreria. Con `cerca` valorizzato usa l'indice full-text.
+    def list_(self, search: str | None = None, limit: int = 200, offset: int = 0) -> list[dict]:
+        """Summary listing for the library. With `search` set, it uses the full-text index.
 
-        Ogni voce contiene il minimo per disegnare una scheda: id, titolo, autore,
-        numero di ingredienti e se ci sono incertezze da rivedere.
+        Each entry holds the minimum needed to draw a card: id, title, author, number of
+        ingredients and whether there are uncertainties to review.
+
+        The keys are still Italian on purpose: they mirror the stored JSON, and they change
+        together with `Recipe`'s fields, in one commit with the frontend that reads them.
         """
-        if cerca and cerca.strip():
-            righe = self._conn.execute(
+        if search and search.strip():
+            rows = self._conn.execute(
                 """SELECT r.id, r.titolo, r.autore, r.url, r.piattaforma,
                           r.ha_incertezze, r.creata_il, r.dati
                      FROM ricette_fts f
@@ -221,48 +232,48 @@ class Libreria:
                     WHERE ricette_fts MATCH ?
                     ORDER BY rank
                     LIMIT ? OFFSET ?""",
-                (_query_fts(cerca), limite, scarto),
+                (_fts_query(search), limit, offset),
             ).fetchall()
         else:
-            righe = self._conn.execute(
+            rows = self._conn.execute(
                 """SELECT id, titolo, autore, url, piattaforma, ha_incertezze, creata_il, dati
                      FROM ricette ORDER BY creata_il DESC LIMIT ? OFFSET ?""",
-                (limite, scarto),
+                (limit, offset),
             ).fetchall()
 
-        risultato = []
-        for riga in righe:
-            dati = json.loads(riga["dati"])
-            risultato.append({
-                "id": riga["id"],
-                "titolo": riga["titolo"],
-                "autore": riga["autore"],
-                "url": riga["url"],
-                "piattaforma": riga["piattaforma"],
-                "ha_incertezze": bool(riga["ha_incertezze"]),
-                "creata_il": riga["creata_il"],
-                "porzioni": dati.get("porzioni"),
-                "tempo_totale_min": dati.get("tempo_totale_min"),
-                "categorie": dati.get("categorie") or [],
-                "n_ingredienti": len(dati.get("ingredienti") or []),
-                "copertina": (dati.get("immagini") or [None])[0],
+        result = []
+        for row in rows:
+            data = json.loads(row["dati"])
+            result.append({
+                "id": row["id"],
+                "titolo": row["titolo"],
+                "autore": row["autore"],
+                "url": row["url"],
+                "piattaforma": row["piattaforma"],
+                "ha_incertezze": bool(row["ha_incertezze"]),
+                "creata_il": row["creata_il"],
+                "porzioni": data.get("porzioni"),
+                "tempo_totale_min": data.get("tempo_totale_min"),
+                "categorie": data.get("categorie") or [],
+                "n_ingredienti": len(data.get("ingredienti") or []),
+                "copertina": (data.get("immagini") or [None])[0],
             })
-        return risultato
+        return result
 
-    def tutte(self) -> list[Ricetta]:
-        righe = self._conn.execute("SELECT dati FROM ricette ORDER BY creata_il DESC").fetchall()
-        return [Ricetta.from_dict(json.loads(r["dati"])) for r in righe]
+    def all_recipes(self) -> list[Ricetta]:
+        rows = self._conn.execute("SELECT dati FROM ricette ORDER BY creata_il DESC").fetchall()
+        return [Ricetta.from_dict(json.loads(r["dati"])) for r in rows]
 
-    def conta(self) -> int:
+    def count(self) -> int:
         return int(self._conn.execute("SELECT COUNT(*) AS n FROM ricette").fetchone()["n"])
 
 
-def _query_fts(cerca: str) -> str:
-    """Trasforma una ricerca dell'utente in una query FTS5 sicura.
+def _fts_query(search: str) -> str:
+    """Turns a user's search into a safe FTS5 query.
 
-    I termini vengono citati (così i caratteri speciali di FTS5 non diventano sintassi
-    per sbaglio) e si aggiunge `*` per la corrispondenza per prefisso: cercando "zucch"
-    si trovano sia "zucchine" sia "zucchero".
+    Terms are quoted (so FTS5's special characters do not accidentally become syntax) and
+    `*` is appended for prefix matching: searching "courg" finds both "courgette" and
+    "courgettes".
     """
-    termini = [t for t in cerca.replace('"', " ").split() if t]
-    return " ".join(f'"{t}"*' for t in termini) if termini else '""'
+    terms = [t for t in search.replace('"', " ").split() if t]
+    return " ".join(f'"{t}"*' for t in terms) if terms else '""'
