@@ -9,7 +9,7 @@ o "senza glutine" fra titoli, ingredienti e procedimenti in un colpo solo, che �
 esattamente ciò che serve quando si apre il frigo e si vuole sapere cosa cucinare.
 
 Il database vive in `workspace/`, quindi fuori da git: contiene materiale di terzi. Dove sia
-davvero `workspace/` lo decide `percorsi.py` — nel container dell'addon è un volume
+davvero `workspace/` lo decide `paths.py` — nel container dell'addon è un volume
 persistente, non una cartella accanto al repo.
 """
 
@@ -22,7 +22,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import percorsi
+from . import paths
 from .recipe import Ricetta
 
 SCHEMA = """
@@ -62,7 +62,7 @@ def _adesso() -> str:
 
 def percorso_predefinito() -> Path:
     """`workspace/ricette.db`, accanto al repo e fuori da git — o dove dice `R2R_WORKSPACE`."""
-    return percorsi.percorso_database()
+    return paths.database_path()
 
 
 class Libreria:

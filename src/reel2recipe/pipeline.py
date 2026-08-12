@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import acquire, asr, audio, extract
-from .percorsi import cartella_media
+from .paths import media_folder
 from .recipe import Fonte, Ricetta, da_bozza
 from .units import Catalogo, Lingua, Sistema, Tabelle, carica_tabelle, sigla, testo_da
 
@@ -140,8 +140,8 @@ def _trascrivi_se_possibile(
             percorso_audio = media.percorso
         else:
             su_avanzamento("audio", testo(lingua, "estrazione_audio"))
-            percorso_audio = audio.estrai_audio(media.percorso, cartella_media())
-    except audio.ErroreAudio as e:
+            percorso_audio = audio.extract_audio(media.percorso, media_folder())
+    except audio.AudioError as e:
         avvertenze.append(testo(lingua, "audio_fallito", dettaglio=e))
         return None
 
@@ -167,7 +167,7 @@ def _copertina(media: acquire.Media) -> list[str]:
     if base64_copertina := media.copertina_base64():
         return [base64_copertina]
     if media.percorso and not media.e_audio:
-        if fotogramma := audio.estrai_copertina(media.percorso, cartella_media()):
+        if fotogramma := audio.extract_cover(media.percorso, media_folder()):
             media.copertina = fotogramma
             if base64_copertina := media.copertina_base64():
                 return [base64_copertina]
@@ -268,7 +268,7 @@ def da_url(url: str, su_avanzamento: Avanzamento = _silenzio,
     """La strada principale: si incolla un link e si preme Cook."""
     lingua = kwargs.get("lingua", Lingua.IT)
     su_avanzamento("acquisizione", testo(lingua, "scaricamento"))
-    media = acquire.da_url(url, cartella_media(), cookies_da_browser=cookies_da_browser)
+    media = acquire.da_url(url, media_folder(), cookies_da_browser=cookies_da_browser)
     su_avanzamento("acquisizione", testo(lingua, "scaricato", etichetta=media.etichetta()))
     return lavora(media, su_avanzamento, **kwargs)
 
@@ -290,7 +290,7 @@ def controlla_ambiente(url_ollama: str = extract.URL_OLLAMA_PREDEFINITO) -> dict
     modelli = extract.modelli_disponibili(url_ollama)
     ollama_ok = extract.ollama_attivo(url_ollama)
     return {
-        "ffmpeg": audio.ffmpeg_disponibile(),
+        "ffmpeg": audio.ffmpeg_available(),
         "yt_dlp": acquire.ytdlp_disponibile(),
         "asr_backend": backend,
         "asr_pronto": bool(backend),

@@ -328,7 +328,7 @@ src/reel2recipe/     il codice
   mela.py            export nel formato Mela
   documenti.py       export in Markdown e PDF, per chi non usa Mela
   store.py           il ricettario (SQLite + ricerca full-text)
-  percorsi.py        dove vivono i dati (una sola decisione, spostabile con R2R_WORKSPACE)
+  paths.py           dove vivono i dati (una sola decisione, spostabile con R2R_WORKSPACE)
   pipeline.py        la catena completa
   api.py             l'interfaccia web
   cli.py             i comandi da terminale

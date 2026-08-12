@@ -30,12 +30,12 @@ from pydantic import BaseModel
 from . import pipeline
 from .documenti import ErroreDocumento, scrivi_markdown, scrivi_pdf
 from .mela import scrivi_melarecipe, scrivi_melarecipes, verso_melarecipe
-from .percorsi import RADICE_REPO, cartella_export
+from .paths import REPO_ROOT, export_folder
 from .recipe import Ricetta
 from .store import Libreria
 from .units import Catalogo, testo_da
 
-CARTELLA_WEB = RADICE_REPO / "web"
+CARTELLA_WEB = REPO_ROOT / "web"
 
 
 # Gli errori che l'interfaccia mostra all'utente.
@@ -280,11 +280,11 @@ def crea_app(db: str | None = None, url_ollama: str = "http://localhost:11434") 
 
         try:
             if formato == "markdown":
-                percorso, tipo = scrivi_markdown(ricetta, cartella_export()), "text/markdown"
+                percorso, tipo = scrivi_markdown(ricetta, export_folder()), "text/markdown"
             elif formato == "pdf":
-                percorso, tipo = scrivi_pdf(ricetta, cartella_export()), "application/pdf"
+                percorso, tipo = scrivi_pdf(ricetta, export_folder()), "application/pdf"
             elif formato == "mela":
-                percorso, tipo = scrivi_melarecipe(ricetta, cartella_export()), "application/json"
+                percorso, tipo = scrivi_melarecipe(ricetta, export_folder()), "application/json"
             else:
                 raise HTTPException(400, testo(lingua_ui, "formato_sconosciuto", formato=formato))
         except ErroreDocumento as e:
@@ -299,7 +299,7 @@ def crea_app(db: str | None = None, url_ollama: str = "http://localhost:11434") 
             ricette = lib.tutte()
         if not ricette:
             raise HTTPException(404, testo(lingua_ui, "libreria_vuota"))
-        percorso = scrivi_melarecipes(ricette, cartella_export() / "libreria")
+        percorso = scrivi_melarecipes(ricette, export_folder() / "libreria")
         return FileResponse(percorso, media_type="application/zip", filename=percorso.name)
 
     @app.post("/api/preview-mela")

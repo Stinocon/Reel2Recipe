@@ -54,7 +54,7 @@ TIMEOUT_PREDEFINITO_S = 300.0
 def timeout_llm() -> float:
     """I secondi concessi al modello, da `R2R_TIMEOUT_LLM`.
 
-    Letta a ogni chiamata e non all'import, per la stessa ragione di `percorsi.py`: un valore
+    Letta a ogni chiamata e non all'import, per la stessa ragione di `paths.py`: un valore
     congelato prima che l'ambiente sia pronto è quello sbagliato per sempre.
 
     Un valore malformato **non** deve far cadere il processo. È l'unica di queste variabili

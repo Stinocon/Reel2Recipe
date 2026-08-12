@@ -318,7 +318,7 @@ def da_file(percorso: Path | str, didascalia: str = "", autore: str | None = Non
 
 
 def _e_audio_derivato(percorso: Path) -> bool:
-    """Un `.16k.wav` estratto da noi (v. `audio.estrai_audio`), non un file dell'utente.
+    """Un `.16k.wav` estratto da noi (v. `audio.extract_audio`), non un file dell'utente.
 
     Sta accanto al video da cui viene, quindi una cartella già lavorata contiene entrambi.
     Senza questo controllo `r2r batch` lavora ogni reel **due volte**: una dal video, con la
