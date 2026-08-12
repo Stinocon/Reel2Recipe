@@ -54,6 +54,36 @@ that starts on it, not the tail of one that has been doing something else all da
 4. **Last:** `web/app.js` in the same commit as the `Recipe` field renames it reads, then
    the `data/*.yaml` keys with their loader, then `docs/`.
 
+### What an aborted attempt at `units.py` taught
+
+It was tried at the end of a long session and reverted at roughly 60%. Three findings, so
+the next attempt does not pay for them again.
+
+**1. The JSON keys and the Python attributes are decoupled in one half and welded in the
+other.** `Recipe.to_dict()` builds the ingredient and quantity dictionaries with **string
+literals** (`"nome"`, `"quantita"`, `"valore"`), so `Quantity` and `Ingredient` can be
+renamed freely without touching a single stored recipe. But the top level starts from
+`asdict(self)`, so **`Recipe`'s own fields map straight onto JSON keys** — renaming `titolo`
+really does rename it on disk. The compatibility net in `from_dict` is needed for the top
+level only; the nested objects need nothing.
+
+**2. Renaming the `MESSAGES` keys breaks every call site inside `units.py` at once**, and
+the failures surface one test at a time rather than all together, which makes it look like
+progress when it is a queue. Rename the catalogue keys and their `message(...)` call sites in
+the same pass, or leave the keys alone.
+
+**3. `note` is three different things** and they collide: `Quantity.note` (singular, the
+conversion note), `Ingredient.notes` (the ingredient's own notes) and the `note` parameter
+threaded through `normalise_ingredient` into `_normalise_ingredient`. A blanket rename gets
+two of the three and leaves an `UnboundLocalError` in the middle of the engine. Map the three
+explicitly before starting.
+
+And the practical lesson, which was predicted and then confirmed: **`units.py` needs a
+session that starts on it.** Not because it is hard in itself, but because the cascade
+through its consumers is long, and a session with little budget left ends with a broken tree
+and nothing to show. Reverting cost nothing because everything else was committed — keep
+that property.
+
 `extract.py` carries an obligation the others do not: it holds the system prompts and the
 JSON schema, so after touching it the model gate has to run —
 `R2R_TEST_MODELLO=1 uv run pytest tests/test_modello.py`, roughly two minutes, and it needs
