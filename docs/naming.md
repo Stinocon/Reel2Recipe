@@ -30,9 +30,32 @@ is mandatory.
 3. `./check.sh` green **before** moving to the next module. Never leave a half-renamed tree.
 4. Leaves first, `units.py` and `recipe.py` last: everything depends on them.
 
-Suggested order — `asr.py` (done, use it as the reference) → `audio.py` → `acquire.py` →
-`percorsi.py` → `extract.py` → `store.py` → `mela.py` → `documenti.py` → `pipeline.py` →
-`api.py` → `cli.py` → `units.py` → `recipe.py` → `web/app.js` → `data/*.yaml` keys → `docs/`.
+### Order — revised after the first four modules
+
+The first version of this list said "leaves first, core last", and that is right for *risk*
+but wrong for *churn*: every module that touches `Recipe` has to be opened twice, once for
+its own identifiers and again when `recipe.py`'s fields are renamed. Converting `units.py`
+and `recipe.py` **before** their consumers avoids the second pass.
+
+The two are not swapped blindly, though. `units.py` is the conversion engine — the most
+delicate code in the project (`AGENTS.md §3`) — and it is 1270 lines. It wants a session
+that starts on it, not the tail of one that has been doing something else all day.
+
+1. **Done:** `asr.py` (the reference for how prose is handled), `percorsi.py` → `paths.py`,
+   `audio.py`, `acquire.py`. All leaves: nothing but the standard library below them.
+2. **Next, on a fresh session:** `units.py`, then `recipe.py`. Highest risk, and everything
+   downstream depends on the names they settle. `recipe.py` is where the compatibility net
+   for `from_dict` goes in, in the same commit as the field renames.
+3. **Then, once each:** `store.py`, `mela.py`, `documenti.py`, `extract.py`, `pipeline.py`,
+   `api.py`, `cli.py` (internals only — its public surface is already English).
+4. **Last:** `web/app.js` in the same commit as the `Recipe` field renames it reads, then
+   the `data/*.yaml` keys with their loader, then `docs/`.
+
+`extract.py` carries an obligation the others do not: it holds the system prompts and the
+JSON schema, so after touching it the model gate has to run —
+`R2R_TEST_MODELLO=1 uv run pytest tests/test_modello.py`, roughly two minutes, and it needs
+Ollama up. Renaming identifiers around the prompts does not change them, but the gate is
+cheap next to the risk of finding out later.
 
 ## What must NOT be renamed
 
