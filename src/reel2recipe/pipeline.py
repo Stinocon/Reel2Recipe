@@ -131,16 +131,16 @@ def _trascrivi_se_possibile(
 ) -> asr.Transcript | None:
     """Estrae l'audio e lo trascrive. Ogni fallimento diventa un'avvertenza, non un'eccezione:
     la didascalia da sola può bastare."""
-    if media.percorso is None:
+    if media.path is None:
         avvertenze.append(testo(lingua, "senza_media"))
         return None
 
     try:
-        if media.e_audio:
-            percorso_audio = media.percorso
+        if media.is_audio:
+            percorso_audio = media.path
         else:
             su_avanzamento("audio", testo(lingua, "estrazione_audio"))
-            percorso_audio = audio.extract_audio(media.percorso, media_folder())
+            percorso_audio = audio.extract_audio(media.path, media_folder())
     except audio.AudioError as e:
         avvertenze.append(testo(lingua, "audio_fallito", dettaglio=e))
         return None
@@ -164,12 +164,12 @@ def _trascrivi_se_possibile(
 def _copertina(media: acquire.Media) -> list[str]:
     """Un'immagine di copertina per la ricetta, se ottenibile. Non è essenziale:
     un fallimento qui non deve costare una ricetta."""
-    if base64_copertina := media.copertina_base64():
+    if base64_copertina := media.cover_base64():
         return [base64_copertina]
-    if media.percorso and not media.e_audio:
-        if fotogramma := audio.extract_cover(media.percorso, media_folder()):
-            media.copertina = fotogramma
-            if base64_copertina := media.copertina_base64():
+    if media.path and not media.is_audio:
+        if fotogramma := audio.extract_cover(media.path, media_folder()):
+            media.cover = fotogramma
+            if base64_copertina := media.cover_base64():
                 return [base64_copertina]
     return []
 
@@ -207,39 +207,39 @@ def lavora(
         )
 
     testo_trascrizione = trascrizione.text if trascrizione else ""
-    if not media.didascalia.strip() and not testo_trascrizione.strip():
+    if not media.caption.strip() and not testo_trascrizione.strip():
         return Esito(
             media=media,
             avvertenze=avvertenze,
             errore=testo(lingua, "niente_da_analizzare"),
         )
 
-    if media.commenti_autore:
+    if media.author_comments:
         su_avanzamento("estrazione", testo(lingua, "commenti_autore",
-                                           quanti=len(media.commenti_autore)))
+                                           quanti=len(media.author_comments)))
 
     su_avanzamento("estrazione", testo(lingua, "ricostruzione"))
     esito_estrazione = extract.estrai_bozza(
-        didascalia=media.didascalia,
+        didascalia=media.caption,
         trascrizione=testo_trascrizione,
-        titolo=media.titolo,
+        titolo=media.title,
         modello=modello_llm,
         url=url_ollama,
-        commenti_autore=media.commenti_autore,
+        commenti_autore=media.author_comments,
         lingua=sigla(lingua),
     )
 
     if not esito_estrazione.e_una_ricetta:
-        raise NonEUnaRicetta(testo(lingua, "non_una_ricetta", etichetta=media.etichetta()))
+        raise NonEUnaRicetta(testo(lingua, "non_una_ricetta", etichetta=media.label()))
 
     su_avanzamento("conversione", testo(lingua, "conversione"))
     ricetta = da_bozza(
         esito_estrazione.bozza,
         fonte=Fonte.adesso(
             url=media.url,
-            autore=media.autore,
-            piattaforma=media.piattaforma,
-            titolo_originale=media.titolo,
+            autore=media.author,
+            piattaforma=media.platform,
+            titolo_originale=media.title,
         ),
         immagini=_copertina(media),
         trascrizione=testo_trascrizione or None,
@@ -248,7 +248,7 @@ def lavora(
         sistema=sistema,
     )
 
-    if not media.didascalia.strip():
+    if not media.caption.strip():
         avvertenze.append(testo(lingua, "solo_parlato"))
     if not testo_trascrizione.strip():
         avvertenze.append(testo(lingua, "solo_didascalia"))
@@ -268,8 +268,8 @@ def da_url(url: str, su_avanzamento: Avanzamento = _silenzio,
     """La strada principale: si incolla un link e si preme Cook."""
     lingua = kwargs.get("lingua", Lingua.IT)
     su_avanzamento("acquisizione", testo(lingua, "scaricamento"))
-    media = acquire.da_url(url, media_folder(), cookies_da_browser=cookies_da_browser)
-    su_avanzamento("acquisizione", testo(lingua, "scaricato", etichetta=media.etichetta()))
+    media = acquire.from_url(url, media_folder(), cookies_from_browser=cookies_da_browser)
+    su_avanzamento("acquisizione", testo(lingua, "scaricato", etichetta=media.label()))
     return lavora(media, su_avanzamento, **kwargs)
 
 
@@ -277,7 +277,7 @@ def da_file(percorso: Path | str, didascalia: str = "",
             su_avanzamento: Avanzamento = _silenzio, **kwargs) -> Esito:
     """Per i reel già salvati sul disco, o quando lo scaricamento non è possibile."""
     su_avanzamento("acquisizione", testo(kwargs.get("lingua", Lingua.IT), "lettura_file"))
-    media = acquire.da_file(percorso, didascalia=didascalia)
+    media = acquire.from_file(percorso, caption=didascalia)
     return lavora(media, su_avanzamento, **kwargs)
 
 
@@ -291,7 +291,7 @@ def controlla_ambiente(url_ollama: str = extract.URL_OLLAMA_PREDEFINITO) -> dict
     ollama_ok = extract.ollama_attivo(url_ollama)
     return {
         "ffmpeg": audio.ffmpeg_available(),
-        "yt_dlp": acquire.ytdlp_disponibile(),
+        "yt_dlp": acquire.ytdlp_available(),
         "asr_backend": backend,
         "asr_pronto": bool(backend),
         "ollama_attivo": ollama_ok,

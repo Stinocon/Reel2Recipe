@@ -12,12 +12,12 @@ from pathlib import Path
 
 import pytest
 
-from reel2recipe.acquire import ErroreAcquisizione, _opzioni_ytdlp
+from reel2recipe.acquire import AcquisitionError, _ytdlp_options
 
 
 def test_senza_variabile_nessun_cookie(monkeypatch, tmp_path):
     monkeypatch.delenv("R2R_COOKIES", raising=False)
-    opzioni = _opzioni_ytdlp(tmp_path, cookies_da_browser=None)
+    opzioni = _ytdlp_options(tmp_path, cookies_from_browser=None)
     assert "cookiefile" not in opzioni
     assert "cookiesfrombrowser" not in opzioni
 
@@ -26,7 +26,7 @@ def test_file_di_cookie_dalla_variabile(monkeypatch, tmp_path):
     file = tmp_path / "cookies.txt"
     file.write_text("# Netscape HTTP Cookie File\n")
     monkeypatch.setenv("R2R_COOKIES", str(file))
-    usato = Path(_opzioni_ytdlp(tmp_path, cookies_da_browser=None)["cookiefile"])
+    usato = Path(_ytdlp_options(tmp_path, cookies_from_browser=None)["cookiefile"])
     assert usato.is_file() and usato.read_text() == file.read_text()
 
 
@@ -39,7 +39,7 @@ def test_il_file_dell_utente_non_viene_mai_toccato(monkeypatch, tmp_path):
     file.write_text("# Netscape HTTP Cookie File\n")
     monkeypatch.setenv("R2R_COOKIES", str(file))
 
-    usato = Path(_opzioni_ytdlp(tmp_path, cookies_da_browser=None)["cookiefile"])
+    usato = Path(_ytdlp_options(tmp_path, cookies_from_browser=None)["cookiefile"])
     assert usato != file, "si sta usando il file dell'utente invece di una copia"
 
     # Simula la riscrittura di yt-dlp: deve finire sulla copia, non sull'originale.
@@ -61,8 +61,8 @@ def test_una_sorgente_illeggibile_lo_dice(monkeypatch, tmp_path):
         "reel2recipe.acquire.shutil.copyfile",
         lambda *a, **k: (_ for _ in ()).throw(OSError("disco pieno")),
     )
-    with pytest.raises(ErroreAcquisizione, match="cookie"):
-        _opzioni_ytdlp(tmp_path, cookies_da_browser=None)
+    with pytest.raises(AcquisitionError, match="cookie"):
+        _ytdlp_options(tmp_path, cookies_from_browser=None)
 
 
 def test_il_browser_ha_la_precedenza(monkeypatch, tmp_path):
@@ -70,7 +70,7 @@ def test_il_browser_ha_la_precedenza(monkeypatch, tmp_path):
     file = tmp_path / "cookies.txt"
     file.write_text("# Netscape HTTP Cookie File\n")
     monkeypatch.setenv("R2R_COOKIES", str(file))
-    opzioni = _opzioni_ytdlp(tmp_path, cookies_da_browser="chrome")
+    opzioni = _ytdlp_options(tmp_path, cookies_from_browser="chrome")
     assert opzioni["cookiesfrombrowser"] == ("chrome",)
     assert "cookiefile" not in opzioni
 
@@ -78,8 +78,8 @@ def test_il_browser_ha_la_precedenza(monkeypatch, tmp_path):
 def test_percorso_inesistente_fallisce_subito(monkeypatch, tmp_path):
     """Meglio un errore che nomina la causa che un download che fallisce per «login richiesto»."""
     monkeypatch.setenv("R2R_COOKIES", str(tmp_path / "non-esiste.txt"))
-    with pytest.raises(ErroreAcquisizione, match="R2R_COOKIES"):
-        _opzioni_ytdlp(tmp_path, cookies_da_browser=None)
+    with pytest.raises(AcquisitionError, match="R2R_COOKIES"):
+        _ytdlp_options(tmp_path, cookies_from_browser=None)
 
 
 def test_la_copia_dei_cookie_e_privata_e_imprevedibile(monkeypatch, tmp_path):
@@ -93,8 +93,8 @@ def test_la_copia_dei_cookie_e_privata_e_imprevedibile(monkeypatch, tmp_path):
     file.write_text("# Netscape HTTP Cookie File\n")
     monkeypatch.setenv("R2R_COOKIES", str(file))
 
-    prima = Path(_opzioni_ytdlp(tmp_path, cookies_da_browser=None)["cookiefile"])
-    dopo = Path(_opzioni_ytdlp(tmp_path, cookies_da_browser=None)["cookiefile"])
+    prima = Path(_ytdlp_options(tmp_path, cookies_from_browser=None)["cookiefile"])
+    dopo = Path(_ytdlp_options(tmp_path, cookies_from_browser=None)["cookiefile"])
 
     modo = stat.S_IMODE(os.stat(prima).st_mode)
     assert modo == 0o600, f"la copia e' leggibile da altri: {oct(modo)}"
@@ -108,11 +108,11 @@ def test_il_batch_non_rilavora_l_audio_che_ha_estratto_lui(tmp_path):
     Senza filtro, `r2r batch` puntato li lavora ogni reel due volte: la seconda dal solo
     audio, che non ha didascalia ne URL, quindi non si deduplica e finisce in libreria come
     una ricetta piu povera. Verificato sul campo, con otto duplicati da ripulire a mano."""
-    from reel2recipe.acquire import da_cartella
+    from reel2recipe.acquire import from_folder
 
     (tmp_path / "reel.mp4").write_bytes(b"x")
     (tmp_path / "reel.16k.wav").write_bytes(b"x")     # derivato: da saltare
     (tmp_path / "podcast.wav").write_bytes(b"x")      # audio vero dell'utente: da tenere
 
-    nomi = sorted(m.percorso.name for m in da_cartella(tmp_path))
+    nomi = sorted(m.path.name for m in from_folder(tmp_path))
     assert nomi == ["podcast.wav", "reel.mp4"]
