@@ -1,6 +1,6 @@
 # Architettura
 
-Il *perché* delle scelte. Per il *cosa* c'è il [README](../README.md); per gli aspetti legali
+Il *perché* delle scelte. Per il *cosa* c'è il [README](../README.it.md); per gli aspetti legali
 c'è [`legale.md`](legale.md).
 
 ---

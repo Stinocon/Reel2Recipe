@@ -1,5 +1,19 @@
 # Condizioni d'uso
 
+> **In English — non-binding summary.** Reel2Recipe is a personal, non-commercial project,
+> published as is and **without warranty of any kind**. Extraction is automatic and can be
+> wrong: **check the amounts and times before you cook**, and if you have allergies go back
+> to the original source, which is always cited. Use it on content **you have already
+> saved**, for **yourself**: downloading reels from Instagram breaches that platform's Terms
+> of Use, and redistributing a creator's prose breaches their copyright — the tool rewrites
+> the method and always credits the source for exactly that reason. Your data never leaves
+> your machine.
+>
+> This summary exists to be understood, not to be relied on. **The Italian text below is the
+> authoritative one**: it is more precise, and where the two appear to differ, the Italian
+> wins. Keeping two legally operative versions in step is a promise this project is not in a
+> position to make.
+
 Questo è il testo rivolto a **chi usa** Reel2Recipe. L'analisi giuridica che sta dietro alle
 scelte di progetto è un'altra cosa e vive in [`legale.md`](legale.md).
 
