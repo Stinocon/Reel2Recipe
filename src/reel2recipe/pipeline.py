@@ -231,6 +231,10 @@ def controlla_ambiente(url_ollama: str = extract.URL_OLLAMA_PREDEFINITO) -> dict
         "asr_pronto": bool(backend),
         "ollama_attivo": ollama_ok,
         "modelli_llm": modelli,
+        # Quale modello suggerire a chi non ne ha nessuno. Viene da qui e non è scritto nella
+        # pagina, perché una stringa duplicata nel frontend invecchia da sola: consigliava il
+        # 7b mentre l'add-on installava il 14b.
+        "modello_consigliato": extract.MODELLI_PREFERITI[0],
         "llm_pronto": ollama_ok and bool(modelli),
         # Il minimo per poter lavorare qualcosa: senza LLM non si struttura nulla.
         "pronto": ollama_ok and bool(modelli),

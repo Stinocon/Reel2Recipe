@@ -327,7 +327,7 @@ def comando_check(args) -> int:
          "" if stato["ollama_attivo"] else "spento → ollama serve")
     riga("Modelli LLM", bool(stato["modelli_llm"]),
          ", ".join(stato["modelli_llm"]) if stato["modelli_llm"]
-         else "nessuno → ollama pull qwen2.5:7b-instruct")
+         else f"nessuno → ollama pull {stato['modello_consigliato']}")
 
     print()
     if stato["pronto"]:
