@@ -48,7 +48,7 @@ def _pare_un_url(testo: str) -> bool:
 
 def comando_cook(args) -> int:
     from . import pipeline
-    from .acquire import ErroreAcquisizione
+    from .acquire import AcquisitionError
     from .extract import ErroreEstrazione
     from .store import Libreria
 
@@ -75,7 +75,7 @@ def comando_cook(args) -> int:
     except pipeline.NonEUnaRicetta as e:
         print(errore(f"\n✗ {e}"))
         return 2
-    except (ErroreAcquisizione, ErroreEstrazione) as e:
+    except (AcquisitionError, ErroreEstrazione) as e:
         print(errore(f"\n✗ {e}"))
         return 1
 
@@ -137,10 +137,10 @@ def comando_batch(args) -> int:
     sorgente = Path(args.sorgente)
     lavori: list = []
     if sorgente.is_dir():
-        media = acquire.da_cartella(sorgente)
+        media = acquire.from_folder(sorgente)
         lavori = [("media", m) for m in media]
     elif sorgente.suffix == ".txt":
-        lavori = [("url", u) for u in acquire.leggi_elenco_url(sorgente)]
+        lavori = [("url", u) for u in acquire.read_url_list(sorgente)]
     else:
         print(errore("Batch needs a folder of files, or a .txt of URLs (one per line)."))
         return 1
@@ -149,7 +149,7 @@ def comando_batch(args) -> int:
     riuscite, ricette = 0, []
     with Libreria(args.db) as lib:
         for indice, (tipo, elemento) in enumerate(lavori, 1):
-            etichetta = elemento if tipo == "url" else elemento.etichetta()
+            etichetta = elemento if tipo == "url" else elemento.label()
             print(_c(f"[{indice}/{len(lavori)}] {etichetta}", "1"))
             try:
                 if tipo == "url":

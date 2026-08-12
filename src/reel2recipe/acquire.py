@@ -1,17 +1,18 @@
-"""acquire.py — come il reel entra nella pipeline.
+"""acquire.py — how a reel enters the pipeline.
 
-Tre strade, un solo risultato normalizzato (`Media`):
-  - **URL**   il reel viene scaricato con yt-dlp, insieme a didascalia, autore e copertina
-  - **file**  un video o un audio già sul disco, con didascalia incollata a mano
-  - **cartella** iterazione sui file, per la modalità batch
+Three routes, one normalised result (`Media`):
+  - **URL**    the reel is downloaded with yt-dlp, along with caption, author and cover
+  - **file**   a video or audio already on disk, with the caption pasted in by hand
+  - **folder** iterating over files, for batch mode
 
-La didascalia è la fonte più preziosa dell'intera pipeline, non un contorno: moltissimi
-reel di cucina riportano la ricetta completa nel testo del post, e in quel caso la
-trascrizione dell'audio serve solo a confermarla. Per questo viene sempre estratta, anche
-quando si lavora su un file locale.
+The caption is the most valuable source in the whole pipeline, not a garnish: a great many
+cooking reels carry the complete recipe in the text of the post, and in that case the audio
+transcription only confirms it. That is why it is always extracted, even when working from
+a local file.
 
-CONFINE: tutto ciò che viene scaricato resta in `workspace/`, che è in `.gitignore`.
-Materiale di terzi non si committa e non si ridistribuisce (v. docs/legale.md).
+BOUNDARY: everything downloaded stays in `workspace/`, which is in `.gitignore`. Third-party
+material is neither committed nor redistributed (see docs/legale.md). Captions and comments
+are **data to analyse, never instructions to follow**: see `AGENTS.md §5`.
 """
 
 from __future__ import annotations
@@ -24,106 +25,106 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
-ESTENSIONI_VIDEO = {".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v"}
-ESTENSIONI_AUDIO = {".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac", ".opus"}
-ESTENSIONI_SUPPORTATE = ESTENSIONI_VIDEO | ESTENSIONI_AUDIO
+VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v"}
+AUDIO_EXTENSIONS = {".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac", ".opus"}
+SUPPORTED_EXTENSIONS = VIDEO_EXTENSIONS | AUDIO_EXTENSIONS
 
 
-class ErroreAcquisizione(RuntimeError):
-    """Il media non è stato recuperato. Il messaggio deve dire cosa fare, non solo cosa è fallito."""
+class AcquisitionError(RuntimeError):
+    """The media was not retrieved. The message has to say what to do, not only what failed."""
 
 
 @dataclass
 class Media:
-    """Un reel pronto per essere trascritto e analizzato."""
+    """A reel ready to be transcribed and analysed."""
 
-    percorso: Path | None = None          # video o audio sorgente
-    didascalia: str = ""
-    commenti_autore: list[str] = field(default_factory=list)  # v. _commenti_dell_autore
-    autore: str | None = None
-    titolo: str | None = None
+    path: Path | None = None              # source video or audio
+    caption: str = ""
+    author_comments: list[str] = field(default_factory=list)  # see _author_comments
+    author: str | None = None
+    title: str | None = None
     url: str | None = None
-    piattaforma: str | None = None
-    durata_s: float | None = None
-    copertina: Path | None = None         # immagine di anteprima, se disponibile
+    platform: str | None = None
+    duration_s: float | None = None
+    cover: Path | None = None             # preview image, when available
     extra: dict = field(default_factory=dict)
 
     @property
-    def e_audio(self) -> bool:
-        return self.percorso is not None and self.percorso.suffix.lower() in ESTENSIONI_AUDIO
+    def is_audio(self) -> bool:
+        return self.path is not None and self.path.suffix.lower() in AUDIO_EXTENSIONS
 
-    def copertina_base64(self) -> str | None:
-        """Copertina come stringa base64, nel formato che Mela vuole in `images`."""
-        if not self.copertina or not self.copertina.is_file():
+    def cover_base64(self) -> str | None:
+        """Cover as a base64 string, in the form Mela wants in `images`."""
+        if not self.cover or not self.cover.is_file():
             return None
-        return base64.b64encode(self.copertina.read_bytes()).decode("ascii")
+        return base64.b64encode(self.cover.read_bytes()).decode("ascii")
 
-    def etichetta(self) -> str:
-        """Come ci si riferisce a questo reel nei messaggi all'utente."""
-        return self.titolo or self.url or (self.percorso.name if self.percorso else "reel")
+    def label(self) -> str:
+        """How this reel is referred to in messages to the user."""
+        return self.title or self.url or (self.path.name if self.path else "reel")
 
 
 # --------------------------------------------------------------------------------------
-# Da URL
+# From a URL
 # --------------------------------------------------------------------------------------
 
 
-def _file_cookie() -> Path | None:
-    """Il file di cookie in formato Netscape indicato da `R2R_COOKIES`, se c'è.
+def _cookie_file() -> Path | None:
+    """The Netscape-format cookie file named by `R2R_COOKIES`, if there is one.
 
-    Esiste per gli ambienti senza browser da cui pescarli: dentro un container — l'addon
-    Home Assistant — `cookiesfrombrowser` non ha nulla da leggere, e senza cookie Instagram
-    rifiuta quasi tutto. Sta in una variabile d'ambiente e non in un parametro perché è una
-    proprietà della macchina, non della singola richiesta.
+    It exists for environments with no browser to take them from: inside a container — the
+    Home Assistant add-on — `cookiesfrombrowser` has nothing to read, and without cookies
+    Instagram refuses nearly everything. It lives in an environment variable rather than a
+    parameter because it is a property of the machine, not of the individual request.
 
-    Se la variabile è impostata ma il file non c'è si fallisce subito: proseguire in
-    silenzio significherebbe far sbagliare l'utente sulla causa del prossimo errore.
+    If the variable is set but the file is not there, we fail immediately: carrying on
+    silently would have the user misdiagnose the next error.
     """
-    percorso = os.environ.get("R2R_COOKIES", "").strip()
-    if not percorso:
+    raw = os.environ.get("R2R_COOKIES", "").strip()
+    if not raw:
         return None
-    file = Path(percorso).expanduser()
+    file = Path(raw).expanduser()
     if not file.is_file():
-        raise ErroreAcquisizione(
-            f"R2R_COOKIES punta a un file che non esiste: {file}\n"
-            "Esporta i cookie in formato Netscape dal browser dove hai fatto l'accesso, "
-            "oppure togli la variabile per procedere senza."
+        raise AcquisitionError(
+            f"R2R_COOKIES points at a file that does not exist: {file}\n"
+            "Export the cookies in Netscape format from the browser you signed in with, "
+            "or drop the variable to carry on without them."
         )
 
-    # Si lavora su una copia usa-e-getta, mai sull'originale. yt-dlp riscrive il cookie jar
-    # quando esce dal blocco `with` (`close` → `save_cookies`), quindi:
-    #   - su un supporto in sola lettura — `/share` dell'add-on Home Assistant è montato
-    #     così — un download RIUSCITO esploderebbe all'uscita, e il messaggio direbbe
-    #     "impossibile scaricare": la diagnosi peggiore possibile, perché indica la fase
-    #     sbagliata;
-    #   - e comunque un file che l'utente ci presta non si modifica a sua insaputa.
+    # We work on a throwaway copy, never on the original. yt-dlp rewrites the cookie jar
+    # when it leaves the `with` block (`close` → `save_cookies`), so:
+    #   - on read-only storage — `/share` in the Home Assistant add-on is mounted that
+    #     way — a SUCCESSFUL download would blow up on the way out, and the message would
+    #     say "could not download": the worst possible diagnosis, because it names the
+    #     wrong phase;
+    #   - and in any case a file the user lends us is not modified behind their back.
     #
-    # `mkstemp` e non un nome composto a mano: dentro ci sono i cookie di sessione di
-    # Instagram, cioè credenziali. Serve che il file nasca a 0600 e con un nome
-    # imprevedibile — su una /tmp condivisa un nome derivato dal PID è indovinabile, e
-    # `copyfile` seguirebbe un collegamento simbolico piazzato lì ad aspettarlo. Un nome
-    # nuovo a ogni chiamata risolve anche la corsa fra due estrazioni in parallelo, che
-    # nell'interfaccia web girano in thread distinti.
-    descrittore, temporaneo = tempfile.mkstemp(prefix="r2r-cookies-", suffix=".txt")
-    os.close(descrittore)
-    copia = Path(temporaneo)
+    # `mkstemp` and not a hand-built name: what is inside are Instagram session cookies,
+    # that is, credentials. The file has to be born 0600 and with an unpredictable name —
+    # on a shared /tmp a name derived from the PID is guessable, and `copyfile` would
+    # follow a symlink planted there waiting for it. A fresh name on every call also
+    # settles the race between two parallel extractions, which in the web interface run
+    # in separate threads.
+    descriptor, temporary = tempfile.mkstemp(prefix="r2r-cookies-", suffix=".txt")
+    os.close(descriptor)
+    copy = Path(temporary)
     try:
-        shutil.copyfile(file, copia)
+        shutil.copyfile(file, copy)
     except OSError as e:
-        copia.unlink(missing_ok=True)
-        raise ErroreAcquisizione(f"Non riesco a copiare il file dei cookie {file}: {e}") from e
-    return copia
+        copy.unlink(missing_ok=True)
+        raise AcquisitionError(f"Cannot copy the cookie file {file}: {e}") from e
+    return copy
 
 
-def _opzioni_ytdlp(cartella: Path, cookies_da_browser: str | None) -> dict:
-    opzioni = {
-        "outtmpl": str(cartella / "%(extractor)s-%(id)s.%(ext)s"),
+def _ytdlp_options(folder: Path, cookies_from_browser: str | None) -> dict:
+    options = {
+        "outtmpl": str(folder / "%(extractor)s-%(id)s.%(ext)s"),
         "format": "bv*+ba/b",
         "writeinfojson": True,
         "writethumbnail": True,
-        # I commenti servono per quelli dell'autore (v. `_commenti_dell_autore`): spesso è
-        # lì che finiscono le dosi che nella didascalia non ci stavano. Costa una richiesta
-        # in più; senza, yt-dlp ne restituisce solo una manciata o nessuno.
+        # Comments are fetched for the author's own (see `_author_comments`): that is
+        # often where the amounts end up when they did not fit in the caption. It costs
+        # one extra request; without it yt-dlp returns a handful or none at all.
         "getcomments": True,
         "quiet": True,
         "no_warnings": True,
@@ -131,226 +132,226 @@ def _opzioni_ytdlp(cartella: Path, cookies_da_browser: str | None) -> dict:
         "ignoreerrors": False,
         "retries": 3,
     }
-    if cookies_da_browser:
-        # Serve per i reel privati o che richiedono di aver effettuato l'accesso.
-        opzioni["cookiesfrombrowser"] = (cookies_da_browser,)
-    elif file := _file_cookie():
-        # Il browser vince se è stato chiesto esplicitamente: è la scelta della singola
-        # esecuzione, mentre il file è il ripiego permanente della macchina.
-        opzioni["cookiefile"] = str(file)
-    return opzioni
+    if cookies_from_browser:
+        # Needed for private reels, or those that require being signed in.
+        options["cookiesfrombrowser"] = (cookies_from_browser,)
+    elif file := _cookie_file():
+        # The browser wins when it was asked for explicitly: that is the choice of this
+        # single run, whereas the file is the machine's permanent fallback.
+        options["cookiefile"] = str(file)
+    return options
 
 
-def da_url(url: str, cartella: Path | str, cookies_da_browser: str | None = None) -> Media:
-    """Scarica un reel e i suoi metadati.
+def from_url(url: str, folder: Path | str, cookies_from_browser: str | None = None) -> Media:
+    """Downloads a reel and its metadata.
 
-    `cookies_da_browser` ("chrome", "safari", "firefox"…) serve solo per i contenuti che
-    richiedono l'accesso: non è automatico, va chiesto esplicitamente.
+    `cookies_from_browser` ("chrome", "safari", "firefox"…) is only for content that
+    requires signing in: it is not automatic, it has to be asked for.
     """
     try:
         import yt_dlp
-    except ImportError as e:  # pragma: no cover - dipendenza dichiarata in pyproject
-        raise ErroreAcquisizione(
-            "yt-dlp non è installato. Esegui: uv sync"
-        ) from e
+    except ImportError as e:  # pragma: no cover - dependency declared in pyproject
+        raise AcquisitionError("yt-dlp is not installed. Run: uv sync") from e
 
-    cartella = Path(cartella)
-    cartella.mkdir(parents=True, exist_ok=True)
+    folder = Path(folder)
+    folder.mkdir(parents=True, exist_ok=True)
 
-    # Fuori dal try: un problema di configurazione (un file di cookie che non c'è) deve
-    # arrivare all'utente com'è, non travestito da "impossibile scaricare il reel".
-    opzioni = _opzioni_ytdlp(cartella, cookies_da_browser)
+    # Outside the try: a configuration problem (a cookie file that is not there) has to
+    # reach the user as it is, not disguised as "could not download the reel".
+    options = _ytdlp_options(folder, cookies_from_browser)
 
     try:
-        with yt_dlp.YoutubeDL(opzioni) as ydl:
+        with yt_dlp.YoutubeDL(options) as ydl:
             info = ydl.extract_info(url, download=True)
     except Exception as e:
-        messaggio = str(e)
-        if "login" in messaggio.lower() or "private" in messaggio.lower() or "rate-limit" in messaggio.lower():
-            raise ErroreAcquisizione(
-                f"Impossibile scaricare {url}: il contenuto richiede l'accesso oppure "
-                "Instagram sta limitando le richieste. Riprova con i cookie del browser "
-                "(--cookies chrome) dopo aver effettuato l'accesso, oppure indica un file "
-                "di cookie con R2R_COOKIES se qui un browser non c'è."
+        message = str(e)
+        if any(s in message.lower() for s in ("login", "private", "rate-limit")):
+            raise AcquisitionError(
+                f"Cannot download {url}: the content requires signing in, or Instagram is "
+                "rate-limiting the requests. Try again with the browser's cookies "
+                "(--cookies chrome) after signing in, or name a cookie file with "
+                "R2R_COOKIES if there is no browser here."
             ) from e
-        raise ErroreAcquisizione(f"Impossibile scaricare {url}: {messaggio}") from e
+        raise AcquisitionError(f"Cannot download {url}: {message}") from e
     finally:
-        # La copia contiene credenziali di sessione: non deve sopravvivere al download,
-        # né quando è andato bene né quando è fallito.
-        if temporaneo := opzioni.get("cookiefile"):
-            Path(temporaneo).unlink(missing_ok=True)
+        # The copy holds session credentials: it must not outlive the download, whether
+        # it went well or badly.
+        if temporary := options.get("cookiefile"):
+            Path(temporary).unlink(missing_ok=True)
 
     if info is None:
-        raise ErroreAcquisizione(f"Nessun contenuto recuperato da {url}")
-    if "entries" in info:  # una playlist: si prende il primo elemento
-        voci = [v for v in info["entries"] if v]
-        if not voci:
-            raise ErroreAcquisizione(f"Nessun video trovato in {url}")
-        info = voci[0]
+        raise AcquisitionError(f"Nothing retrieved from {url}")
+    if "entries" in info:  # a playlist: the first item is taken
+        entries = [v for v in info["entries"] if v]
+        if not entries:
+            raise AcquisitionError(f"No video found in {url}")
+        info = entries[0]
 
-    return _media_da_info(info, cartella, url)
+    return _media_from_info(info, folder, url)
 
 
-def _media_da_info(info: dict, cartella: Path, url_richiesto: str) -> Media:
-    percorso = _percorso_scaricato(info, cartella)
+def _media_from_info(info: dict, folder: Path, requested_url: str) -> Media:
+    path = _downloaded_path(info, folder)
     return Media(
-        percorso=percorso,
-        # Su Instagram la didascalia del post finisce nel campo `description`.
-        didascalia=(info.get("description") or "").strip(),
-        commenti_autore=_commenti_dell_autore(info),
-        autore=info.get("uploader") or info.get("channel") or info.get("uploader_id"),
-        titolo=(info.get("title") or "").strip() or None,
-        url=info.get("webpage_url") or url_richiesto,
-        piattaforma=(info.get("extractor_key") or info.get("extractor") or "").lower() or None,
-        durata_s=info.get("duration"),
-        copertina=_copertina_scaricata(percorso),
+        path=path,
+        # On Instagram the post's caption ends up in the `description` field.
+        caption=(info.get("description") or "").strip(),
+        author_comments=_author_comments(info),
+        author=info.get("uploader") or info.get("channel") or info.get("uploader_id"),
+        title=(info.get("title") or "").strip() or None,
+        url=info.get("webpage_url") or requested_url,
+        platform=(info.get("extractor_key") or info.get("extractor") or "").lower() or None,
+        duration_s=info.get("duration"),
+        cover=_downloaded_cover(path),
         extra={"id": info.get("id")},
     )
 
 
-def _commenti_dell_autore(info: dict, massimo: int = 5, caratteri: int = 1500) -> list[str]:
-    """I commenti scritti da chi ha pubblicato il reel.
+def _author_comments(info: dict, most: int = 5, characters: int = 1500) -> list[str]:
+    """The comments written by whoever published the reel.
 
-    Gli autori usano spesso il primo commento per quello che non è entrato nella didascalia:
-    le dosi, una correzione, il link alla versione completa. È il commento che di solito
-    fissano in cima. Non possiamo però chiedere "quelli fissati": per Instagram yt-dlp non
-    espone `is_pinned`, i campi di un commento sono solo autore, testo, data e like. Il
-    criterio praticabile — ed è anche quello con più segnale — è la paternità.
+    Authors often use the first comment for what did not fit in the caption: the amounts,
+    a correction, a link to the full version. It is usually the comment they pin to the
+    top. We cannot ask for "the pinned ones" though: for Instagram yt-dlp does not expose
+    `is_pinned`, and a comment's fields are only author, text, date and likes. The workable
+    criterion — and also the one with the most signal — is authorship.
 
-    Gli altri commenti restano fuori di proposito. Sono testo di sconosciuti: rumore per
-    l'estrazione e superficie in più per un imperativo ostile rivolto al modello (v. "Confini
-    di sicurezza" in docs/architettura.md). Un commento dell'autore resta comunque materiale di
-    terzi e va nel prompt dentro i suoi delimitatori, come la didascalia.
+    The other comments are left out deliberately. They are strangers' text: noise for the
+    extraction, and extra surface for a hostile imperative aimed at the model (see
+    "Confini di sicurezza" in docs/architettura.md). An author's comment is still
+    third-party material and goes into the prompt inside its own delimiters, like the
+    caption.
     """
-    commenti = info.get("comments")
-    if not isinstance(commenti, list):
+    comments = info.get("comments")
+    if not isinstance(comments, list):
         return []
 
-    # Su Instagram `channel` è l'handle (amicojeko) e `uploader` il nome esteso; nei commenti
-    # `author` è l'handle. Si confrontano tutte le forme disponibili, ID compresi.
-    identita = {
+    # On Instagram `channel` is the handle (amicojeko) and `uploader` the full name; in
+    # comments `author` is the handle. Every available form is compared, IDs included.
+    identities = {
         str(info.get(k)).strip().lower()
         for k in ("channel", "uploader", "uploader_id", "channel_id")
         if info.get(k)
     }
-    if not identita:
+    if not identities:
         return []
 
-    suoi = []
-    for c in commenti:
+    theirs = []
+    for c in comments:
         if not isinstance(c, dict):
             continue
-        firme = {str(c.get(k)).strip().lower() for k in ("author", "author_id") if c.get(k)}
-        if firme & identita and (testo := (c.get("text") or "").strip()):
-            suoi.append(testo[:caratteri])
-        if len(suoi) >= massimo:
+        signatures = {str(c.get(k)).strip().lower() for k in ("author", "author_id") if c.get(k)}
+        if signatures & identities and (text := (c.get("text") or "").strip()):
+            theirs.append(text[:characters])
+        if len(theirs) >= most:
             break
-    return suoi
+    return theirs
 
 
-def _percorso_scaricato(info: dict, cartella: Path) -> Path | None:
-    """Il file effettivamente scritto da yt-dlp, con qualche ripiego se il campo manca."""
-    for chiave in ("filepath", "_filename"):
-        if (valore := info.get(chiave)) and Path(valore).is_file():
-            return Path(valore)
-    for scaricato in info.get("requested_downloads") or []:
-        if (valore := scaricato.get("filepath")) and Path(valore).is_file():
-            return Path(valore)
-    identificativo = info.get("id")
-    if identificativo:
-        candidati = [
-            p for p in cartella.glob(f"*{identificativo}*")
-            if p.suffix.lower() in ESTENSIONI_SUPPORTATE
+def _downloaded_path(info: dict, folder: Path) -> Path | None:
+    """The file yt-dlp actually wrote, with a few fallbacks when the field is missing."""
+    for key in ("filepath", "_filename"):
+        if (value := info.get(key)) and Path(value).is_file():
+            return Path(value)
+    for downloaded in info.get("requested_downloads") or []:
+        if (value := downloaded.get("filepath")) and Path(value).is_file():
+            return Path(value)
+    identifier = info.get("id")
+    if identifier:
+        candidates = [
+            p for p in folder.glob(f"*{identifier}*")
+            if p.suffix.lower() in SUPPORTED_EXTENSIONS
         ]
-        if candidati:
-            return max(candidati, key=lambda p: p.stat().st_size)
+        if candidates:
+            return max(candidates, key=lambda p: p.stat().st_size)
     return None
 
 
-def _copertina_scaricata(percorso_media: Path | None) -> Path | None:
-    if not percorso_media:
+def _downloaded_cover(media_path: Path | None) -> Path | None:
+    if not media_path:
         return None
-    for estensione in (".jpg", ".jpeg", ".webp", ".png"):
-        candidato = percorso_media.with_suffix(estensione)
-        if candidato.is_file():
-            return candidato
+    for extension in (".jpg", ".jpeg", ".webp", ".png"):
+        candidate = media_path.with_suffix(extension)
+        if candidate.is_file():
+            return candidate
     return None
 
 
 # --------------------------------------------------------------------------------------
-# Da file e da cartella
+# From a file and from a folder
 # --------------------------------------------------------------------------------------
 
 
-def da_file(percorso: Path | str, didascalia: str = "", autore: str | None = None,
-            url: str | None = None) -> Media:
-    """Un video o un audio già sul disco. La didascalia, se c'è, va passata a mano:
-    è l'unico modo di recuperarla quando il file non arriva da un URL."""
-    percorso = Path(percorso).expanduser().resolve()
-    if not percorso.is_file():
-        raise ErroreAcquisizione(f"File non trovato: {percorso}")
-    if percorso.suffix.lower() not in ESTENSIONI_SUPPORTATE:
-        raise ErroreAcquisizione(
-            f"Formato non supportato: {percorso.suffix}. "
-            f"Accettati: {', '.join(sorted(ESTENSIONI_SUPPORTATE))}"
+def from_file(path: Path | str, caption: str = "", author: str | None = None,
+              url: str | None = None) -> Media:
+    """A video or audio already on disk. The caption, if there is one, has to be passed in
+    by hand: it is the only way to recover it when the file did not come from a URL."""
+    path = Path(path).expanduser().resolve()
+    if not path.is_file():
+        raise AcquisitionError(f"File not found: {path}")
+    if path.suffix.lower() not in SUPPORTED_EXTENSIONS:
+        raise AcquisitionError(
+            f"Unsupported format: {path.suffix}. "
+            f"Accepted: {', '.join(sorted(SUPPORTED_EXTENSIONS))}"
         )
 
-    # Se accanto al file c'è l'info.json di un download precedente, riusiamone i metadati.
-    accanto = percorso.with_suffix(".info.json")
-    if accanto.is_file():
+    # If an earlier download's info.json sits next to the file, reuse its metadata.
+    alongside = path.with_suffix(".info.json")
+    if alongside.is_file():
         try:
-            info = json.loads(accanto.read_text(encoding="utf-8"))
-            didascalia = didascalia or (info.get("description") or "").strip()
-            autore = autore or info.get("uploader")
+            info = json.loads(alongside.read_text(encoding="utf-8"))
+            caption = caption or (info.get("description") or "").strip()
+            author = author or info.get("uploader")
             url = url or info.get("webpage_url")
         except (json.JSONDecodeError, OSError):
-            pass   # metadati opzionali: un file corrotto non deve fermare l'importazione
+            pass   # optional metadata: a corrupt file must not stop the import
 
     return Media(
-        percorso=percorso,
-        didascalia=didascalia,
-        autore=autore,
-        titolo=percorso.stem,
+        path=path,
+        caption=caption,
+        author=author,
+        title=path.stem,
         url=url,
-        piattaforma="file",
-        copertina=_copertina_scaricata(percorso),
+        platform="file",
+        cover=_downloaded_cover(path),
     )
 
 
-def _e_audio_derivato(percorso: Path) -> bool:
-    """Un `.16k.wav` estratto da noi (v. `audio.extract_audio`), non un file dell'utente.
+def _is_derived_audio(path: Path) -> bool:
+    """A `.16k.wav` we extracted ourselves (see `audio.extract_audio`), not a user's file.
 
-    Sta accanto al video da cui viene, quindi una cartella già lavorata contiene entrambi.
-    Senza questo controllo `r2r batch` lavora ogni reel **due volte**: una dal video, con la
-    sua didascalia, e una dall'audio soltanto — che non ha né didascalia né URL, quindi non
-    si deduplica e finisce in libreria come una seconda ricetta più povera. Succede proprio
-    puntando batch su `workspace/media/`, che è dove i reel scaricati atterrano.
+    It sits next to the video it came from, so a folder already processed holds both.
+    Without this check `r2r batch` processes every reel **twice**: once from the video,
+    with its caption, and once from the audio alone — which has neither caption nor URL, so
+    it does not deduplicate and lands in the library as a second, poorer recipe. It happens
+    precisely when pointing batch at `workspace/media/`, which is where downloaded reels
+    land.
     """
-    return percorso.name.lower().endswith(".16k.wav")
+    return path.name.lower().endswith(".16k.wav")
 
 
-def da_cartella(cartella: Path | str) -> list[Media]:
-    """Tutti i media di una cartella, in ordine alfabetico. Per la modalità batch."""
-    cartella = Path(cartella).expanduser().resolve()
-    if not cartella.is_dir():
-        raise ErroreAcquisizione(f"Cartella non trovata: {cartella}")
-    file = sorted(
-        p for p in cartella.iterdir()
-        if p.is_file() and p.suffix.lower() in ESTENSIONI_SUPPORTATE
-        and not _e_audio_derivato(p)
+def from_folder(folder: Path | str) -> list[Media]:
+    """Every media file in a folder, alphabetically. For batch mode."""
+    folder = Path(folder).expanduser().resolve()
+    if not folder.is_dir():
+        raise AcquisitionError(f"Folder not found: {folder}")
+    files = sorted(
+        p for p in folder.iterdir()
+        if p.is_file() and p.suffix.lower() in SUPPORTED_EXTENSIONS
+        and not _is_derived_audio(p)
     )
-    if not file:
-        raise ErroreAcquisizione(f"Nessun video o audio in {cartella}")
-    return [da_file(p) for p in file]
+    if not files:
+        raise AcquisitionError(f"No video or audio in {folder}")
+    return [from_file(p) for p in files]
 
 
-def leggi_elenco_url(percorso: Path | str) -> list[str]:
-    """Un URL per riga; righe vuote e commenti con `#` vengono ignorati."""
-    righe = Path(percorso).read_text(encoding="utf-8").splitlines()
-    return [r.strip() for r in righe if r.strip() and not r.lstrip().startswith("#")]
+def read_url_list(path: Path | str) -> list[str]:
+    """One URL per line; blank lines and `#` comments are ignored."""
+    lines = Path(path).read_text(encoding="utf-8").splitlines()
+    return [r.strip() for r in lines if r.strip() and not r.lstrip().startswith("#")]
 
 
-def ytdlp_disponibile() -> bool:
+def ytdlp_available() -> bool:
     try:
         import yt_dlp  # noqa: F401
         return True
