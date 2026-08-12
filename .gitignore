@@ -1,0 +1,46 @@
+# --- Confine di riservatezza e copyright -------------------------------------
+# `workspace/` contiene materiale di terzi scaricato dai reel (video, audio, keyframe,
+# didascalie) e la libreria personale delle ricette. NON esce mai dalla macchina:
+# non si committa, non si ridistribuisce. Nel repo va solo il codice.
+# Vedi docs/legale.md.
+workspace/
+
+# --- Strumenti di sviluppo, fuori dal repo pubblicato -------------------------
+# Il progetto è sviluppato con l'assistenza di agenti di codice. La loro configurazione
+# (istruzioni, regole, worker di delega, hook di avvio) serve a chi sviluppa, non a chi
+# usa o legge il progetto: resta sulla macchina e non viene pubblicata. Ciò che un
+# lettore deve sapere sta in README.md e in docs/.
+# Una riga per strumento, perché ognuno cerca la propria cartella: `.claude/` per Claude
+# Code, `.agents/` e `.codex/` per Codex CLI. Un nuovo strumento va aggiunto qui prima
+# del primo commit, non dopo.
+.claude/
+.agents/
+.codex/
+CLAUDE.md
+AGENTS.md
+
+# --- Python ------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+
+# uv.lock NON va qui: era classificato fra gli artefatti di build, ma per un'applicazione è
+# il contrario di un artefatto. È il registro di quali versioni esatte sono state installate,
+# ed è ciò che permette a una build fuori da questa macchina — quella dell'add-on Home
+# Assistant — di ricostruire lo stesso ambiente invece di risolvere le dipendenze da capo.
+
+# --- Modelli ASR scaricati in locale -----------------------------------------
+models/
+.cache/
+
+# --- Sistema -----------------------------------------------------------------
+.DS_Store
+.env
+.env.*
+!.env.example

@@ -1,0 +1,318 @@
+<p align="center">
+  <img src="docs/brand/banner.svg" alt="Reel2Recipe" width="860">
+</p>
+
+# Reel2Recipe
+
+> **Da leggere prima.** Progetto **personale**, pubblicato così com'è e **senza garanzie**:
+> non è un prodotto finito né commerciale, e non lo diventerà. È scritto in gran parte **con
+> un assistente IA**, sotto guida e revisione umana — era anche il punto.
+>
+> L'estrazione è automatica e può sbagliare. Il progetto è costruito per rendere visibili le
+> incertezze invece di nasconderle, ma **rileggi la ricetta prima di cucinarla**, soprattutto
+> pesi e tempi; e se hai allergie, torna alla fonte originale, che è sempre citata.
+> Dettagli in [`docs/condizioni-uso.md`](docs/condizioni-uso.md).
+
+**Dai reel di cucina di Instagram a un ricettario ordinato, importabile in [Mela](https://mela.recipes).**
+Incolli un link, premi *Cook*, e ottieni una ricetta pulita — con gli ingredienti in grammi
+e millilitri, il procedimento in italiano e la fonte originale sempre citata.
+
+Nato da un problema concreto: si salvano decine di ricette su Instagram e poi non si
+ritrovano più. Reel2Recipe le estrae, le rende ricercabili e le porta nell'app che usi
+davvero per cucinare.
+
+> **Tutto succede sul tuo computer.** Nessuna intelligenza artificiale online, nessun
+> abbonamento, nessuna chiave API, nessun dato che lascia la macchina. Se un domani smetti
+> di pagare qualsiasi servizio, Reel2Recipe continua a funzionare esattamente come prima.
+
+---
+
+## Cosa fa, in breve
+
+1. **Prende un reel** — da un link, da un file video che hai già salvato, o da un'intera
+   cartella (modalità batch, per smaltire l'arretrato).
+2. **Legge tutto** — la didascalia del post e il parlato del video (trascritto con Whisper,
+   in locale).
+3. **Ricostruisce la ricetta** — con un modello di linguaggio locale (via [Ollama](https://ollama.com)):
+   titolo, ingredienti, procedimento, porzioni e tempo di cottura. Il tempo di *preparazione*
+   si estrae solo quando la fonte lo dichiara in modo netto: costringere il modello a
+   riempirlo lo portava a inventarlo, e un tempo mancante è meno dannoso di uno sbagliato.
+4. **Converte le quantità** — "1 cup di farina" diventa "120 g", "2 tbsp d'olio" diventa
+   "2 cucchiai (≈ 30 ml)". La conversione è **deterministica**, basata su tabelle di densità
+   verificate, non indovinata dal modello (v. [Il principio](#il-principio-che-conta)).
+5. **Archivia e cerca** — tutte le ricette in un ricettario locale ricercabile.
+6. **Esporta per Mela** — in formato `.melarecipe`, con gruppi di ingredienti, tempi e link
+   alla fonte.
+
+---
+
+## Installazione
+
+Serve **[uv](https://docs.astral.sh/uv/)** (il resto lo installa lo script).
+Da terminale, nella cartella del progetto:
+
+```bash
+./install.sh
+```
+
+Lo script controlla e, dove può, installa da sé tutto il necessario:
+
+| Componente | A cosa serve | Obbligatorio? |
+|---|---|---|
+| **uv** | gestore del progetto Python | sì |
+| **Ollama** + un modello | il "cervello" che struttura la ricetta | sì |
+| **ffmpeg** | estrae l'audio dai video | per il parlato (senza, usi le didascalie) |
+| **Whisper** (locale) | trascrive il parlato | per il parlato |
+
+Dove non può installare da solo (per esempio se manca Homebrew su macOS), lo script ti dice
+esattamente cosa fare. Puoi rilanciarlo quante volte vuoi: è idempotente.
+
+Per controllare in ogni momento cosa è pronto:
+
+```bash
+uv run r2r check
+```
+
+---
+
+## Uso
+
+### Interfaccia web (consigliata)
+
+```bash
+uv run r2r serve
+```
+
+Poi apri **http://localhost:8500**. Incolla il link di un reel nella barra, premi *Cook*, e
+segui l'estrazione fase per fase. Quando la ricetta è pronta puoi **correggerla a mano**
+(il modello propone, tu hai l'ultima parola), salvarla nel ricettario o scaricarla per Mela.
+
+Puoi anche **trascinare un video** direttamente nella pagina.
+
+### Da terminale
+
+```bash
+# Estrai una ricetta da un link e salvala in libreria
+uv run r2r cook https://www.instagram.com/reel/XXXXX/
+
+# Da un file già salvato, con la didascalia incollata
+uv run r2r cook ~/Video/reel.mp4 --didascalia "1 cup farina, 2 uova..."
+
+# Molti reel in serie: una cartella di video, o un .txt con un URL per riga
+uv run r2r batch ~/Video/reel-da-lavorare/ --export workspace/export/
+# (i file audio che Reel2Recipe estrae da sé vengono saltati: niente doppie lavorazioni)
+
+# Cerca nel ricettario
+uv run r2r list --cerca "zucchine"
+
+# Esporta
+uv run r2r export 42                    # una ricetta, per Mela
+uv run r2r export --tutte               # l'intero ricettario in un .melarecipes
+uv run r2r export 42 --formato pdf      # oppure markdown, o più formati insieme
+uv run r2r export 42 --formato markdown pdf mela
+
+# Elimina una ricetta dal ricettario (chiede conferma; --si per saltarla)
+uv run r2r elimina 42
+```
+
+### Se non usi Mela
+
+`.melarecipe` è il formato migliore *se* hai Mela. Altrimenti la stessa ricetta esce in
+**Markdown** (si apre ovunque e resta modificabile) o in **PDF** (si stampa e si manda),
+dalla riga di comando con `--formato` o dai bottoni sotto la scheda nell'interfaccia web.
+
+Tutti e tre i formati riportano anche le **lacune** e le quantità che sono stime nostre: un
+PDF pulito che nascondesse le incertezze sarebbe più bello e più pericoloso. Il Markdown non
+richiede nulla; il PDF usa `reportlab`, che `./install.sh` installa da sé (a mano:
+`uv sync --extra doc`).
+
+### Lingua e sistema di misura
+
+Di base Reel2Recipe lavora in **italiano** e col **sistema metrico**, ma i due assi sono
+indipendenti:
+
+```bash
+uv run r2r cook <url> --lingua en                    # ricetta in inglese, misure imperiali
+uv run r2r cook <url> --lingua en --sistema metrico  # inglese, ma con grammi e ml
+uv run r2r cook <url> --sistema imperiale            # italiano, ma con cup e once
+```
+
+Nell'interfaccia web ci sono due selettori nelle *Opzioni*. Il sistema, se non lo scegli,
+segue la lingua (italiano → metrico, inglese → imperiale), ma puoi incrociarli: un inglese o
+un australiano legge in inglese e cucina in grammi.
+
+La differenza fra i due assi è netta. Il **sistema** cambia i numeri e lo fa il codice, in
+modo deterministico: "1 cup di farina" diventa 120 g in metrico e resta "1 cup" in imperiale,
+scritto a frazioni ("2 1/2 cup"), come su un misurino. La **lingua** cambia le parole. Le
+etichette delle misure, le sezioni degli export e i messaggi sono sempre tradotti; i nomi
+degli ingredienti e il procedimento li traduce il modello locale al momento dell'estrazione,
+ed è la parte meno solida — vedi la nota qui sotto.
+
+> **Onestà sui limiti.** La traduzione dei nomi e del procedimento è la parte meno affidabile,
+> ed è l'unica non deterministica dell'intero percorso. Su una fonte **già italiana** la
+> qualità è ottima. Su una fonte **inglese** i nomi degli ingredienti sbagliano con una certa
+> regolarità: `berries` è diventato "fragole", `flax seeds` "semi di lecithia" (parola
+> inesistente), `a pinch` "una pizzetta". Una didascalia **bilingue** peggiora le cose, perché
+> il modello pesca da entrambe le lingue: da un post inglese-tedesco è uscito "dinkel fette".
+> **Verso l'inglese**, da un testo tutto italiano, `qwen2.5:14b` tende a restare ancorato
+> all'italiano: traduce il titolo ma non sempre l'elenco.
+>
+> In tutti questi casi **le quantità restano corrette**: sbagliano le parole, non i numeri.
+> È la ragione per cui la conversione non è affidata al modello, e per cui la revisione prima
+> dell'export non è un ripiego ma parte del flusso.
+
+### Reel privati
+
+Per i reel che richiedono l'accesso, passa i cookie del browser in cui hai effettuato il login:
+
+```bash
+uv run r2r cook <url> --cookies chrome    # o safari, firefox
+```
+
+Dove un browser non c'è — dentro un container, per esempio — esporta i cookie in formato
+Netscape e indica il file con `R2R_COOKIES=/percorso/cookies.txt`. Se la variabile punta a un
+file che non esiste, l'errore lo dice subito invece di far fallire il download senza motivo
+apparente.
+
+### Variabili d'ambiente
+
+Poche, e servono tutte a far girare il prodotto dove i percorsi predefiniti non vanno bene.
+
+| variabile | effetto |
+|-----------|---------|
+| `R2R_WORKSPACE` | Sposta la radice dei dati (libreria, media, export). Predefinito: `workspace/` accanto al repo |
+| `R2R_COOKIES` | File di cookie in formato Netscape per i reel che richiedono l'accesso. Non viene mai modificato: se ne usa una copia temporanea, cancellata a fine scaricamento |
+| `R2R_TIMEOUT_LLM` | Secondi concessi al modello per una risposta — solo la cifra. Predefinito 300: da alzare su CPU senza acceleratore |
+| `R2R_PORTA` | Porta dell'interfaccia avviata da `tools/serve.sh`. Predefinito 8500 |
+
+### Home Assistant
+
+C'è un add-on che fa girare tutto — interfaccia, Whisper e Ollama — su un server sempre
+acceso, con l'interfaccia nel pannello laterale:
+**[Stinocon/addons](https://github.com/Stinocon/addons/tree/master/reel2recipe)**. Serve una
+macchina amd64 con 16 GB di RAM: l'inferenza gira su CPU.
+
+---
+
+## Come importare in Mela
+
+Reel2Recipe produce file `.melarecipe` (una ricetta) o `.melarecipes` (più ricette, in uno
+zip). Per importarli:
+
+1. Salva il file esportato dove Mela può raggiungerlo (AirDrop, iCloud Drive, email a te
+   stesso…).
+2. Aprilo su iPhone/iPad/Mac: Mela lo riconosce e propone l'importazione.
+
+Il parser di Mela legge già le quantità in italiano, quindi gli ingredienti arrivano con la
+loro misura e i gruppi ("Per la base", "Per la crema") vengono rispettati. Il **link alla
+fonte** è sempre incluso, così puoi tornare al reel originale.
+
+---
+
+## Il principio che conta
+
+Il pezzo di cui questo progetto va più fiero è la **conversione delle quantità**, ed è dove
+si distingue da un semplice "chiedi a un'IA di trascrivere la ricetta".
+
+Un modello di linguaggio a cui chiedi "quanti grammi sono una tazza di farina?" ti dà un
+numero *plausibile*. A volte 120, a volte 128, a volte 150 — e per lo zucchero magari
+ripete lo stesso numero della farina, che è sbagliato del **67%** (stesso volume, densità
+diverse). Il modello non sta calcolando: sta ricordando male.
+
+Reel2Recipe fa una cosa diversa:
+
+- Il modello riporta la quantità **esattamente come compare** nel reel ("1", "cup") e **non
+  la converte mai**.
+- La conversione la fa un modulo deterministico, con **tabelle di densità verificate** (una
+  per ingrediente). Ogni densità cita la fonte da cui viene — il database USDA FoodData
+  Central o la tabella dei pesi di King Arthur Baking — con il peso per cup da cui è
+  calcolata, così puoi andare a controllarla.
+- Se non conosciamo la densità di un ingrediente, la quantità **non viene convertita in
+  peso**: si conserva il volume e si dichiara la cosa. Non si inventa mai un numero.
+
+Il risultato: ogni quantità porta con sé la sua provenienza — *dichiarata* dal reel,
+*convertita* da tabella, o *stimata* (per le misure a occhio come "un pizzico"). Le stime
+sono sempre segnalate, così sai di quali fidarti. **Una lacuna dichiarata vale più di un
+numero inventato**: in cucina un peso sbagliato di cui non sai che è sbagliato fa danni.
+
+Le tabelle sono in [`data/`](data/) e sono leggibili e modificabili: se una densità non ti
+convince, la correggi lì — dichiarando la fonte, che i test pretendono.
+
+---
+
+## Cosa è lecito, cosa no
+
+Reel2Recipe è pensato per **uso personale**, su contenuti che **tu hai già salvato**.
+Le condizioni rivolte a chi usa lo strumento stanno in
+[`docs/condizioni-uso.md`](docs/condizioni-uso.md); l'analisi giuridica che sta dietro alle
+scelte di progetto in [`docs/legale.md`](docs/legale.md). In breve:
+
+- **Gli elenchi di ingredienti non sono protetti da copyright**: estrarli e riformattarli è
+  lecito.
+- **Il testo descrittivo di un creator sì**: per questo Reel2Recipe *riformula* il
+  procedimento invece di copiarlo, e cita **sempre** la fonte originale.
+- **Scaricare un reel da Instagram viola i Termini d'Uso della piattaforma.** È il motivo
+  per cui questo strumento gira in locale, per uso personale: non è un servizio pubblico che
+  scarica per conto di altri. Se lo userai su reel altrui, fallo con buon senso e per te.
+- **I file scaricati restano sul tuo computer**: la cartella `workspace/` è esclusa da git e
+  non viene mai condivisa.
+
+---
+
+## Struttura del progetto
+
+```
+src/reel2recipe/     il codice
+  acquire.py         recupero del reel (URL, file, cartella)
+  audio.py           estrazione audio con ffmpeg
+  asr.py             trascrizione locale (Whisper) con fallback
+  extract.py         strutturazione con LLM locale (Ollama)
+  units.py           conversione deterministica delle quantità — il cuore del progetto
+  recipe.py          il modello di una ricetta
+  mela.py            export nel formato Mela
+  documenti.py       export in Markdown e PDF, per chi non usa Mela
+  store.py           il ricettario (SQLite + ricerca full-text)
+  percorsi.py        dove vivono i dati (una sola decisione, spostabile con R2R_WORKSPACE)
+  pipeline.py        la catena completa
+  api.py             l'interfaccia web
+  cli.py             i comandi da terminale
+data/                le tabelle di conversione (leggibili e modificabili)
+web/                 l'interfaccia (HTML/CSS/JS, senza build)
+tools/               script di supporto (avvio di Ollama e dell'interfaccia)
+docs/                documentazione (architettura, aspetti legali)
+tests/               i test
+workspace/           i tuoi dati — mai condivisi (in .gitignore)
+```
+
+Documentazione tecnica: [`docs/architettura.md`](docs/architettura.md).
+
+---
+
+## Domande frequenti
+
+**Devo pagare qualcosa?** No. Tutto gira in locale ed è gratuito. L'unico costo è lo spazio
+su disco per il modello di Ollama (~5 GB) e per quello di Whisper (~1,5 GB), scaricati una
+volta sola.
+
+**Funziona senza connessione?** Dopo l'installazione, sì — tranne per scaricare un nuovo
+reel da un URL, che ovviamente richiede internet. Un reel già salvato si lavora offline.
+
+**Le ricette in altre lingue?** Un reel in inglese diventa una ricetta in italiano — nomi e
+procedimento tradotti, unità convertite, i Fahrenheit portati a Celsius. Puoi anche chiedere
+l'uscita in inglese o con le misure imperiali: vedi *[Lingua e sistema di misura](#lingua-e-sistema-di-misura)*.
+
+**E se un reel non ha la ricetta scritta né detta chiaramente?** Reel2Recipe estrae ciò che
+può e **dichiara le lacune** invece di riempirle a caso. Poi puoi completare a mano.
+
+---
+
+## Licenza
+
+Reel2Recipe è distribuito con licenza **MIT** (v. [`LICENSE`](LICENSE)): puoi usarlo,
+modificarlo e ridistribuirlo liberamente, anche per scopi commerciali, tenendo
+l'attribuzione.
+
+Il materiale di terzi che il progetto include o usa — le icone Material Symbols incorporate
+nell'interfaccia, gli strumenti che vengono installati a parte, le fonti delle densità — è
+elencato in [`NOTICE.md`](NOTICE.md) con le rispettive licenze. Vale lo stesso criterio delle
+densità in `data/`: un'attribuzione che nessuno può verificare non è un'attribuzione.
