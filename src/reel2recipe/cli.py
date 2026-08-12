@@ -50,7 +50,7 @@ def comando_cook(args) -> int:
     from . import pipeline
     from .acquire import AcquisitionError
     from .extract import ErroreEstrazione
-    from .store import Libreria
+    from .store import Library
 
     sorgente = args.sorgente
     try:
@@ -91,8 +91,8 @@ def comando_cook(args) -> int:
     _stampa_ricetta(ricetta)
 
     if not args.no_save:
-        with Libreria(args.db) as lib:
-            identificativo = lib.salva(ricetta)
+        with Library(args.db) as lib:
+            identificativo = lib.save(ricetta)
         print(spento(f"\n  Saved to the library with id {identificativo}."))
 
     if args.export:
@@ -132,7 +132,7 @@ def _stampa_ricetta(ricetta) -> None:
 
 def comando_batch(args) -> int:
     from . import acquire, pipeline
-    from .store import Libreria
+    from .store import Library
 
     sorgente = Path(args.sorgente)
     lavori: list = []
@@ -147,7 +147,7 @@ def comando_batch(args) -> int:
 
     print(f"Queued: {len(lavori)} item(s).\n")
     riuscite, ricette = 0, []
-    with Libreria(args.db) as lib:
+    with Library(args.db) as lib:
         for indice, (tipo, elemento) in enumerate(lavori, 1):
             etichetta = elemento if tipo == "url" else elemento.label()
             print(_c(f"[{indice}/{len(lavori)}] {etichetta}", "1"))
@@ -170,7 +170,7 @@ def comando_batch(args) -> int:
                 continue
 
             if esito.riuscito:
-                lib.salva(esito.ricetta)
+                lib.save(esito.ricetta)
                 ricette.append(esito.ricetta)
                 riuscite += 1
                 print(ok(f"  ✓ {esito.ricetta.titolo}\n"))
@@ -184,10 +184,10 @@ def comando_batch(args) -> int:
 
 
 def comando_list(args) -> int:
-    from .store import Libreria
+    from .store import Library
 
-    with Libreria(args.db) as lib:
-        voci = lib.elenca(cerca=args.search)
+    with Library(args.db) as lib:
+        voci = lib.list_(search=args.search)
 
     if not voci:
         print(spento("The library is empty." if not args.search
@@ -208,10 +208,10 @@ def comando_list(args) -> int:
 def comando_elimina(args) -> int:
     """Toglie una ricetta dal ricettario. Chiede conferma mostrando il titolo, perché
     l'operazione non è reversibile e un id sbagliato non dà nessun segnale."""
-    from .store import Libreria
+    from .store import Library
 
-    with Libreria(args.db) as lib:
-        ricetta = lib.leggi(args.id)
+    with Library(args.db) as lib:
+        ricetta = lib.read(args.id)
         if not ricetta:
             print(errore(f"No recipe with id {args.id}."))
             return 1
@@ -225,7 +225,7 @@ def comando_elimina(args) -> int:
                 print(spento("Cancelled."))
                 return 0
 
-        lib.elimina(args.id)
+        lib.delete(args.id)
     print(ok(f"✓ «{ricetta.titolo}» deleted from the library."))
     return 0
 
@@ -261,7 +261,7 @@ def comando_export(args) -> int:
     from . import paths
     from .documenti import ErroreDocumento, scrivi_markdown, scrivi_pdf
     from .mela import scrivi_melarecipe, scrivi_melarecipes
-    from .store import Libreria
+    from .store import Library
 
     # Senza --out la destinazione la decide `paths.py`, come per tutto il resto: il
     # predefinito era una quarta copia cablata di quel fatto, per giunta RELATIVA — dentro
@@ -276,9 +276,9 @@ def comando_export(args) -> int:
             return scrivi_pdf(ricetta, destinazione)
         return scrivi_melarecipe(ricetta, destinazione)
 
-    with Libreria(args.db) as lib:
+    with Library(args.db) as lib:
         if args.all:
-            ricette = lib.tutte()
+            ricette = lib.all_recipes()
             if not ricette:
                 print(spento("The library is empty: nothing to export."))
                 return 0
@@ -297,7 +297,7 @@ def comando_export(args) -> int:
                     print(errore(str(e)))
                     return 1
         else:
-            ricetta = lib.leggi(args.id)
+            ricetta = lib.read(args.id)
             if not ricetta:
                 print(errore(f"No recipe with id {args.id}."))
                 return 1

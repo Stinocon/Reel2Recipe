@@ -32,7 +32,7 @@ from .documenti import ErroreDocumento, scrivi_markdown, scrivi_pdf
 from .mela import scrivi_melarecipe, scrivi_melarecipes, verso_melarecipe
 from .paths import REPO_ROOT, export_folder
 from .recipe import Ricetta
-from .store import Libreria
+from .store import Library
 from .units import Catalogo, testo_da
 
 CARTELLA_WEB = REPO_ROOT / "web"
@@ -51,7 +51,7 @@ TESTI: Catalogo = {
         "lavoro_sconosciuto": "Lavoro sconosciuto.",
         "ricetta_non_trovata": "Ricetta non trovata.",
         "formato_sconosciuto": "Formato «{formato}» sconosciuto: usa mela, markdown o pdf.",
-        "libreria_vuota": "Libreria vuota.",
+        "libreria_vuota": "Library vuota.",
     },
     "en": {
         "serve_url": "The URL of a reel is required.",
@@ -145,8 +145,8 @@ def crea_app(db: str | None = None, url_ollama: str = "http://localhost:11434") 
     app = FastAPI(title="Reel2Recipe", version="0.1.0")
     registro: RegistroLavori | None = None
 
-    def libreria() -> Libreria:
-        return Libreria(db)
+    def libreria() -> Library:
+        return Library(db)
 
     @app.on_event("startup")
     async def _avvio():
@@ -227,12 +227,12 @@ def crea_app(db: str | None = None, url_ollama: str = "http://localhost:11434") 
     @app.get("/api/ricette")
     def elenca(cerca: str | None = None) -> list[dict]:
         with libreria() as lib:
-            return lib.elenca(cerca=cerca)
+            return lib.list_(search=cerca)
 
     @app.get("/api/ricette/{id}")
     def leggi(id: int, lingua_ui: str = "it") -> dict:
         with libreria() as lib:
-            ricetta = lib.leggi(id)
+            ricetta = lib.read(id)
         if not ricetta:
             raise HTTPException(404, testo(lingua_ui, "ricetta_non_trovata"))
         d = ricetta.to_dict()
@@ -244,16 +244,16 @@ def crea_app(db: str | None = None, url_ollama: str = "http://localhost:11434") 
         """Salva le correzioni manuali dell'utente. È il passaggio che rende affidabile
         l'export: l'LLM propone, l'utente corregge, e solo poi si esporta."""
         with libreria() as lib:
-            if not lib.leggi(id):
+            if not lib.read(id):
                 raise HTTPException(404, testo(lingua_ui, "ricetta_non_trovata"))
             ricetta.pop("id", None)
-            lib.aggiorna(id, Ricetta.from_dict(ricetta))
+            lib.update(id, Ricetta.from_dict(ricetta))
         return {"ok": True}
 
     @app.delete("/api/ricette/{id}")
     def elimina(id: int, lingua_ui: str = "it") -> dict:
         with libreria() as lib:
-            if not lib.elimina(id):
+            if not lib.delete(id):
                 raise HTTPException(404, testo(lingua_ui, "ricetta_non_trovata"))
         return {"ok": True}
 
@@ -261,7 +261,7 @@ def crea_app(db: str | None = None, url_ollama: str = "http://localhost:11434") 
     def salva_nuova(ricetta: dict) -> dict:
         """Salva in libreria una ricetta appena estratta (con eventuali correzioni)."""
         with libreria() as lib:
-            id = lib.salva(Ricetta.from_dict(ricetta))
+            id = lib.save(Ricetta.from_dict(ricetta))
         return {"id": id}
 
     # ---- export ----------------------------------------------------------------------
@@ -274,7 +274,7 @@ def crea_app(db: str | None = None, url_ollama: str = "http://localhost:11434") 
         servono a chi Mela non ce l'ha e vuole comunque tenersi la ricetta.
         """
         with libreria() as lib:
-            ricetta = lib.leggi(id)
+            ricetta = lib.read(id)
         if not ricetta:
             raise HTTPException(404, testo(lingua_ui, "ricetta_non_trovata"))
 
@@ -296,7 +296,7 @@ def crea_app(db: str | None = None, url_ollama: str = "http://localhost:11434") 
     @app.get("/api/export")
     def export_tutte(lingua_ui: str = "it") -> FileResponse:
         with libreria() as lib:
-            ricette = lib.tutte()
+            ricette = lib.all_recipes()
         if not ricette:
             raise HTTPException(404, testo(lingua_ui, "libreria_vuota"))
         percorso = scrivi_melarecipes(ricette, export_folder() / "libreria")
@@ -335,8 +335,8 @@ def _concludi_con_esito(registro: RegistroLavori, lavoro: Lavoro, esito: pipelin
     if not esito.riuscito:
         registro.concludi(lavoro, {"ok": False, "errore": esito.errore, "avvertenze": esito.avvertenze})
         return
-    with Libreria(db) as lib:
-        identificativo = lib.salva(esito.ricetta)
+    with Library(db) as lib:
+        identificativo = lib.save(esito.ricetta)
     dati = esito.ricetta.to_dict()
     dati["id"] = identificativo
     registro.concludi(lavoro, {
