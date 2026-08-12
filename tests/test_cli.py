@@ -64,3 +64,48 @@ def test_serve_ha_i_valori_di_ripiego_dello_sviluppo():
     assert args.host == "127.0.0.1"
     assert args.porta == 8500
     assert args.ollama == "http://localhost:11434"
+
+
+# --------------------------------------------------------------------------------------
+# La lingua del parlato: un asse dell'ingresso, non dell'uscita
+# --------------------------------------------------------------------------------------
+
+
+def test_il_parlato_si_riconosce_da_se_per_impostazione_predefinita():
+    """Il valore che arriva a Whisper deve essere `None`, non "it".
+
+    Qui c'era un "it" cablato in `asr.py` che nessuna opzione poteva togliere: ogni reel
+    veniva dato a Whisper dichiarando che era italiano, anche quando era inglese. La
+    trascrizione ne usciva storpiata e tutto il resto della catena lavorava su quella.
+    """
+    from reel2recipe import asr
+    from reel2recipe.cli import lingua_del_parlato
+
+    assert asr.LINGUA_PREDEFINITA is None
+    args = _parser().parse_args(["cook", "https://esempio.test/reel"])
+    assert args.lingua_parlato == "auto"
+    assert lingua_del_parlato(args) is None
+
+
+@pytest.mark.parametrize("scelta, atteso", [("auto", None), ("it", "it"), ("en", "en")])
+def test_il_parlato_si_puo_forzare(scelta, atteso):
+    from reel2recipe.cli import lingua_del_parlato
+
+    args = _parser().parse_args(["cook", "https://esempio.test/reel", "--lingua-parlato", scelta])
+    assert lingua_del_parlato(args) == atteso
+
+
+def test_il_parlato_non_segue_la_lingua_di_uscita():
+    """Chiedere la ricetta in inglese non significa che il reel sia parlato in inglese:
+    tradurre è il caso normale, e dedurre l'una dall'altra direbbe a Whisper una cosa falsa."""
+    from reel2recipe.cli import assi_di_uscita, lingua_del_parlato
+
+    args = _parser().parse_args(["cook", "https://esempio.test/reel", "--lingua", "en"])
+    assert assi_di_uscita(args)["lingua"] == "en"
+    assert lingua_del_parlato(args) is None
+
+
+def test_batch_accetta_la_stessa_opzione():
+    """`cook` e `batch` non devono divergere sulle opzioni di lavorazione."""
+    args = _parser().parse_args(["batch", "elenco.txt", "--lingua-parlato", "en"])
+    assert args.lingua_parlato == "en"

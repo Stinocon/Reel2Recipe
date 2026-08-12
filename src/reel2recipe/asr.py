@@ -25,7 +25,19 @@ from pathlib import Path
 # (30-90 secondi di parlato) la differenza rispetto ai modelli piccoli si sente,
 # soprattutto sui nomi degli ingredienti.
 MODELLO_PREDEFINITO = "large-v3-turbo"
-LINGUA_PREDEFINITA = "it"
+
+# `None` significa: la riconosce Whisper da sé, che è ciò che sa fare nativamente.
+#
+# Qui c'era "it", e non era un predefinito ma un vincolo: la lingua non è mai stata
+# esposta né dalla CLI né dall'API, quindi *ogni* reel veniva dato a Whisper dichiarando
+# che era italiano. Un reel inglese non veniva tradotto male — veniva trascritto male,
+# forzando parole italiane su suoni inglesi, e da lì in poi tutto il resto della catena
+# lavorava su spazzatura. Il difetto era invisibile perché a valle il modello locale
+# produce comunque una ricetta plausibile.
+#
+# Entrambi i backend riportano la lingua che hanno riconosciuto in `Trascrizione.lingua`:
+# il rilevamento non si perde, e chi vuole forzarla può ancora passarla.
+LINGUA_PREDEFINITA = None
 
 
 class ErroreTrascrizione(RuntimeError):

@@ -76,6 +76,17 @@ Le prime due vivono in `data/` indicizzate per lingua e per sistema; i messaggi 
 prompt di sistema per lingua — ed è l'unico pezzo non deterministico del percorso, quindi il
 meno affidabile.
 
+**Un terzo asse, che non appartiene a questa coppia: la lingua *parlata* nel reel.** Riguarda
+l'ingresso, non l'uscita, e per questo si chiama `lingua_audio` e non `lingua`: serve solo a
+Whisper. Il predefinito è `None`, cioè *riconoscila da sé*, che è ciò che Whisper sa fare
+nativamente e riporta in `Trascrizione.lingua`. **Non si deduce dalla lingua di uscita**: un
+reel inglese che diventa una ricetta italiana è il caso normale, non l'eccezione, e legare i
+due assi significherebbe dichiarare a Whisper una lingua falsa ogni volta che si traduce.
+Qui c'era un `"it"` cablato che nessuna opzione poteva togliere, e il danno non era una
+traduzione storta ma una **trascrizione** storta — parole italiane forzate su suoni inglesi,
+con tutto il resto della catena che lavorava su quella. Invisibile a valle, perché il modello
+locale produce comunque una ricetta plausibile.
+
 ### 2. La lettura viene prima della conversione
 
 Sei estrazioni su reel veri hanno prodotto quattro difetti, e **nessuno era nel motore di

@@ -117,6 +117,9 @@ async function aggiornaStato() {
 function opzioniScelte() {
   return {
     backend_asr: $('#opt-asr').value,
+    // Vuoto = la riconosce Whisper. È un fatto dell'ingresso e non segue la lingua della
+    // ricetta: un reel inglese che diventa una ricetta italiana è il caso più comune.
+    lingua_audio: $('#opt-lingua-parlato').value || null,
     modello_llm: $('#opt-modello').value || null,
     salta_audio: $('#opt-no-audio').checked,
     lingua: $('#opt-lingua').value,
