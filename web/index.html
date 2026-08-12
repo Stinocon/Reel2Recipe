@@ -1,9 +1,11 @@
 <!DOCTYPE html>
+<!-- L'attributo `lang` lo rimette `i18n.js` all'avvio e a ogni cambio: qui c'è solo un
+     valore di partenza, per non lasciare l'elemento senza lingua prima che il modulo giri. -->
 <html lang="it">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Reel2Recipe — dai reel al ricettario</title>
+  <title>Reel2Recipe</title>
   <link rel="stylesheet" href="style.css" />
   <!-- Favicon: la stessa icona del marchio (Material Symbols "skillet", v. NOTICE.md),
        incorporata come data URI. Nessuna richiesta di rete, coerente col resto. -->
@@ -17,12 +19,23 @@
       <span class="marchio-icona" data-icona="padella" data-icona-dim="30"></span>
       <div>
         <h1>Reel2Recipe</h1>
-        <p class="sottotitolo">Dai reel di cucina al tuo ricettario. Tutto sul tuo computer.</p>
+        <p class="sottotitolo" data-i18n="sottotitolo">Dai reel di cucina al tuo ricettario. Tutto sul tuo computer.</p>
       </div>
     </div>
-    <div class="stato-ambiente" id="stato-ambiente" title="Stato dei componenti locali">
-      <span class="pallino" id="pallino-stato"></span>
-      <span id="testo-stato">verifica…</span>
+    <div class="strumenti-testata">
+      <!-- La lingua dell'interfaccia sta qui e non sepolta nelle Opzioni: è la prima cosa
+           che serve a chi apre la pagina e non legge l'italiano, e da lì in giù la catena
+           dei tre assi parte da sola (interfaccia → ricetta → misure). I nomi delle lingue
+           restano nella loro lingua, che è l'unico modo di renderli leggibili a chi cerca
+           la propria. -->
+      <select id="opt-lingua-ui" class="scelta-lingua" data-i18n-aria-label="lingua_interfaccia">
+        <option value="it">Italiano</option>
+        <option value="en">English</option>
+      </select>
+      <div class="stato-ambiente" id="stato-ambiente" data-i18n-title="stato_titolo">
+        <span class="pallino" id="pallino-stato"></span>
+        <span id="testo-stato" data-i18n="stato_verifica">verifica…</span>
+      </div>
     </div>
   </header>
 
@@ -34,63 +47,66 @@
           type="url"
           id="input-url"
           class="cook-input"
-          placeholder="Incolla il link di un reel di cucina…"
+          data-i18n-placeholder="url_placeholder"
           autocomplete="off"
           spellcheck="false"
         />
         <button id="btn-cook" class="btn-cook">
-          <span class="btn-cook-testo">Cook</span>
+          <span class="btn-cook-testo" data-i18n="cook">Cook</span>
           <span class="btn-cook-icona" data-icona="padella"></span>
         </button>
       </div>
 
       <div class="cook-alternative">
+        <!-- Il testo sta in uno `span` e non nell'etichetta: l'etichetta contiene anche
+             l'input nascosto, e riscriverne il contenuto lo cancellerebbe. -->
         <label class="link-file" for="input-file">
           <input type="file" id="input-file" accept="video/*,audio/*" hidden />
-          oppure trascina qui un video, o <span class="sottolineato">scegli un file</span>
+          <span data-i18n-html="trascina">oppure trascina qui un video, o <span class="sottolineato">scegli un file</span></span>
         </label>
-        <button class="link-opzioni" id="btn-opzioni" type="button">Opzioni ▾</button>
+        <button class="link-opzioni" id="btn-opzioni" type="button" data-i18n="opzioni_apri">Opzioni ▾</button>
       </div>
 
       <div class="opzioni" id="opzioni" hidden>
         <label>
-          Trascrizione
+          <span data-i18n="lbl_trascrizione">Trascrizione</span>
           <select id="opt-asr">
-            <option value="auto">Automatica (consigliata)</option>
-            <option value="mlx">Accelerata (Mac Apple Silicon)</option>
-            <option value="faster-whisper">Portabile (CPU)</option>
+            <option value="auto" data-i18n="asr_auto">Automatica (consigliata)</option>
+            <option value="mlx" data-i18n="asr_mlx">Accelerata (Mac Apple Silicon)</option>
+            <option value="faster-whisper" data-i18n="asr_cpu">Portabile (CPU)</option>
           </select>
         </label>
         <label>
-          Lingua parlata nel reel
+          <span data-i18n="lbl_lingua_parlato">Lingua parlata nel reel</span>
           <select id="opt-lingua-parlato">
-            <option value="">Riconoscila da sé</option>
+            <option value="" data-i18n="parlato_auto">Riconoscila da sé</option>
             <option value="it">Italiano</option>
             <option value="en">English</option>
           </select>
         </label>
         <label>
-          Modello di linguaggio
-          <select id="opt-modello"><option value="">Il migliore installato</option></select>
+          <span data-i18n="lbl_modello">Modello di linguaggio</span>
+          <select id="opt-modello"><option value="" data-i18n="modello_migliore">Il migliore installato</option></select>
         </label>
         <label>
-          Lingua della ricetta
+          <span data-i18n="lbl_lingua_ricetta">Lingua della ricetta</span>
           <select id="opt-lingua">
+            <option value="" data-i18n="lingua_come_interfaccia">Come l'interfaccia</option>
             <option value="it">Italiano</option>
             <option value="en">English</option>
           </select>
         </label>
         <label>
-          Misure
+          <span data-i18n="lbl_misure">Misure</span>
           <select id="opt-sistema">
-            <option value="">Come la lingua</option>
-            <option value="metrico">Metriche (g, ml)</option>
-            <option value="imperiale">Imperiali (cup, oz)</option>
+            <option value="" data-i18n="misure_come_lingua">Come la lingua</option>
+            <option value="metrico" data-i18n="misure_metriche">Metriche (g, ml)</option>
+            <option value="imperiale" data-i18n="misure_imperiali">Imperiali (cup, oz)</option>
           </select>
         </label>
         <label class="opt-check">
           <input type="checkbox" id="opt-no-audio" />
-          Usa solo la didascalia (salta l'audio)
+          <span data-i18n="opt_no_audio">Usa solo la didascalia (salta l'audio)</span>
         </label>
       </div>
 
@@ -100,14 +116,14 @@
     <!-- ---------- Zona di rilascio file ---------- -->
     <div class="drop-overlay" id="drop-overlay" hidden>
       <div class="drop-messaggio">
-        <span data-icona="carica" data-icona-dim="40"></span><br />Rilascia qui il video del reel
+        <span data-icona="carica" data-icona-dim="40"></span><br /><span data-i18n="rilascia_qui">Rilascia qui il video del reel</span>
       </div>
     </div>
 
     <!-- ---------- Avanzamento ---------- -->
     <section class="pannello-avanzamento" id="pannello-avanzamento" hidden>
       <div class="fasi" id="fasi"></div>
-      <button class="btn-annulla" id="btn-annulla" hidden>Annulla</button>
+      <button class="btn-annulla" id="btn-annulla" hidden data-i18n="annulla">Annulla</button>
     </section>
 
     <!-- ---------- Scheda ricetta ---------- -->
@@ -116,35 +132,35 @@
     <!-- ---------- Libreria ---------- -->
     <section class="libreria" id="libreria">
       <div class="libreria-testata">
-        <h2>Il tuo ricettario</h2>
+        <h2 data-i18n="libreria_titolo">Il tuo ricettario</h2>
         <div class="libreria-azioni">
-          <input type="search" id="input-cerca" class="cerca" placeholder="Cerca fra le ricette…" />
-          <button class="btn-secondario" id="btn-export-tutte">Esporta tutto per Mela</button>
+          <input type="search" id="input-cerca" class="cerca" data-i18n-placeholder="cerca_placeholder" />
+          <button class="btn-secondario" id="btn-export-tutte" data-i18n="esporta_tutto">Esporta tutto per Mela</button>
         </div>
       </div>
       <div class="griglia-ricette" id="griglia-ricette"></div>
-      <p class="libreria-vuota" id="libreria-vuota" hidden>
+      <p class="libreria-vuota" id="libreria-vuota" hidden data-i18n="libreria_vuota">
         Il ricettario è vuoto. Incolla il link di un reel qui sopra e premi Cook per iniziare.
       </p>
     </section>
   </main>
 
   <footer class="pie-pagina">
-    <p>
+    <p data-i18n-html="pie_locale">
       Interamente locale · nessuna IA online · nessun dato lascia il computer ·
       esporta in <strong>Mela</strong>, PDF e Markdown
     </p>
-    <p class="pie-avvertenza">
+    <p class="pie-avvertenza" data-i18n-html="pie_avvertenza">
       Le quantità convertite vengono da tabelle verificate, ma l'estrazione è automatica:
       <strong>controlla la ricetta prima di cucinarla.</strong>
       Le lacune sono sempre dichiarate, mai riempite a caso.
     </p>
     <p class="pie-collegamenti">
-      <a href="https://github.com/Stinocon/Reel2Recipe" target="_blank" rel="noopener noreferrer">Codice sorgente</a>
+      <a href="https://github.com/Stinocon/Reel2Recipe" target="_blank" rel="noopener noreferrer" data-i18n="pie_codice">Codice sorgente</a>
       ·
-      <a href="https://github.com/Stinocon/Reel2Recipe/blob/main/docs/condizioni-uso.md" target="_blank" rel="noopener noreferrer">Condizioni d'uso</a>
+      <a href="https://github.com/Stinocon/Reel2Recipe/blob/main/docs/condizioni-uso.md" target="_blank" rel="noopener noreferrer" data-i18n="pie_condizioni">Condizioni d'uso</a>
       ·
-      <a href="https://github.com/Stinocon/Reel2Recipe/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">Licenza MIT</a>
+      <a href="https://github.com/Stinocon/Reel2Recipe/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" data-i18n="pie_licenza">Licenza MIT</a>
     </p>
   </footer>
 

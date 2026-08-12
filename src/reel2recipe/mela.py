@@ -25,7 +25,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .recipe import Ricetta, percorso_libero
-from .units import sigla
+from .units import sigla, testo_da
 
 # Intestazioni e frasi dell'export, per lingua. Poche e stabili: un dizionario qui è più
 # leggibile di un meccanismo di traduzione per una manciata di stringhe.
@@ -49,8 +49,7 @@ TESTI = {
 
 def testo(lingua: str, chiave: str, **dati) -> str:
     """Una stringa dell'export nella lingua della ricetta, con ripiego sull'italiano."""
-    catalogo = TESTI.get(sigla(lingua), TESTI["it"])
-    return catalogo.get(chiave, TESTI["it"][chiave]).format(**dati)
+    return testo_da(TESTI, lingua, chiave, **dati)
 
 # Mela memorizza le date come secondi dal 1° gennaio 2001 UTC (epoca di riferimento Apple).
 _EPOCA_APPLE = datetime(2001, 1, 1, tzinfo=timezone.utc)

@@ -202,6 +202,20 @@ L'estrazione è lunga (download + trascrizione + LLM), quindi non blocca la rich
 parte in un thread e l'avanzamento arriva alla pagina via Server-Sent Events. La barra *Cook*
 racconta le fasi in tempo reale.
 
+**L'interfaccia è bilingue, e il suo catalogo sta nel frontend** (`web/i18n.js`), non nel
+server. Il criterio è *chi scrive la stringa la possiede*: le parole dei bottoni le scrive la
+pagina, quelle dell'avanzamento e degli errori le scrive Python e restano in `pipeline.py` e
+`api.py`. Portarle tutte nel server costringerebbe la pagina a un giro di rete prima di
+potersi disegnare, con un lampo di testo non tradotto a ogni caricamento.
+
+I due lati seguono però assi diversi, e la differenza è deliberata. La **pagina** segue la
+lingua dell'interfaccia, che viaggia su ogni chiamata come `lingua_ui` — nome distinto da
+`lingua`, che su `/api/cook` significa già un'altra cosa: in che lingua *produrre la ricetta*.
+L'**avanzamento e le avvertenze** seguono invece la lingua della ricetta, perché finiscono
+accanto alle `lacune`, che nella lingua della ricetta ci sono salvate dentro; farli divergere
+darebbe una scheda mezza in una lingua e mezza nell'altra. Nell'uso normale i due valori
+coincidono comunque, perché la lingua della ricetta segue quella dell'interfaccia.
+
 Le chiamate all'API partono dalla base della pagina (`document.baseURI`) e non dalla radice
 del sito. In locale è la stessa cosa; sotto l'Ingress di Home Assistant no, perché lì la
 pagina vive dietro un prefisso con token e un `/api/stato` assoluto finirebbe sull'API di

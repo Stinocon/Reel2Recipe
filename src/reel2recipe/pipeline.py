@@ -23,9 +23,72 @@ from pathlib import Path
 from . import acquire, asr, audio, extract
 from .percorsi import cartella_media
 from .recipe import Fonte, Ricetta, da_bozza
-from .units import Lingua, Sistema, Tabelle, carica_tabelle, sigla
+from .units import Catalogo, Lingua, Sistema, Tabelle, carica_tabelle, sigla, testo_da
 
 Avanzamento = Callable[[str, str], None]   # (fase, messaggio)
+
+
+# Ciò che la pipeline racconta mentre lavora: avanzamento e avvertenze.
+#
+# Seguono la lingua **della ricetta**, non quella dei bottoni della pagina. Sono frasi che
+# parlano della lavorazione di quella ricetta e finiscono accanto alle `lacune`, che nella
+# lingua della ricetta ci stanno già perché vengono salvate con lei: farle divergere
+# produrrebbe una scheda mezza in una lingua e mezza nell'altra. Nell'uso normale i due
+# valori coincidono comunque, perché la lingua della ricetta segue quella dell'interfaccia.
+TESTI: Catalogo = {
+    "it": {
+        "scaricamento": "Scaricamento del reel…",
+        "scaricato": "Scaricato: {etichetta}",
+        "lettura_file": "Lettura del file…",
+        "estrazione_audio": "Estrazione della traccia audio…",
+        "trascrizione_in_corso": "Trascrizione del parlato in corso…",
+        "trascritto": "Trascritti {caratteri} caratteri ({backend}).",
+        "ricostruzione": "Il modello locale sta ricostruendo la ricetta…",
+        "commenti_autore": ("Trovati {quanti} commenti dell'autore: spesso contengono le "
+                            "dosi mancanti."),
+        "conversione": "Conversione delle quantità con le tabelle…",
+        "pronta": "Pronta: «{titolo}».",
+        "senza_media": "Nessun file multimediale: analizzata la sola didascalia.",
+        "audio_fallito": "Audio non estratto ({dettaglio}). Si procede con la sola didascalia.",
+        "trascrizione_vuota": ("La trascrizione non ha prodotto testo: forse il reel non ha "
+                               "parlato."),
+        "trascrizione_fallita": ("Trascrizione non riuscita ({dettaglio}). Si procede con la "
+                                 "sola didascalia."),
+        "solo_parlato": "Ricetta ricavata dal solo parlato: verifica le quantità.",
+        "solo_didascalia": ("Ricetta ricavata dalla sola didascalia: il parlato non è stato "
+                            "letto."),
+        "niente_da_analizzare": ("Non c'è nulla da analizzare: né didascalia né parlato "
+                                 "trascrivibile."),
+        "non_una_ricetta": "«{etichetta}» non sembra contenere una ricetta di cucina.",
+    },
+    "en": {
+        "scaricamento": "Downloading the reel…",
+        "scaricato": "Downloaded: {etichetta}",
+        "lettura_file": "Reading the file…",
+        "estrazione_audio": "Extracting the audio track…",
+        "trascrizione_in_corso": "Transcribing the speech…",
+        "trascritto": "Transcribed {caratteri} characters ({backend}).",
+        "ricostruzione": "The local model is reconstructing the recipe…",
+        "commenti_autore": ("Found {quanti} comments by the author: they often hold the "
+                            "missing amounts."),
+        "conversione": "Converting the amounts with the tables…",
+        "pronta": "Ready: «{titolo}».",
+        "senza_media": "No media file: only the caption was analysed.",
+        "audio_fallito": "Audio not extracted ({dettaglio}). Carrying on with the caption alone.",
+        "trascrizione_vuota": "The transcription came out empty: perhaps nobody speaks in the reel.",
+        "trascrizione_fallita": ("Transcription failed ({dettaglio}). Carrying on with the "
+                                 "caption alone."),
+        "solo_parlato": "Recipe taken from the speech alone: check the amounts.",
+        "solo_didascalia": "Recipe taken from the caption alone: the speech was not read.",
+        "niente_da_analizzare": "There is nothing to analyse: no caption and no transcribable speech.",
+        "non_una_ricetta": "«{etichetta}» does not seem to contain a cooking recipe.",
+    },
+}
+
+
+def testo(lingua: str, chiave: str, **dati) -> str:
+    """Una frase di avanzamento o un'avvertenza, nella lingua della ricetta."""
+    return testo_da(TESTI, lingua, chiave, **dati)
 
 
 def _silenzio(fase: str, messaggio: str) -> None:
@@ -64,35 +127,37 @@ def _trascrivi_se_possibile(
     lingua_audio: str | None,
     su_avanzamento: Avanzamento,
     avvertenze: list[str],
+    lingua: str,
 ) -> asr.Trascrizione | None:
     """Estrae l'audio e lo trascrive. Ogni fallimento diventa un'avvertenza, non un'eccezione:
     la didascalia da sola può bastare."""
     if media.percorso is None:
-        avvertenze.append("Nessun file multimediale: analizzata la sola didascalia.")
+        avvertenze.append(testo(lingua, "senza_media"))
         return None
 
     try:
         if media.e_audio:
             percorso_audio = media.percorso
         else:
-            su_avanzamento("audio", "Estrazione della traccia audio…")
+            su_avanzamento("audio", testo(lingua, "estrazione_audio"))
             percorso_audio = audio.estrai_audio(media.percorso, cartella_media())
     except audio.ErroreAudio as e:
-        avvertenze.append(f"Audio non estratto ({e}). Si procede con la sola didascalia.")
+        avvertenze.append(testo(lingua, "audio_fallito", dettaglio=e))
         return None
 
     try:
-        su_avanzamento("trascrizione", "Trascrizione del parlato in corso…")
+        su_avanzamento("trascrizione", testo(lingua, "trascrizione_in_corso"))
         trascrizione = asr.trascrivi(percorso_audio, lingua=lingua_audio,
                                      modello=modello_asr, backend=backend)
         if not trascrizione:
-            avvertenze.append("La trascrizione non ha prodotto testo: forse il reel non ha parlato.")
+            avvertenze.append(testo(lingua, "trascrizione_vuota"))
             return None
-        su_avanzamento("trascrizione", f"Trascritti {len(trascrizione.testo)} caratteri "
-                                       f"({trascrizione.backend}).")
+        su_avanzamento("trascrizione", testo(lingua, "trascritto",
+                                             caratteri=len(trascrizione.testo),
+                                             backend=trascrizione.backend))
         return trascrizione
     except asr.ErroreTrascrizione as e:
-        avvertenze.append(f"Trascrizione non riuscita ({e}). Si procede con la sola didascalia.")
+        avvertenze.append(testo(lingua, "trascrizione_fallita", dettaglio=e))
         return None
 
 
@@ -137,7 +202,8 @@ def lavora(
     trascrizione = None
     if not salta_audio:
         trascrizione = _trascrivi_se_possibile(
-            media, backend_asr, modello_asr, lingua_audio, su_avanzamento, avvertenze
+            media, backend_asr, modello_asr, lingua_audio, su_avanzamento, avvertenze,
+            sigla(lingua),
         )
 
     testo_trascrizione = trascrizione.testo if trascrizione else ""
@@ -145,14 +211,14 @@ def lavora(
         return Esito(
             media=media,
             avvertenze=avvertenze,
-            errore="Non c'è nulla da analizzare: né didascalia né parlato trascrivibile.",
+            errore=testo(lingua, "niente_da_analizzare"),
         )
 
     if media.commenti_autore:
-        su_avanzamento("estrazione", f"Trovati {len(media.commenti_autore)} commenti "
-                                     f"dell'autore: spesso contengono le dosi mancanti.")
+        su_avanzamento("estrazione", testo(lingua, "commenti_autore",
+                                           quanti=len(media.commenti_autore)))
 
-    su_avanzamento("estrazione", "Il modello locale sta ricostruendo la ricetta…")
+    su_avanzamento("estrazione", testo(lingua, "ricostruzione"))
     esito_estrazione = extract.estrai_bozza(
         didascalia=media.didascalia,
         trascrizione=testo_trascrizione,
@@ -164,11 +230,9 @@ def lavora(
     )
 
     if not esito_estrazione.e_una_ricetta:
-        raise NonEUnaRicetta(
-            f"«{media.etichetta()}» non sembra contenere una ricetta di cucina."
-        )
+        raise NonEUnaRicetta(testo(lingua, "non_una_ricetta", etichetta=media.etichetta()))
 
-    su_avanzamento("conversione", "Conversione delle quantità con le tabelle…")
+    su_avanzamento("conversione", testo(lingua, "conversione"))
     ricetta = da_bozza(
         esito_estrazione.bozza,
         fonte=Fonte.adesso(
@@ -185,11 +249,11 @@ def lavora(
     )
 
     if not media.didascalia.strip():
-        avvertenze.append("Ricetta ricavata dal solo parlato: verifica le quantità.")
+        avvertenze.append(testo(lingua, "solo_parlato"))
     if not testo_trascrizione.strip():
-        avvertenze.append("Ricetta ricavata dalla sola didascalia: il parlato non è stato letto.")
+        avvertenze.append(testo(lingua, "solo_didascalia"))
 
-    su_avanzamento("fatto", f"Pronta: «{ricetta.titolo}».")
+    su_avanzamento("fatto", testo(lingua, "pronta", titolo=ricetta.titolo))
     return Esito(
         ricetta=ricetta,
         media=media,
@@ -202,16 +266,17 @@ def lavora(
 def da_url(url: str, su_avanzamento: Avanzamento = _silenzio,
            cookies_da_browser: str | None = None, **kwargs) -> Esito:
     """La strada principale: si incolla un link e si preme Cook."""
-    su_avanzamento("acquisizione", "Scaricamento del reel…")
+    lingua = kwargs.get("lingua", Lingua.IT)
+    su_avanzamento("acquisizione", testo(lingua, "scaricamento"))
     media = acquire.da_url(url, cartella_media(), cookies_da_browser=cookies_da_browser)
-    su_avanzamento("acquisizione", f"Scaricato: {media.etichetta()}")
+    su_avanzamento("acquisizione", testo(lingua, "scaricato", etichetta=media.etichetta()))
     return lavora(media, su_avanzamento, **kwargs)
 
 
 def da_file(percorso: Path | str, didascalia: str = "",
             su_avanzamento: Avanzamento = _silenzio, **kwargs) -> Esito:
     """Per i reel già salvati sul disco, o quando lo scaricamento non è possibile."""
-    su_avanzamento("acquisizione", "Lettura del file…")
+    su_avanzamento("acquisizione", testo(kwargs.get("lingua", Lingua.IT), "lettura_file"))
     media = acquire.da_file(percorso, didascalia=didascalia)
     return lavora(media, su_avanzamento, **kwargs)
 

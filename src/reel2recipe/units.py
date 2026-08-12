@@ -117,11 +117,29 @@ def sigla(valore) -> str:
     return valore.value if isinstance(valore, Enum) else str(valore)
 
 
+Catalogo = dict[str, dict[str, str]]   # lingua → chiave → testo
+
+
+def testo_da(catalogo: Catalogo, lingua: str, chiave: str, **dati) -> str:
+    """Una stringa da un catalogo per lingua, con ripiego sull'italiano.
+
+    Sta qui, e non accanto a ciascun catalogo, perché di cataloghi ce ne sono ormai
+    parecchi — i messaggi di conversione qui sotto, le intestazioni degli export in
+    `mela.py` e `documenti.py`, le note sulle temperature in `recipe.py`, l'avanzamento in
+    `pipeline.py` — e la funzione per leggerli era già stata ricopiata tre volte identica.
+
+    Il ripiego è a due livelli e i due servono a cose diverse: una **lingua** non prevista
+    non deve far sparire il messaggio, e una **chiave** tradotta a metà nemmeno. Meglio una
+    frase italiana dentro un'uscita inglese che un `KeyError` a metà export, o un buco dove
+    doveva esserci una lacuna dichiarata.
+    """
+    per_lingua = catalogo.get(sigla(lingua), catalogo["it"])
+    return per_lingua.get(chiave, catalogo["it"][chiave]).format(**dati)
+
+
 def messaggio(lingua: str, chiave: str, **dati) -> str:
-    """Un messaggio nella lingua richiesta. Se la lingua è ignota si ripiega sull'italiano:
-    meglio un messaggio comprensibile a metà che un KeyError davanti all'utente."""
-    catalogo = MESSAGGI.get(sigla(lingua), MESSAGGI["it"])
-    return catalogo.get(chiave, MESSAGGI["it"][chiave]).format(**dati)
+    """Un messaggio di conversione nella lingua richiesta."""
+    return testo_da(MESSAGGI, lingua, chiave, **dati)
 
 
 class Provenienza(str, Enum):

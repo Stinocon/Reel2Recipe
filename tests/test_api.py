@@ -161,3 +161,29 @@ def test_il_sistema_segue_la_lingua(lingua, atteso):
 def test_il_sistema_chiesto_esplicitamente_vince():
     assi = api.RichiestaCook(lingua="en", sistema="metrico").assi()
     assert assi == {"lingua": "en", "sistema": "metrico"}
+
+
+# --------------------------------------------------------------------------------------
+# Gli errori dell'API seguono la lingua dell'INTERFACCIA
+# --------------------------------------------------------------------------------------
+
+
+def test_errori_tradotti(client):
+    """`lingua_ui` e non `lingua`: su `/api/cook` quest'ultimo esiste già e vuol dire
+    un'altra cosa — in che lingua produrre la ricetta. Chiamarli uguale avrebbe legato la
+    lingua dei bottoni a quella del contenuto senza che nessuno lo avesse deciso."""
+    assert client.get("/api/export?lingua_ui=en").json()["detail"] == "The library is empty."
+    assert client.get("/api/export?lingua_ui=it").json()["detail"] == "Libreria vuota."
+    assert client.get("/api/ricette/999?lingua_ui=en").json()["detail"] == "Recipe not found."
+
+
+def test_errori_in_italiano_senza_indicazione(client):
+    """Senza `lingua_ui` si ripiega sull'italiano, che è la lingua in cui il progetto è
+    scritto: un ripiego deve essere una lingua vera, non una chiave grezza."""
+    assert client.get("/api/export").json()["detail"] == "Libreria vuota."
+
+
+def test_una_lingua_ignota_non_fa_sparire_il_messaggio(client):
+    """Il ripiego serve proprio a questo: meglio una frase italiana dentro un'uscita in
+    un'altra lingua che un `KeyError` davanti all'utente."""
+    assert client.get("/api/export?lingua_ui=de").json()["detail"] == "Libreria vuota."

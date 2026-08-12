@@ -103,6 +103,27 @@ body {
 }
 .sottotitolo { color: var(--inchiostro-tenue); font-size: 0.92rem; }
 
+/* La lingua dell'interfaccia e lo stato dei componenti stanno insieme in coda alla
+   testata: sono le due cose che si guardano prima di cominciare, non mentre si lavora. */
+.strumenti-testata {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.scelta-lingua {
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--inchiostro-tenue);
+  background: var(--carta);
+  border: 1px solid var(--bordo);
+  border-radius: 999px;
+  padding: 0.45rem 0.6rem;
+  cursor: pointer;
+}
+.scelta-lingua:hover { color: var(--inchiostro); border-color: var(--terracotta); }
+
 .stato-ambiente {
   display: flex;
   align-items: center;

@@ -5,6 +5,7 @@
 // Server-Sent Events. Così la barra Cook racconta cosa sta facendo, fase per fase.
 
 import { icona, riempiIcone } from './icone.js';
+import { alCambioLingua, applicaTesti, impostaLingua, lingua, t } from './i18n.js';
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
@@ -12,29 +13,36 @@ const $$ = (sel) => document.querySelectorAll(sel);
 // Ogni fase con la sua icona: il nome dice cosa sta succedendo, l'icona lo rende
 // riconoscibile a colpo d'occhio mentre la barra avanza.
 const FASI = {
-  acquisizione: { icona: 'scarica', testo: 'Recupero del reel' },
-  audio: { icona: 'video', testo: 'Estrazione audio' },
-  trascrizione: { icona: 'microfono', testo: 'Trascrizione del parlato' },
-  estrazione: { icona: 'modello', testo: 'Ricostruzione della ricetta' },
-  conversione: { icona: 'bilancia', testo: 'Conversione delle quantità' },
-  fatto: { icona: 'fatto', testo: 'Pronta' },
+  acquisizione: { icona: 'scarica', chiave: 'fase_acquisizione' },
+  audio: { icona: 'video', chiave: 'fase_audio' },
+  trascrizione: { icona: 'microfono', chiave: 'fase_trascrizione' },
+  estrazione: { icona: 'modello', chiave: 'fase_estrazione' },
+  conversione: { icona: 'bilancia', chiave: 'fase_conversione' },
+  fatto: { icona: 'fatto', chiave: 'fase_fatto' },
 };
 
 const PROVENIENZE_STIMA = new Set(['stimato:vaghe', 'indeterminato', 'assente']);
 
 let ricettaCorrente = null;   // la ricetta appena estratta, non ancora rivista
+// Servono a ridisegnare la scheda quando cambia la lingua: senza di questi il cambio
+// perderebbe l'avviso sulle incertezze e il nome del modello, che non stanno nella ricetta.
+let avvertenzeCorrenti = [];
+let modelloCorrente = '';
 
 // ---------------------------------------------------------------------------
 // Utilità
 // ---------------------------------------------------------------------------
 
 function toast(messaggio, errore = false) {
-  const t = $('#toast');
-  t.textContent = messaggio;
-  t.classList.toggle('errore', errore);
-  t.hidden = false;
-  clearTimeout(t._timer);
-  t._timer = setTimeout(() => (t.hidden = true), 3200);
+  // `elemento` e non `t`: `t` ora è la funzione di traduzione importata, e una variabile
+  // locale con quel nome la renderebbe invisibile dentro questa funzione. Oggi qui non
+  // servirebbe, ma la prima riga che ne avesse bisogno fallirebbe in un modo poco leggibile.
+  const elemento = $('#toast');
+  elemento.textContent = messaggio;
+  elemento.classList.toggle('errore', errore);
+  elemento.hidden = false;
+  clearTimeout(elemento._timer);
+  elemento._timer = setTimeout(() => (elemento.hidden = true), 3200);
 }
 
 // Sotto l'Ingress di Home Assistant la pagina non è servita dalla radice ma da dietro un
@@ -51,10 +59,20 @@ function toast(messaggio, errore = false) {
 const BASE = new URL('.', document.baseURI).href;
 const indirizzo = (percorso) => BASE + percorso.replace(/^\//, '');
 
+// La lingua dell'interfaccia accompagna ogni chiamata, così anche gli errori del server
+// arrivano nella lingua giusta. Si chiama `lingua_ui` e non `lingua` di proposito: su
+// `/api/cook` esiste già un `lingua` e vuol dire un'altra cosa — in che lingua produrre la
+// ricetta. Gli endpoint che non se ne fanno niente lo ignorano.
+function conLinguaUI(percorso) {
+  const url = new URL(indirizzo(percorso));
+  url.searchParams.set('lingua_ui', lingua());
+  return url.href;
+}
+
 async function api(percorso, opzioni = {}) {
-  const risposta = await fetch(indirizzo(percorso), opzioni);
+  const risposta = await fetch(conLinguaUI(percorso), opzioni);
   if (!risposta.ok) {
-    let dettaglio = `Errore ${risposta.status}`;
+    let dettaglio = t('errore_http', { stato: risposta.status });
     try { dettaglio = (await risposta.json()).detail || dettaglio; } catch {}
     throw new Error(dettaglio);
   }
@@ -79,28 +97,25 @@ async function aggiornaStato() {
 
     if (!s.pronto) {
       pallino.className = 'pallino ko';
-      testo.textContent = s.ollama_attivo ? 'nessun modello LLM' : 'Ollama spento';
+      testo.textContent = t(s.ollama_attivo ? 'stato_nessun_modello' : 'stato_ollama_spento');
       // Il messaggio non dà per scontato di girare su una macchina di sviluppo: dentro
       // l'add-on Home Assistant non c'è una shell dove digitare `ollama pull`, e il modello
       // se lo scarica l'add-on da solo — dire «esegui» lì è un consiglio che non si può
       // seguire. Prima si dichiara lo stato, poi il comando, per chi ha dove darlo.
       $('#cook-nota').textContent = s.ollama_attivo
-        ? `Nessun modello di linguaggio disponibile. Se l'installazione è appena avvenuta `
-          + `può essere ancora in scaricamento: sono diversi GB e il registro lo dice. `
-          + `Su un'installazione locale: ollama pull ${s.modello_consigliato}`
-        : `Ollama non risponde. Nell'add-on parte da solo, quindi conviene guardare il `
-          + `registro; su un'installazione locale avvialo con: ollama serve`;
+        ? t('nota_nessun_modello', { modello: s.modello_consigliato })
+        : t('nota_ollama_spento');
       $('#cook-nota').classList.add('errore');
     } else if (!s.asr_pronto) {
       pallino.className = 'pallino parziale';
-      testo.textContent = 'pronto (solo didascalie)';
+      testo.textContent = t('stato_pronto_didascalie');
     } else {
       pallino.className = 'pallino ok';
-      testo.textContent = 'tutto pronto';
+      testo.textContent = t('stato_tutto_pronto');
     }
   } catch {
     $('#pallino-stato').className = 'pallino ko';
-    $('#testo-stato').textContent = 'server non raggiungibile';
+    $('#testo-stato').textContent = t('stato_irraggiungibile');
   }
 }
 
@@ -122,7 +137,9 @@ function opzioniScelte() {
     lingua_audio: $('#opt-lingua-parlato').value || null,
     modello_llm: $('#opt-modello').value || null,
     salta_audio: $('#opt-no-audio').checked,
-    lingua: $('#opt-lingua').value,
+    // Vuoto = «come l'interfaccia». È il primo anello della catena dei tre assi:
+    // interfaccia → ricetta → misure, ciascuno con il precedente come ripiego.
+    lingua: $('#opt-lingua').value || lingua(),
     // Vuoto significa «come la lingua», e a decidere è il server: la regola sta in un
     // punto solo (`RichiestaCook.assi()`), non anche qui.
     sistema: $('#opt-sistema').value || null,
@@ -143,7 +160,7 @@ function queryOpzioni() {
 async function cookDaUrl() {
   const url = $('#input-url').value.trim();
   if (!url) { $('#input-url').focus(); return; }
-  if (!/^https?:\/\//.test(url)) { toast('Incolla un link che inizia con http.', true); return; }
+  if (!/^https?:\/\//.test(url)) { toast(t('toast_link_http'), true); return; }
 
   avviaUI();
   try {
@@ -173,7 +190,7 @@ async function cookDaFile(file) {
 }
 
 function seguiLavoro(job) {
-  const sorgente = new EventSource(indirizzo(`/api/cook/${job}/eventi`));
+  const sorgente = new EventSource(conLinguaUI(`/api/cook/${job}/eventi`));
   sorgente.onmessage = (ev) => {
     const dato = JSON.parse(ev.data);
     if (dato.tipo === 'avanzamento') {
@@ -185,7 +202,7 @@ function seguiLavoro(job) {
         mostraRicetta(dato.ricetta, dato.avvertenze, dato.modello);
         caricaLibreria();
       } else {
-        toast(dato.errore || 'Estrazione non riuscita.', true);
+        toast(dato.errore || t('toast_estrazione_fallita'), true);
         $('#cook-nota').textContent = dato.errore || '';
         $('#cook-nota').classList.add('errore');
       }
@@ -194,7 +211,7 @@ function seguiLavoro(job) {
   sorgente.onerror = () => {
     sorgente.close();
     fineUI();
-    toast('Connessione interrotta durante l\'estrazione.', true);
+    toast(t('toast_connessione'), true);
   };
 }
 
@@ -218,7 +235,7 @@ function avviaUI() {
     riga.dataset.fase = chiave;
     riga.innerHTML =
       `<span class="fase-icona">${icona(fase.icona, 16)}</span>` +
-      `<span class="fase-testo">${fase.testo}</span>`;
+      `<span class="fase-testo">${t(fase.chiave)}</span>`;
     contenitore.appendChild(riga);
   }
   $('#pannello-avanzamento').hidden = false;
@@ -252,9 +269,17 @@ function fineUI() {
 // Scheda ricetta
 // ---------------------------------------------------------------------------
 
-function mostraRicetta(ricetta, avvertenze = [], modello = '') {
+function mostraRicetta(ricetta, avvertenze = [], modello = '', scorri = true) {
   ricettaCorrente = ricetta;
+  avvertenzeCorrenti = avvertenze;
+  modelloCorrente = modello;
   const scheda = $('#scheda-ricetta');
+
+  // Le intestazioni della scheda seguono la lingua **della ricetta**, non quella della
+  // pagina: è la stessa scelta già fatta per gli export in `mela.py` e `documenti.py`, e
+  // per le `lacune`, che nella lingua della ricetta ci sono salvate dentro. Una ricetta
+  // inglese sotto un titolo «Ingredienti» sarebbe una scheda mezza e mezza.
+  const lr = ricetta.lingua || lingua();
 
   const copertina = ricetta.immagini?.[0]
     ? `<img class="scheda-copertina" src="data:image/jpeg;base64,${ricetta.immagini[0]}" alt="" />`
@@ -262,7 +287,7 @@ function mostraRicetta(ricetta, avvertenze = [], modello = '') {
 
   const meta = [];
   if (ricetta.porzioni) meta.push(`<span>${icona('piatto', 16)} ${esc(ricetta.porzioni)}</span>`);
-  if (ricetta.tempo_totale_min) meta.push(`<span>${icona('tempo', 16)} ${ricetta.tempo_totale_min} min</span>`);
+  if (ricetta.tempo_totale_min) meta.push(`<span>${icona('tempo', 16)} ${t('minuti', { quanti: ricetta.tempo_totale_min }, lr)}</span>`);
   if (ricetta.fonte?.autore) meta.push(`<span>${icona('autore', 16)} ${esc(ricetta.fonte.autore)}</span>`);
 
   scheda.innerHTML = `
@@ -270,24 +295,26 @@ function mostraRicetta(ricetta, avvertenze = [], modello = '') {
     <div class="scheda-corpo">
       <h2 class="scheda-titolo">${esc(ricetta.titolo)}</h2>
       <div class="scheda-meta">${meta.join('')}${modello ? `<span class="badge-fonte">${icona('modello', 16)} ${esc(modello)}</span>` : ''}</div>
-      ${avvertenze?.length ? `<div class="avviso-incertezze"><strong>Nota:</strong> ${avvertenze.map(esc).join(' ')}</div>` : ''}
-      <h3 class="sezione-titolo">Ingredienti</h3>
-      ${renderIngredienti(ricetta)}
-      <h3 class="sezione-titolo">Procedimento</h3>
+      ${avvertenze?.length ? `<div class="avviso-incertezze"><strong>${esc(t('scheda_nota', {}, lr))}</strong> ${avvertenze.map(esc).join(' ')}</div>` : ''}
+      <h3 class="sezione-titolo">${esc(t('scheda_ingredienti', {}, lr))}</h3>
+      ${renderIngredienti(ricetta, lr)}
+      <h3 class="sezione-titolo">${esc(t('scheda_procedimento', {}, lr))}</h3>
       <ol class="lista-procedimento">${(ricetta.procedimento || []).map((p) => `<li class="passo">${esc(p)}</li>`).join('')}</ol>
-      ${renderLacune(ricetta)}
+      ${renderLacune(ricetta, lr)}
       <div class="scheda-azioni">
-        <button class="btn-primario" id="btn-salva-scheda">${icona('salva')} Salva nel ricettario</button>
-        <button class="btn-secondario" id="btn-modifica-scheda">${icona('correggi')} Correggi</button>
-        <button class="btn-secondario" id="btn-export-scheda">${icona('scarica')} Scarica per Mela</button>
-        <button class="btn-secondario" id="btn-export-pdf">${icona('pdf')} PDF</button>
-        <button class="btn-secondario" id="btn-export-md">${icona('markdown')} Markdown</button>
-        ${ricetta.id ? `<button class="btn-pericolo" id="btn-elimina-scheda">${icona('elimina')} Elimina</button>` : ''}
+        <button class="btn-primario" id="btn-salva-scheda">${icona('salva')} ${esc(t('btn_salva'))}</button>
+        <button class="btn-secondario" id="btn-modifica-scheda">${icona('correggi')} ${esc(t('btn_correggi'))}</button>
+        <button class="btn-secondario" id="btn-export-scheda">${icona('scarica')} ${esc(t('btn_mela'))}</button>
+        <button class="btn-secondario" id="btn-export-pdf">${icona('pdf')} ${esc(t('btn_pdf'))}</button>
+        <button class="btn-secondario" id="btn-export-md">${icona('markdown')} ${esc(t('btn_markdown'))}</button>
+        ${ricetta.id ? `<button class="btn-pericolo" id="btn-elimina-scheda">${icona('elimina')} ${esc(t('btn_elimina'))}</button>` : ''}
       </div>
     </div>`;
 
   scheda.hidden = false;
-  scheda.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // Non quando si sta solo ridisegnando per un cambio di lingua: lì la pagina è ferma dove
+  // l'utente l'ha lasciata e portargliela via sarebbe una sorpresa.
+  if (scorri) scheda.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   $('#btn-salva-scheda').onclick = salvaRicettaCorrente;
   $('#btn-modifica-scheda').onclick = () => apriModifica(ricettaCorrente);
@@ -299,7 +326,7 @@ function mostraRicetta(ricetta, avvertenze = [], modello = '') {
   if ($('#btn-elimina-scheda')) $('#btn-elimina-scheda').onclick = () => eliminaRicettaCorrente();
 }
 
-function renderIngredienti(ricetta) {
+function renderIngredienti(ricetta, lr) {
   const gruppi = [...new Set((ricetta.ingredienti || []).map((i) => i.gruppo))];
   const mostraGruppi = gruppi.filter(Boolean).length > 0 && gruppi.length > 1;
   let html = '<ul class="lista-ingredienti">';
@@ -308,7 +335,7 @@ function renderIngredienti(ricetta) {
     for (const ing of ricetta.ingredienti.filter((i) => i.gruppo === gruppo)) {
       const incerta = PROVENIENZE_STIMA.has(ing.quantita?.provenienza);
       const tag = incerta
-        ? `<span class="tag-provenienza stima">stima</span>`
+        ? `<span class="tag-provenienza stima">${esc(t('tag_stima', {}, lr))}</span>`
         : '';
       html += `<li class="ingrediente${incerta ? ' incerta' : ''}">
         <span>${esc(ing.riga)}</span>${tag}</li>`;
@@ -317,9 +344,9 @@ function renderIngredienti(ricetta) {
   return html + '</ul>';
 }
 
-function renderLacune(ricetta) {
+function renderLacune(ricetta, lr) {
   if (!ricetta.lacune?.length) return '';
-  return `<h3 class="sezione-titolo">Da verificare</h3>
+  return `<h3 class="sezione-titolo">${esc(t('scheda_da_verificare', {}, lr))}</h3>
     <ul class="lista-lacune">${ricetta.lacune.map((l) => `<li class="lacuna">${esc(l)}</li>`).join('')}</ul>`;
 }
 
@@ -335,7 +362,7 @@ async function salvaRicettaCorrente() {
       body: JSON.stringify(ricettaCorrente),
     });
     ricettaCorrente.id = id;
-    toast('Salvata nel ricettario.');
+    toast(t('toast_salvata'));
     caricaLibreria();
   } catch (e) { toast(e.message, true); }
 }
@@ -344,12 +371,12 @@ async function eliminaRicettaCorrente() {
   if (!ricettaCorrente?.id) return;
   // Conferma esplicita: è l'unica azione distruttiva dell'interfaccia e non si può
   // annullare. Il titolo nel messaggio evita di cancellare la ricetta sbagliata.
-  if (!confirm(`Eliminare «${ricettaCorrente.titolo}» dal ricettario?\n\nL'operazione non è reversibile.`)) return;
+  if (!confirm(t('conferma_elimina', { titolo: ricettaCorrente.titolo }))) return;
   try {
     await api(`/api/ricette/${ricettaCorrente.id}`, { method: 'DELETE' });
     $('#scheda-ricetta').hidden = true;
     ricettaCorrente = null;
-    toast('Ricetta eliminata.');
+    toast(t('toast_eliminata'));
     caricaLibreria();
   } catch (e) { toast(e.message, true); }
 }
@@ -369,28 +396,27 @@ function apriModifica(ricetta) {
   const righeProc = (ricetta.procedimento || []).join('\n');
 
   contenuto.innerHTML = `
-    <h2 class="scheda-titolo">Correggi la ricetta</h2>
-    <p class="suggerimento-modifica">Un ingrediente per riga (es. "200 g farina 00"), un passo per riga.
-       Usa "# Titolo" per iniziare un gruppo di ingredienti.</p>
+    <h2 class="scheda-titolo">${esc(t('modale_titolo'))}</h2>
+    <p class="suggerimento-modifica">${esc(t('modale_suggerimento'))}</p>
     <div class="campo-modifica">
-      <label>Titolo</label>
+      <label>${esc(t('campo_titolo'))}</label>
       <input id="mod-titolo" value="${esc(ricetta.titolo)}" />
     </div>
     <div class="campo-modifica">
-      <label>Porzioni</label>
+      <label>${esc(t('campo_porzioni'))}</label>
       <input id="mod-porzioni" value="${esc(ricetta.porzioni || '')}" />
     </div>
     <div class="campo-modifica">
-      <label>Ingredienti</label>
+      <label>${esc(t('campo_ingredienti'))}</label>
       <textarea id="mod-ingredienti">${esc(righeIng)}</textarea>
     </div>
     <div class="campo-modifica">
-      <label>Procedimento</label>
+      <label>${esc(t('campo_procedimento'))}</label>
       <textarea id="mod-procedimento">${esc(righeProc)}</textarea>
     </div>
     <div class="scheda-azioni">
-      <button class="btn-primario" id="btn-salva-modifica">Salva le correzioni</button>
-      <button class="btn-testo" id="btn-chiudi-modale">Annulla</button>
+      <button class="btn-primario" id="btn-salva-modifica">${esc(t('btn_salva_correzioni'))}</button>
+      <button class="btn-testo" id="btn-chiudi-modale">${esc(t('annulla'))}</button>
     </div>`;
 
   $('#modale').hidden = false;
@@ -423,7 +449,7 @@ function applicaModifiche(ricetta) {
 
   $('#modale').hidden = true;
   mostraRicetta(ricetta, [], '');
-  toast('Correzioni applicate. Ricordati di salvare.');
+  toast(t('toast_correzioni'));
 }
 
 // ---------------------------------------------------------------------------
@@ -436,16 +462,16 @@ async function caricaLibreria(cerca = '') {
     const griglia = $('#griglia-ricette');
     $('#libreria-vuota').hidden = voci.length > 0;
     $('#libreria-vuota').textContent = cerca
-      ? `Nessuna ricetta trovata per «${cerca}».`
-      : 'Il ricettario è vuoto. Incolla il link di un reel qui sopra e premi Cook per iniziare.';
+      ? t('libreria_nessun_risultato', { cerca })
+      : t('libreria_vuota');
 
     griglia.innerHTML = voci.map((v) => {
       const copertina = v.copertina
         ? `style="background-image:url('data:image/jpeg;base64,${v.copertina}')"`
         : '';
       const meta = [
-        v.porzioni, v.tempo_totale_min ? `${v.tempo_totale_min} min` : null,
-        `${v.n_ingredienti} ingr.`,
+        v.porzioni, v.tempo_totale_min ? t('minuti', { quanti: v.tempo_totale_min }) : null,
+        t('carta_ingredienti', { quanti: v.n_ingredienti }),
       ].filter(Boolean).join(' · ');
       return `<article class="carta-ricetta" data-id="${v.id}">
         <div class="carta-copertina" ${copertina}>${v.copertina ? '' : icona('piatto', 34)}</div>
@@ -453,7 +479,7 @@ async function caricaLibreria(cerca = '') {
           <div class="carta-titolo">${esc(v.titolo)}</div>
           <div class="carta-meta">
             <span>${esc(meta)}</span>
-            ${v.ha_incertezze ? `<span class="carta-badge-incerta">${icona('avviso', 14)} da rivedere</span>` : ''}
+            ${v.ha_incertezze ? `<span class="carta-badge-incerta">${icona('avviso', 14)} ${esc(t('carta_da_rivedere'))}</span>` : ''}
           </div>
         </div>
       </article>`;
@@ -492,12 +518,18 @@ function ricercaLibreria(valore) {
 
 function collega() {
   $('#btn-cook').onclick = cookDaUrl;
+
+  // Il selettore parte dalla lingua già in uso — ricordata dalla volta scorsa o dedotta dal
+  // browser — e non da quella che capita di essere scritta per prima nel markup.
+  const selettoreLingua = $('#opt-lingua-ui');
+  selettoreLingua.value = lingua();
+  selettoreLingua.onchange = () => impostaLingua(selettoreLingua.value);
   $('#input-url').addEventListener('keydown', (e) => { if (e.key === 'Enter') cookDaUrl(); });
 
   $('#btn-opzioni').onclick = () => {
     const o = $('#opzioni');
     o.hidden = !o.hidden;
-    $('#btn-opzioni').textContent = o.hidden ? 'Opzioni ▾' : 'Opzioni ▴';
+    $('#btn-opzioni').textContent = t(o.hidden ? 'opzioni_apri' : 'opzioni_chiudi');
   };
 
   $('#input-file').onchange = (e) => { if (e.target.files[0]) cookDaFile(e.target.files[0]); };
@@ -523,7 +555,23 @@ function collega() {
 // Avvio
 // ---------------------------------------------------------------------------
 
+// Prima le parole, poi le icone: `applicaTesti` riscrive il contenuto di alcuni elementi
+// e le icone dei pezzi statici devono finirci sopra, non sotto.
+applicaTesti();
 riempiIcone();   // le icone dei pezzi statici di index.html (marchio, Cook, area di rilascio)
 collega();
+
+// Il markup statico lo ridisegna `i18n.js`; qui si ridisegna ciò che è costruito a runtime.
+// La scheda della ricetta si rifà solo se ce n'è una a schermo, e le sue intestazioni
+// restano nella lingua della ricetta: a cambiare sono i bottoni intorno.
+alCambioLingua(() => {
+  $('#btn-opzioni').textContent = t($('#opzioni').hidden ? 'opzioni_apri' : 'opzioni_chiudi');
+  aggiornaStato();
+  caricaLibreria($('#input-cerca').value.trim());
+  if (ricettaCorrente && !$('#scheda-ricetta').hidden) {
+    mostraRicetta(ricettaCorrente, avvertenzeCorrenti, modelloCorrente, false);
+  }
+});
+
 aggiornaStato();
 caricaLibreria();
