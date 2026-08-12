@@ -81,7 +81,7 @@ def test_il_parlato_si_riconosce_da_se_per_impostazione_predefinita():
     from reel2recipe import asr
     from reel2recipe.cli import lingua_del_parlato
 
-    assert asr.LINGUA_PREDEFINITA is None
+    assert asr.DEFAULT_LANGUAGE is None
     args = _parser().parse_args(["cook", "https://esempio.test/reel"])
     assert args.spoken_language == "auto"
     assert lingua_del_parlato(args) is None
