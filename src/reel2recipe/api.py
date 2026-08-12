@@ -140,17 +140,29 @@ def crea_app(db: str | None = None, url_ollama: str = "http://localhost:11434") 
 
     @app.post("/api/cook-file")
     async def cook_file(file: UploadFile, didascalia: str = "",
+                        backend_asr: str = "auto", modello_llm: str | None = None,
+                        salta_audio: bool = False,
                         lingua: str = "it", sistema: str | None = None) -> dict:
-        """Come sopra, ma da un file caricato dalla pagina (trascina-e-rilascia)."""
+        """Come sopra, ma da un file caricato dalla pagina (trascina-e-rilascia).
+
+        Le opzioni arrivano come parametri di query e non nel corpo, perché il corpo è già
+        il multipart del file. Sono **le stesse** di `/api/cook`: un file caricato non è un
+        cittadino di seconda classe. Prima lo era — backend ASR, modello e `salta_audio`
+        non erano nemmeno accettati, quindi chi trascinava un video otteneva sempre le
+        impostazioni predefinite senza che niente lo dicesse.
+        """
         suffisso = Path(file.filename or "reel.mp4").suffix or ".mp4"
         temporaneo = Path(tempfile.gettempdir()) / f"r2r-{uuid.uuid4().hex[:8]}{suffisso}"
         temporaneo.write_bytes(await file.read())
 
+        richiesta = RichiestaCook(
+            didascalia=didascalia, backend_asr=backend_asr, modello_llm=modello_llm,
+            salta_audio=salta_audio, lingua=lingua, sistema=sistema,
+        )
         lavoro = registro.nuovo()
         threading.Thread(
             target=_esegui_da_file,
-            args=(registro, lavoro, temporaneo, didascalia, url_ollama, db,
-                  RichiestaCook(lingua=lingua, sistema=sistema).assi()),
+            args=(registro, lavoro, temporaneo, richiesta, url_ollama, db),
             daemon=True,
         ).start()
         return {"job": lavoro.id}
@@ -315,13 +327,14 @@ def _esegui_da_url(registro: RegistroLavori, lavoro: Lavoro, richiesta: Richiest
 
 
 def _esegui_da_file(registro: RegistroLavori, lavoro: Lavoro, percorso: Path,
-                    didascalia: str, url_ollama: str, db: str | None,
-                    assi: dict | None = None) -> None:
+                    richiesta: RichiestaCook, url_ollama: str, db: str | None) -> None:
     try:
         esito = pipeline.da_file(
-            percorso, didascalia=didascalia,
+            percorso, didascalia=richiesta.didascalia or "",
             su_avanzamento=_avanzamento(registro, lavoro), url_ollama=url_ollama,
-            **(assi or {}),
+            backend_asr=richiesta.backend_asr, modello_llm=richiesta.modello_llm,
+            salta_audio=richiesta.salta_audio,
+            **richiesta.assi(),
         )
         _concludi_con_esito(registro, lavoro, esito, db)
     except pipeline.NonEUnaRicetta as e:

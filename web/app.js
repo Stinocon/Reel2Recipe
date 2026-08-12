@@ -108,12 +108,33 @@ async function aggiornaStato() {
 // Avvio di un'estrazione
 // ---------------------------------------------------------------------------
 
+// Le opzioni del pannello, nella forma che l'API si aspetta. Vale per entrambe le strade
+// (link e file): quello che si sceglie qui deve arrivare al server, sempre.
+//
+// `lingua` e `sistema` erano disegnate in index.html ma non venivano lette: il menu c'era,
+// la scelta si poteva fare, e ogni estrazione usciva comunque in italiano metrico. Un
+// comando che non fa niente è peggio di un comando assente, perché insegna a non fidarsi.
 function opzioniScelte() {
   return {
     backend_asr: $('#opt-asr').value,
     modello_llm: $('#opt-modello').value || null,
     salta_audio: $('#opt-no-audio').checked,
+    lingua: $('#opt-lingua').value,
+    // Vuoto significa «come la lingua», e a decidere è il server: la regola sta in un
+    // punto solo (`RichiestaCook.assi()`), non anche qui.
+    sistema: $('#opt-sistema').value || null,
   };
+}
+
+// Le stesse opzioni come query string, per il caricamento di un file: lì il corpo della
+// richiesta è già occupato dal multipart. Un valore nullo non si manda affatto, così il
+// predefinito del server resta l'unica regola di ripiego.
+function queryOpzioni() {
+  const q = new URLSearchParams();
+  for (const [chiave, valore] of Object.entries(opzioniScelte())) {
+    if (valore !== null && valore !== '') q.set(chiave, valore);
+  }
+  return q.toString();
 }
 
 async function cookDaUrl() {
@@ -140,7 +161,7 @@ async function cookDaFile(file) {
   const modulo = new FormData();
   modulo.append('file', file);
   try {
-    const { job } = await api('/api/cook-file', { method: 'POST', body: modulo });
+    const { job } = await api(`/api/cook-file?${queryOpzioni()}`, { method: 'POST', body: modulo });
     seguiLavoro(job);
   } catch (e) {
     fineUI();
