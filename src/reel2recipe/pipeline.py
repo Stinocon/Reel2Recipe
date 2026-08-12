@@ -101,7 +101,7 @@ class Esito:
 
     ricetta: Ricetta | None = None
     media: acquire.Media | None = None
-    trascrizione: asr.Trascrizione | None = None
+    trascrizione: asr.Transcript | None = None
     modello: str | None = None
     avvertenze: list[str] = field(default_factory=list)
     errore: str | None = None
@@ -128,7 +128,7 @@ def _trascrivi_se_possibile(
     su_avanzamento: Avanzamento,
     avvertenze: list[str],
     lingua: str,
-) -> asr.Trascrizione | None:
+) -> asr.Transcript | None:
     """Estrae l'audio e lo trascrive. Ogni fallimento diventa un'avvertenza, non un'eccezione:
     la didascalia da sola può bastare."""
     if media.percorso is None:
@@ -147,16 +147,16 @@ def _trascrivi_se_possibile(
 
     try:
         su_avanzamento("trascrizione", testo(lingua, "trascrizione_in_corso"))
-        trascrizione = asr.trascrivi(percorso_audio, lingua=lingua_audio,
-                                     modello=modello_asr, backend=backend)
+        trascrizione = asr.transcribe(percorso_audio, language=lingua_audio,
+                                      model=modello_asr, backend=backend)
         if not trascrizione:
             avvertenze.append(testo(lingua, "trascrizione_vuota"))
             return None
         su_avanzamento("trascrizione", testo(lingua, "trascritto",
-                                             caratteri=len(trascrizione.testo),
+                                             caratteri=len(trascrizione.text),
                                              backend=trascrizione.backend))
         return trascrizione
-    except asr.ErroreTrascrizione as e:
+    except asr.TranscriptionError as e:
         avvertenze.append(testo(lingua, "trascrizione_fallita", dettaglio=e))
         return None
 
@@ -183,8 +183,8 @@ def lavora(
     media: acquire.Media,
     su_avanzamento: Avanzamento = _silenzio,
     backend_asr: str = "auto",
-    modello_asr: str = asr.MODELLO_PREDEFINITO,
-    lingua_audio: str | None = asr.LINGUA_PREDEFINITA,
+    modello_asr: str = asr.DEFAULT_MODEL,
+    lingua_audio: str | None = asr.DEFAULT_LANGUAGE,
     modello_llm: str | None = None,
     url_ollama: str = extract.URL_OLLAMA_PREDEFINITO,
     salta_audio: bool = False,
@@ -206,7 +206,7 @@ def lavora(
             sigla(lingua),
         )
 
-    testo_trascrizione = trascrizione.testo if trascrizione else ""
+    testo_trascrizione = trascrizione.text if trascrizione else ""
     if not media.didascalia.strip() and not testo_trascrizione.strip():
         return Esito(
             media=media,
@@ -286,7 +286,7 @@ def controlla_ambiente(url_ollama: str = extract.URL_OLLAMA_PREDEFINITO) -> dict
 
     Serve a dare messaggi utili *prima* che qualcosa fallisca a metà lavorazione.
     """
-    backend = asr.backend_disponibili()
+    backend = asr.available_backends()
     modelli = extract.modelli_disponibili(url_ollama)
     ollama_ok = extract.ollama_attivo(url_ollama)
     return {

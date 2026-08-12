@@ -90,7 +90,7 @@ def test_cook_inoltra_le_opzioni_di_lavorazione(client, spia):
 def test_cook_non_dichiara_una_lingua_del_parlato_che_non_sa(client, spia):
     """Senza una scelta esplicita, a Whisper non si dice nulla: la riconosce da sé.
 
-    Non basta che `asr.LINGUA_PREDEFINITA` sia `None` — l'API deve anche non inventarsi
+    Non basta che `asr.DEFAULT_LANGUAGE` sia `None` — l'API deve anche non inventarsi
     un valore per conto suo, per esempio deducendolo dalla lingua richiesta in uscita.
     """
     client.post("/api/cook", json={"url": "https://esempio.test/reel/1", "lingua": "en"})
