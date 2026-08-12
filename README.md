@@ -278,7 +278,7 @@ src/reel2recipe/     il codice
   cli.py             i comandi da terminale
 data/                le tabelle di conversione (leggibili e modificabili)
 web/                 l'interfaccia (HTML/CSS/JS, senza build)
-tools/               script di supporto (avvio di Ollama e dell'interfaccia)
+tools/               script di supporto (avvio di Ollama e dell'interfaccia, guard di confine)
 docs/                documentazione (architettura, aspetti legali)
 tests/               i test
 workspace/           i tuoi dati — mai condivisi (in .gitignore)
