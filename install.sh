@@ -30,7 +30,17 @@ note()    { printf "    ${DIM}%s${OFF}\n" "$1"; }
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
-DEFAULT_LLM_MODEL="qwen2.5:7b-instruct"
+# The model to download. It is NOT hard-wired: it is asked of the code, which already holds
+# the answer in `extract.PREFERRED_MODELS[0]`, so this stays the only place that does not have
+# its own opinion. The literal below is only the fallback for when the Python dependencies are
+# not installable, and it says the same thing.
+#
+# This used to be hard-wired to `qwen2.5:7b-instruct` while `r2r check` and the web interface
+# recommended the 14b — a fourth copy of one fact, diverged. And not a harmless divergence: on
+# real reels the 7b loses the ingredient groups and **invents the amounts**, which is precisely
+# the damage AGENTS.md §3 and §4 exist to prevent. The installer was handing out the model the
+# project says not to trust.
+DEFAULT_LLM_MODEL="$(uv run python -c 'from reel2recipe.extract import PREFERRED_MODELS; print(PREFERRED_MODELS[0])' 2>/dev/null || echo 'qwen2.5:14b')"
 PROBLEMS=0
 
 exists() { command -v "$1" >/dev/null 2>&1; }
@@ -165,7 +175,7 @@ if exists ollama; then
     if [ "${MODELS:-0}" -gt 0 ]; then
       ok "models already present ($MODELS)"
     else
-      missing "no model installed: downloading $DEFAULT_LLM_MODEL (~4.7 GB)…"
+      missing "no model installed: downloading $DEFAULT_LLM_MODEL (several GB)…"
       note "Needed only the first time. You can interrupt and pull it later with: ollama pull $DEFAULT_LLM_MODEL"
       if ollama pull "$DEFAULT_LLM_MODEL"; then
         ok "model $DEFAULT_LLM_MODEL ready"
