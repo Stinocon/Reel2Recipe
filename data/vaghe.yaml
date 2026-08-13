@@ -8,7 +8,7 @@
 # l'interfaccia e l'export segnalano come stima. Non vengono mai presentate come dati
 # certi: sono un aiuto, non una misurazione.
 #
-# `senza_quantita: true` significa che l'espressione non esprime affatto una quantità
+# `without_quantity: true` significa che l'espressione non esprime affatto una quantità
 # ("q.b."): in quel caso non si stima nulla, si conserva la dicitura.
 #
 # ---------------------------------------------------------------------------------
@@ -30,133 +30,133 @@
 #
 # aggiornato: 2026-07-24
 
-espressioni:
+expressions:
 
   # ---- non esprimono una quantità -------------------------------------------
   "q.b.":
-    senza_quantita: true
-    resa:
+    without_quantity: true
+    rendering:
       it: "q.b."
       en: "to taste"
     alias: [qb, "q b", quanto basta, a piacere, a piacimento, to taste, as needed]
   "quanto serve":
-    senza_quantita: true
-    resa:
+    without_quantity: true
+    rendering:
       it: "q.b."
       en: "as needed"
     alias: [al bisogno, se necessario, as required]
 
   # ---- piccole quantità di condimento ---------------------------------------
   "un pizzico":
-    nome:
+    name:
       it: "un pizzico"
       en: "a pinch"
-    valore:
-      metrico: {quantita: 0.5, unita: g}
-      imperiale: {quantita: 0.125, unita: tsp}
+    value:
+      metrico: {quantity: 0.5, unit: g}
+      imperiale: {quantity: 0.125, unit: tsp}
     alias: [pizzico, un pizzico di, a pinch, pinch]
   "una presa":
-    nome:
+    name:
       it: "una presa"
       en: "a pinch"
-    valore:
-      metrico: {quantita: 1.0, unita: g}
-      imperiale: {quantita: 0.25, unita: tsp}
+    value:
+      metrico: {quantity: 1.0, unit: g}
+      imperiale: {quantity: 0.25, unit: tsp}
     alias: [presa, una presa di]
   "una punta":
-    nome:
+    name:
       it: "una punta"
       en: "a knife tip"
-    valore:
-      metrico: {quantita: 0.5, unita: g}
-      imperiale: {quantita: 0.125, unita: tsp}
+    value:
+      metrico: {quantity: 0.5, unit: g}
+      imperiale: {quantity: 0.125, unit: tsp}
     alias: [punta di coltello, una punta di, knife tip]
 
   # ---- grassi e liquidi versati a occhio ------------------------------------
   "un filo":
-    nome:
+    name:
       it: "un filo"
       en: "a drizzle"
-    valore:
-      metrico: {quantita: 5.0, unita: ml}
-      imperiale: {quantita: 1.0, unita: tsp}
+    value:
+      metrico: {quantity: 5.0, unit: ml}
+      imperiale: {quantity: 1.0, unit: tsp}
     alias: [filo, un filo di, un giro, un giro di, a drizzle, drizzle]
   "una noce":
-    nome:
+    name:
       it: "una noce"
       en: "a knob"
-    valore:
-      metrico: {quantita: 10.0, unita: g}
-      imperiale: {quantita: 2.0, unita: tsp}
+    value:
+      metrico: {quantity: 10.0, unit: g}
+      imperiale: {quantity: 2.0, unit: tsp}
     alias: [noce, una noce di, noce di burro, a knob, knob of butter]
   "un bicchiere":
-    nome:
+    name:
       it: "un bicchiere"
       en: "a glass"
-    valore:
-      metrico: {quantita: 200.0, unita: ml}
-      imperiale: {quantita: 0.75, unita: cup}
+    value:
+      metrico: {quantity: 200.0, unit: ml}
+      imperiale: {quantity: 0.75, unit: cup}
     alias: [bicchiere, un bicchiere di, bicchiere d'acqua, a glass, glass]
   "mezzo bicchiere":
-    nome:
+    name:
       it: "mezzo bicchiere"
       en: "half a glass"
-    valore:
-      metrico: {quantita: 100.0, unita: ml}
-      imperiale: {quantita: 0.375, unita: cup}
+    value:
+      metrico: {quantity: 100.0, unit: ml}
+      imperiale: {quantity: 0.375, unit: cup}
     alias: [mezzo bicchiere di, half a glass]
   "una tazza":
-    nome:
+    name:
       it: "una tazza"
       en: "a mug"
-    valore:
-      metrico: {quantita: 240.0, unita: ml}
-      imperiale: {quantita: 1.0, unita: cup}
+    value:
+      metrico: {quantity: 240.0, unit: ml}
+      imperiale: {quantity: 1.0, unit: cup}
     alias: [tazza, una tazza di, tazzina, a mug, mug]
 
   # ---- quantità a manciate ---------------------------------------------------
   "una manciata":
-    nome:
+    name:
       it: "una manciata"
       en: "a handful"
-    valore:
-      metrico: {quantita: 30.0, unita: g}
-      imperiale: {quantita: 0.25, unita: cup}
+    value:
+      metrico: {quantity: 30.0, unit: g}
+      imperiale: {quantity: 0.25, unit: cup}
     alias: [manciata, una manciata di, a handful, handful]
   "un mazzetto":
-    nome:
+    name:
       it: "un mazzetto"
       en: "a bunch"
-    valore:
-      metrico: {quantita: 20.0, unita: g}
-      imperiale: {quantita: 0.75, unita: oz}
+    value:
+      metrico: {quantity: 20.0, unit: g}
+      imperiale: {quantity: 0.75, unit: oz}
     alias: [mazzetto, un mazzetto di, un ciuffo, ciuffo, un mazzo, a bunch, bunch]
 
   # ---- pezzi contati ---------------------------------------------------------
   "uno spicchio":
-    nome:
+    name:
       it: "uno spicchio"
       en: "a clove"
-    valore:
-      metrico: {quantita: 5.0, unita: g}
-      imperiale: {quantita: 1.0, unita: tsp}
+    value:
+      metrico: {quantity: 5.0, unit: g}
+      imperiale: {quantity: 1.0, unit: tsp}
     alias: [spicchio, uno spicchio di, clove, a clove]
   "una fetta":
-    nome:
+    name:
       it: "una fetta"
       en: "a slice"
-    valore:
-      metrico: {quantita: 25.0, unita: g}
-      imperiale: {quantita: 1.0, unita: oz}
+    value:
+      metrico: {quantity: 25.0, unit: g}
+      imperiale: {quantity: 1.0, unit: oz}
     alias: [fetta, una fetta di, slice, a slice]
 
   # ---- moltiplicatori di conteggio (non producono peso) ----------------------
   # Diventano un numero puro applicato all'unità che segue, o al conteggio dei pezzi.
   "un paio":
-    moltiplicatore: 2
+    multiplier: 2
     alias: [paio, un paio di, a couple, a couple of]
   "una dozzina":
-    moltiplicatore: 12
+    multiplier: 12
     alias: [dozzina, una dozzina di, dozen, a dozen]
 
 # Espressioni che indicano quantità genuinamente indeterminata: non si stima,
