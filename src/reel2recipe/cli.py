@@ -87,7 +87,7 @@ def comando_cook(args) -> int:
         print(avviso(f"  ⚠ {a}"))
 
     ricetta = esito.ricetta
-    print(ok(f"\n✓ {ricetta.titolo}") + spento(f"  ({esito.modello})"))
+    print(ok(f"\n✓ {ricetta.title}") + spento(f"  ({esito.modello})"))
     _stampa_ricetta(ricetta)
 
     if not args.no_save:
@@ -106,27 +106,27 @@ def comando_cook(args) -> int:
 def _stampa_ricetta(ricetta) -> None:
     from .units import UNCERTAIN_PROVENANCES
 
-    if ricetta.porzioni or ricetta.tempo_totale_min():
-        dettagli = [d for d in (ricetta.porzioni,
-                                f"{ricetta.tempo_totale_min()} min" if ricetta.tempo_totale_min() else None) if d]
+    if ricetta.servings or ricetta.total_time_min():
+        dettagli = [d for d in (ricetta.servings,
+                                f"{ricetta.total_time_min()} min" if ricetta.total_time_min() else None) if d]
         print(spento("  " + " · ".join(dettagli)))
 
     print("\n  " + _c("Ingredients", "1"))
-    for gruppo in ricetta.gruppi:
-        if gruppo and len([g for g in ricetta.gruppi if g]) > 0 and len(ricetta.gruppi) > 1:
+    for gruppo in ricetta.groups:
+        if gruppo and len([g for g in ricetta.groups if g]) > 0 and len(ricetta.groups) > 1:
             print(spento(f"    — {gruppo} —"))
-        for i in ricetta.ingredienti:
+        for i in ricetta.ingredients:
             if i.group == gruppo:
                 riga = f"    {i.mela_line()}"
                 print(avviso(riga) if i.quantity.provenance in UNCERTAIN_PROVENANCES else riga)
 
     print("\n  " + _c("Method", "1"))
-    for n, passo in enumerate(ricetta.procedimento, 1):
+    for n, passo in enumerate(ricetta.method, 1):
         print(f"    {n}. {passo}")
 
-    if ricetta.lacune:
+    if ricetta.gaps:
         print("\n  " + avviso("To check"))
-        for l in ricetta.lacune:
+        for l in ricetta.gaps:
             print(avviso(f"    • {l}"))
 
 
@@ -173,7 +173,7 @@ def comando_batch(args) -> int:
                 lib.save(esito.ricetta)
                 ricette.append(esito.ricetta)
                 riuscite += 1
-                print(ok(f"  ✓ {esito.ricetta.titolo}\n"))
+                print(ok(f"  ✓ {esito.ricetta.title}\n"))
 
     print(f"\nDone: {ok(str(riuscite))} succeeded out of {len(lavori)}.")
     if ricette and args.export:
@@ -195,10 +195,10 @@ def comando_list(args) -> int:
         return 0
 
     for v in voci:
-        marchio = avviso(" (to review)") if v["ha_incertezze"] else ""
-        dettagli = " · ".join(str(x) for x in (v["autore"], v["porzioni"],
-                              f"{v['tempo_totale_min']} min" if v["tempo_totale_min"] else None) if x)
-        print(f"{_c(str(v['id']).rjust(4), '1')}  {v['titolo']}{marchio}")
+        marchio = avviso(" (to review)") if v["has_uncertainties"] else ""
+        dettagli = " · ".join(str(x) for x in (v["author"], v["servings"],
+                              f"{v['total_time_min']} min" if v["total_time_min"] else None) if x)
+        print(f"{_c(str(v['id']).rjust(4), '1')}  {v['title']}{marchio}")
         if dettagli:
             print(spento(f"      {dettagli}"))
     print(spento(f"\n{len(voci)} ricett{'a' if len(voci) == 1 else 'e'}."))
@@ -220,13 +220,13 @@ def comando_elimina(args) -> int:
             # Le risposte affermative restano accettate in entrambe le lingue: chi ha usato
             # questo comando per mesi digita «s» senza pensarci, e un «s» non riconosciuto
             # qui non annulla un errore — annulla una cancellazione voluta.
-            risposta = input(f"Delete «{ricetta.titolo}»? This cannot be undone. [y/N] ").strip().lower()
+            risposta = input(f"Delete «{ricetta.title}»? This cannot be undone. [y/N] ").strip().lower()
             if risposta not in ("y", "yes", "s", "si", "sì"):
                 print(spento("Cancelled."))
                 return 0
 
         lib.delete(args.id)
-    print(ok(f"✓ «{ricetta.titolo}» deleted from the library."))
+    print(ok(f"✓ «{ricetta.title}» deleted from the library."))
     return 0
 
 

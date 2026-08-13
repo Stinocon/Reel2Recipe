@@ -19,7 +19,7 @@ from reel2recipe.mela import (
     scrivi_melarecipes,
     verso_melarecipe,
 )
-from reel2recipe.recipe import Fonte, Ricetta, da_bozza
+from reel2recipe.recipe import Source, Recipe, from_draft
 
 
 BOZZA = {
@@ -46,13 +46,13 @@ BOZZA = {
 
 
 @pytest.fixture
-def ricetta() -> Ricetta:
-    return da_bozza(
+def ricetta() -> Recipe:
+    return from_draft(
         BOZZA,
-        fonte=Fonte.adesso(
+        source=Source.now(
             url="https://www.instagram.com/reel/ABC123/",
-            autore="cucina_test",
-            piattaforma="instagram",
+            author="cucina_test",
+            platform="instagram",
         ),
     )
 
@@ -64,7 +64,7 @@ def ricetta() -> Ricetta:
 
 def test_bozza_normalizza_le_quantita(ricetta):
     """La cup di zucchero deve essere diventata 200 g passando per units.py."""
-    zucchero = next(i for i in ricetta.ingredienti if i.name == "zucchero semolato")
+    zucchero = next(i for i in ricetta.ingredients if i.name == "zucchero semolato")
     assert (zucchero.quantity.value, zucchero.quantity.unit) == (200.0, "g")
 
 
@@ -75,26 +75,26 @@ def test_bozza_converte_le_temperature(ricetta):
     della frase che la introduce: quella dipende da lingua e sistema, il fatto che la
     modifica al testo dell'autore sia dichiarata no.
     """
-    assert any("175 °C" in p for p in ricetta.procedimento)
-    assert not any("350" in p and "F" in p for p in ricetta.procedimento)
-    assert any("350°F" in n and "175 °C" in n for n in ricetta.note)
+    assert any("175 °C" in p for p in ricetta.method)
+    assert not any("350" in p and "F" in p for p in ricetta.method)
+    assert any("350°F" in n and "175 °C" in n for n in ricetta.notes)
 
 
 def test_bozza_raccoglie_le_lacune(ricetta):
     """Il "q.b." del cacao non è una lacuna, ma la ricetta deve saper dire se ha incertezze."""
-    assert ricetta.ha_incertezze
+    assert ricetta.has_uncertainties
 
 
 def test_tempo_totale(ricetta):
-    assert ricetta.tempo_totale_min() == 25
+    assert ricetta.total_time_min() == 25
 
 
 def test_round_trip_del_modello(ricetta):
-    """Ricetta → dict → Ricetta senza perdere quantità né provenienze."""
-    ricostruita = Ricetta.from_dict(json.loads(ricetta.to_json()))
-    assert ricostruita.titolo == ricetta.titolo
-    assert len(ricostruita.ingredienti) == len(ricetta.ingredienti)
-    for a, b in zip(ricetta.ingredienti, ricostruita.ingredienti):
+    """Recipe → dict → Recipe senza perdere quantità né provenienze."""
+    ricostruita = Recipe.from_dict(json.loads(ricetta.to_json()))
+    assert ricostruita.title == ricetta.title
+    assert len(ricostruita.ingredients) == len(ricetta.ingredients)
+    for a, b in zip(ricetta.ingredients, ricostruita.ingredients):
         assert a.mela_line() == b.mela_line()
         assert a.quantity.provenance is b.quantity.provenance
 
@@ -122,7 +122,7 @@ def test_gruppi_come_intestazioni_con_cancelletto(ricetta):
 
 def test_gruppo_unico_non_produce_intestazione():
     """Se c'è un solo gruppo (o nessuno), l'intestazione è rumore."""
-    r = da_bozza({
+    r = from_draft({
         "titolo": "Pasta al burro",
         "ingredienti": [{"quantita_raw": "100", "unita_raw": "g", "nome": "burro"}],
         "procedimento": ["Sciogli il burro."],
@@ -147,7 +147,7 @@ def test_procedimento_non_numerato(ricetta):
 
 def test_numerazione_gia_presente_viene_tolta(ricetta):
     """Stesso doppione per l'altra strada: un passo che arriva già numerato dal modello."""
-    ricetta.procedimento = ["1. Monta i tuorli.", "2) Inforna.", "3 - Sforna."]
+    ricetta.method = ["1. Monta i tuorli.", "2) Inforna.", "3 - Sforna."]
     righe = verso_melarecipe(ricetta)["instructions"].split("\n")
     assert righe == ["Monta i tuorli.", "Inforna.", "Sforna."]
 
@@ -158,7 +158,7 @@ def test_passo_che_inizia_per_cifra_resta_intero(ricetta):
     Il terzo caso è quello che costringe il criterio a essere stretto: "5 - 6 minuti" ha la
     forma di una numerazione, ma togliere "5 - " cambierebbe un tempo di cottura in silenzio.
     """
-    ricetta.procedimento = [
+    ricetta.method = [
         "200 g di farina in una ciotola.",
         "180 °C per 20 minuti.",
         "5 - 6 minuti di cottura, finché non è dorato.",
@@ -196,7 +196,7 @@ def test_link_valorizzato_per_attribuzione(ricetta):
 
 
 def test_durate_leggibili():
-    r = da_bozza({"titolo": "X", "tempo_preparazione_min": 90, "tempo_cottura_min": 45})
+    r = from_draft({"titolo": "X", "tempo_preparazione_min": 90, "tempo_cottura_min": 45})
     d = verso_melarecipe(r)
     assert d["prepTime"] == "1 h 30 min"
     assert d["cookTime"] == "45 min"
@@ -205,13 +205,13 @@ def test_durate_leggibili():
 
 def test_categorie_senza_virgole():
     """Mela non ammette virgole nei nomi di categoria: verrebbero spezzate all'import."""
-    r = da_bozza({"titolo": "X", "categorie": ["Dolci, freddi"]})
+    r = from_draft({"titolo": "X", "categorie": ["Dolci, freddi"]})
     assert "," not in verso_melarecipe(r)["categories"][0]
 
 
 def test_lacune_finiscono_nelle_note():
     """Una stima non deve mai passare per un dato certo: va scritta nella ricetta."""
-    r = da_bozza({
+    r = from_draft({
         "titolo": "Test",
         "ingredienti": [{"quantita_raw": "1", "unita_raw": "cup", "nome": "gorgonzola"}],
     })

@@ -67,7 +67,7 @@ def bozza() -> dict:
     """Una sola estrazione per tutto il modulo: è la parte lenta."""
     return extract.estrai_bozza(
         didascalia=DIDASCALIA,
-        trascrizione="",
+        transcript="",
         titolo="Yaki Udon",
         modello=os.environ.get("R2R_MODELLO"),
     ).bozza
@@ -147,8 +147,8 @@ METHOD: Fry the pancetta, mix the eggs with pecorino, combine off the heat.
 @pytest.fixture(scope="module")
 def bozza_it_da_en() -> dict:
     return extract.estrai_bozza(
-        didascalia=DIDASCALIA_EN, trascrizione="", titolo="Carbonara",
-        modello=os.environ.get("R2R_MODELLO"), lingua="it",
+        didascalia=DIDASCALIA_EN, transcript="", titolo="Carbonara",
+        modello=os.environ.get("R2R_MODELLO"), language="it",
     ).bozza
 
 
@@ -193,17 +193,17 @@ Mescola tutto e inforna a 180°C per 40 minuti.
 @pytest.fixture(scope="module")
 def ricetta_ambigua():
     """Una sola estrazione, portata fino in fondo alla catena: è il risultato che conta."""
-    from reel2recipe.recipe import Fonte, da_bozza
+    from reel2recipe.recipe import Source, from_draft
 
     bozza = extract.estrai_bozza(
-        didascalia=DIDASCALIA_AMBIGUA, trascrizione="", titolo="Torta di mele",
+        didascalia=DIDASCALIA_AMBIGUA, transcript="", titolo="Torta di mele",
         modello=os.environ.get("R2R_MODELLO"),
     ).bozza
-    return bozza, da_bozza(bozza, fonte=Fonte.adesso(url=None, autore="test"))
+    return bozza, from_draft(bozza, source=Source.now(url=None, author="test"))
 
 
 def _ingrediente(ricetta, parola):
-    for i in ricetta.ingredienti:
+    for i in ricetta.ingredients:
         if parola in i.name.lower():
             return i
     return None
@@ -226,16 +226,16 @@ def test_porzioni_e_cottura_non_si_possono_omettere(ricetta_ambigua):
     """Erano opzionali nello schema e il modello li ometteva SEMPRE, anche quando la fonte
     li dichiarava. Se questo torna rosso, guardare `required` in extract.py prima del prompt."""
     _, ricetta = ricetta_ambigua
-    assert ricetta.porzioni and "6" in ricetta.porzioni, f"porzioni: {ricetta.porzioni!r}"
-    assert ricetta.tempo_cottura_min == 40, f"cottura: {ricetta.tempo_cottura_min!r}"
+    assert ricetta.servings and "6" in ricetta.servings, f"porzioni: {ricetta.servings!r}"
+    assert ricetta.cook_time_min == 40, f"cottura: {ricetta.cook_time_min!r}"
 
 
 def test_il_tempo_di_preparazione_non_si_inventa(ricetta_ambigua):
     """La didascalia dichiara solo la cottura. Reso obbligatorio, il campo veniva riempito
     con un numero plausibile — e spezzando un intervallo di cottura fra i due campi."""
     _, ricetta = ricetta_ambigua
-    assert ricetta.tempo_preparazione_min is None, (
-        f"preparazione inventata: {ricetta.tempo_preparazione_min!r} (la fonte non la dichiara)"
+    assert ricetta.prep_time_min is None, (
+        f"preparazione inventata: {ricetta.prep_time_min!r} (la fonte non la dichiara)"
     )
 
 

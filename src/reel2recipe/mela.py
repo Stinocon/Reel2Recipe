@@ -24,7 +24,7 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .recipe import Ricetta, percorso_libero
+from .recipe import Recipe, free_path
 from .units import text_from
 
 # Intestazioni e frasi dell'export, per lingua. Poche e stabili: un dizionario qui è più
@@ -77,34 +77,34 @@ def _durata(minuti: int | None) -> str:
     return f"{resto} min"
 
 
-def _identificativo(ricetta: Ricetta) -> str:
+def _identificativo(ricetta: Recipe) -> str:
     """Mela accetta un UUID oppure, per le ricette importate dal web, l'URL senza schema.
 
     Usare l'URL quando c'è non è un dettaglio: dà a Mela una chiave stabile, così
     reimportare la stessa ricetta aggiorna quella esistente invece di duplicarla.
     """
-    url = ricetta.fonte.url if ricetta.fonte else None
+    url = ricetta.source.url if ricetta.source else None
     if url:
         return re.sub(r"^https?://", "", url.strip()).rstrip("/")
     return str(uuid.uuid4())
 
 
-def righe_ingredienti(ricetta: Ricetta) -> list[str]:
+def righe_ingredienti(ricetta: Recipe) -> list[str]:
     """Ingredienti come righe di testo, con i titoli di gruppo nel formato `# Titolo`."""
     righe: list[str] = []
-    gruppi = ricetta.gruppi
+    gruppi = ricetta.groups
     mostra_intestazioni = len([g for g in gruppi if g]) > 0 and len(gruppi) > 1
 
     for gruppo in gruppi:
         if mostra_intestazioni and gruppo:
             righe.append(f"# {gruppo}")
-        for ingrediente in ricetta.ingredienti:
+        for ingrediente in ricetta.ingredients:
             if ingrediente.group == gruppo:
                 righe.append(ingrediente.mela_line())
     return righe
 
 
-def righe_procedimento(ricetta: Ricetta) -> list[str]:
+def righe_procedimento(ricetta: Recipe) -> list[str]:
     """Passi senza numerazione: la mette Mela.
 
     Qui prima si scriveva "1. ", per l'ipotesi che una numerazione esplicita sopravvivesse
@@ -115,28 +115,28 @@ def righe_procedimento(ricetta: Ricetta) -> list[str]:
     Un passo che arriva già numerato dal modello viene ripulito, altrimenti si ricade nello
     stesso doppione per un'altra strada.
     """
-    return [_NUMERAZIONE.sub("", passo.strip()) for passo in ricetta.procedimento]
+    return [_NUMERAZIONE.sub("", passo.strip()) for passo in ricetta.method]
 
 
-def righe_note(ricetta: Ricetta) -> list[str]:
+def righe_note(ricetta: Recipe) -> list[str]:
     """Note, avvertenze sulle conversioni e attribuzione.
 
     Le lacune finiscono qui e non vengono nascoste: chi apre la ricetta in cucina deve
     sapere quali quantità sono stime nostre e quali il reel non le diceva affatto.
     """
-    righe: list[str] = list(ricetta.note)
-    lingua = ricetta.lingua
+    righe: list[str] = list(ricetta.notes)
+    lingua = ricetta.language
 
-    if ricetta.lacune:
+    if ricetta.gaps:
         righe.append("")
         righe.append("# " + testo(lingua, "da_verificare"))
-        righe.extend(f"* {l}" for l in ricetta.lacune)
+        righe.extend(f"* {l}" for l in ricetta.gaps)
 
-    if ricetta.fonte and (ricetta.fonte.url or ricetta.fonte.autore):
+    if ricetta.source and (ricetta.source.url or ricetta.source.author):
         righe.append("")
         righe.append("# " + testo(lingua, "fonte"))
-        autore = ricetta.fonte.autore
-        url = ricetta.fonte.url
+        autore = ricetta.source.author
+        url = ricetta.source.url
         if autore and url:
             righe.append(testo(lingua, "ricetta_di_con_url", autore=autore, url=url))
         elif autore:
@@ -148,36 +148,36 @@ def righe_note(ricetta: Ricetta) -> list[str]:
     return righe
 
 
-def verso_melarecipe(ricetta: Ricetta) -> dict:
+def verso_melarecipe(ricetta: Recipe) -> dict:
     """Costruisce il dizionario `.melarecipe`. Le chiavi e i tipi seguono il formato
     documentato: tutte stringhe tranne `images` (array), `favorite`/`wantToCook` (bool)
     e `date` (float)."""
     return {
         "id": _identificativo(ricetta),
-        "title": ricetta.titolo,
-        "text": ricetta.descrizione or "",
-        "images": list(ricetta.immagini),
+        "title": ricetta.title,
+        "text": ricetta.description or "",
+        "images": list(ricetta.images),
         # Mela non ammette virgole nei nomi di categoria: le sostituiamo invece di
         # produrre categorie spezzate all'import.
-        "categories": [c.replace(",", " ").strip() for c in ricetta.categorie if c.strip()],
-        "yield": ricetta.porzioni or "",
-        "prepTime": _durata(ricetta.tempo_preparazione_min),
-        "cookTime": _durata(ricetta.tempo_cottura_min),
-        "totalTime": _durata(ricetta.tempo_totale_min()),
+        "categories": [c.replace(",", " ").strip() for c in ricetta.categories if c.strip()],
+        "yield": ricetta.servings or "",
+        "prepTime": _durata(ricetta.prep_time_min),
+        "cookTime": _durata(ricetta.cook_time_min),
+        "totalTime": _durata(ricetta.total_time_min()),
         "ingredients": "\n".join(righe_ingredienti(ricetta)),
         "instructions": "\n".join(righe_procedimento(ricetta)),
         "notes": "\n".join(righe_note(ricetta)).strip(),
         "nutrition": "",
-        "link": (ricetta.fonte.url if ricetta.fonte else "") or "",
+        "link": (ricetta.source.url if ricetta.source else "") or "",
         "favorite": False,
         "wantToCook": False,
         "date": (datetime.now(timezone.utc) - _EPOCA_APPLE).total_seconds(),
     }
 
 
-def scrivi_melarecipe(ricetta: Ricetta, cartella: Path | str) -> Path:
+def scrivi_melarecipe(ricetta: Recipe, cartella: Path | str) -> Path:
     """Scrive una singola ricetta come `.melarecipe`. Ritorna il percorso creato."""
-    percorso = percorso_libero(cartella, ricetta.nome_file(), ESTENSIONE_SINGOLA)
+    percorso = free_path(cartella, ricetta.file_name(), ESTENSIONE_SINGOLA)
     percorso.write_text(
         json.dumps(verso_melarecipe(ricetta), ensure_ascii=False, indent=2),
         encoding="utf-8",
@@ -185,7 +185,7 @@ def scrivi_melarecipe(ricetta: Ricetta, cartella: Path | str) -> Path:
     return percorso
 
 
-def scrivi_melarecipes(ricette: list[Ricetta], percorso: Path | str) -> Path:
+def scrivi_melarecipes(ricette: list[Recipe], percorso: Path | str) -> Path:
     """Scrive più ricette in un unico `.melarecipes` (uno zip di `.melarecipe`),
     che è il modo di importare un'infornata di ricette in Mela in una volta sola."""
     percorso = Path(percorso)
@@ -196,7 +196,7 @@ def scrivi_melarecipes(ricette: list[Ricetta], percorso: Path | str) -> Path:
     usati: set[str] = set()
     with zipfile.ZipFile(percorso, "w", zipfile.ZIP_DEFLATED) as z:
         for ricetta in ricette:
-            base = ricetta.nome_file()
+            base = ricetta.file_name()
             nome, n = f"{base}{ESTENSIONE_SINGOLA}", 2
             while nome in usati:
                 nome = f"{base}-{n}{ESTENSIONE_SINGOLA}"

@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .mela import righe_ingredienti
-from .recipe import Ricetta, percorso_libero
+from .recipe import Recipe, free_path
 from .units import UNCERTAIN_PROVENANCES, text_from
 
 # Le stringhe dei documenti, per lingua. Come in `mela.py`: poche e stabili, un dizionario
@@ -92,33 +92,33 @@ class Blocco:
     testo: str
 
 
-def _sommario(ricetta: Ricetta) -> str:
+def _sommario(ricetta: Recipe) -> str:
     """La riga sotto il titolo: porzioni e tempi, se ci sono. Vuota se non si sa nulla."""
     pezzi = []
-    if ricetta.porzioni:
-        pezzi.append(str(ricetta.porzioni))
-    if ricetta.tempo_preparazione_min:
-        pezzi.append(testo(ricetta.lingua, "preparazione", minuti=ricetta.tempo_preparazione_min))
-    if ricetta.tempo_cottura_min:
-        pezzi.append(testo(ricetta.lingua, "cottura", minuti=ricetta.tempo_cottura_min))
+    if ricetta.servings:
+        pezzi.append(str(ricetta.servings))
+    if ricetta.prep_time_min:
+        pezzi.append(testo(ricetta.language, "preparazione", minuti=ricetta.prep_time_min))
+    if ricetta.cook_time_min:
+        pezzi.append(testo(ricetta.language, "cottura", minuti=ricetta.cook_time_min))
     return " · ".join(pezzi)
 
 
-def _blocchi(ricetta: Ricetta) -> list[Blocco]:
+def _blocchi(ricetta: Recipe) -> list[Blocco]:
     """La ricetta come sequenza di blocchi, nell'ordine in cui va letta.
 
     L'ordine non è casuale: prima cosa serve (ingredienti), poi cosa fare (procedimento),
     poi ciò di cui diffidare (da verificare), infine di chi è la ricetta (fonte). Le note
     dell'autore stanno prima delle lacune perché sono sue, non nostre.
     """
-    blocchi = [Blocco("titolo", ricetta.titolo)]
+    blocchi = [Blocco("titolo", ricetta.title)]
 
     if sommario := _sommario(ricetta):
         blocchi.append(Blocco("sommario", sommario))
-    if ricetta.descrizione:
-        blocchi.append(Blocco("paragrafo", ricetta.descrizione))
+    if ricetta.description:
+        blocchi.append(Blocco("paragrafo", ricetta.description))
 
-    lingua = ricetta.lingua
+    lingua = ricetta.language
     blocchi.append(Blocco("sottotitolo", testo(lingua, "ingredienti")))
     for riga in righe_ingredienti(ricetta):
         # `righe_ingredienti` marca i titoli di gruppo con "#", che è la convenzione di
@@ -129,13 +129,13 @@ def _blocchi(ricetta: Ricetta) -> list[Blocco]:
         else:
             blocchi.append(Blocco("voce", riga))
 
-    if ricetta.procedimento:
+    if ricetta.method:
         blocchi.append(Blocco("sottotitolo", testo(lingua, "procedimento")))
-        blocchi.extend(Blocco("passo", passo) for passo in ricetta.procedimento)
+        blocchi.extend(Blocco("passo", passo) for passo in ricetta.method)
 
-    if ricetta.note:
+    if ricetta.notes:
         blocchi.append(Blocco("sottotitolo", testo(lingua, "note")))
-        blocchi.extend(Blocco("voce", nota) for nota in ricetta.note)
+        blocchi.extend(Blocco("voce", nota) for nota in ricetta.notes)
 
     if avvertenze := _avvertenze(ricetta):
         blocchi.append(Blocco("sottotitolo", testo(lingua, "da_verificare")))
@@ -148,16 +148,16 @@ def _blocchi(ricetta: Ricetta) -> list[Blocco]:
     return blocchi
 
 
-def _avvertenze(ricetta: Ricetta) -> list[str]:
+def _avvertenze(ricetta: Recipe) -> list[str]:
     """Le lacune dichiarate, più le quantità che sono stime e non dati.
 
     Le due cose sono diverse e vanno dette entrambe: "non era indicato" è un buco,
     "un pizzico ≈ 0,5 g" è un numero nostro. Chi cucina deve poter distinguere.
     """
-    righe = list(ricetta.lacune)
+    righe = list(ricetta.gaps)
     stimate = [
-        testo(ricetta.lingua, "stima", nome=i.name, quantita=i.quantity.text())
-        for i in ricetta.ingredienti
+        testo(ricetta.language, "stima", nome=i.name, quantita=i.quantity.text())
+        for i in ricetta.ingredients
         if i.quantity.provenance in UNCERTAIN_PROVENANCES and i.quantity.value is not None
     ]
     # Le lacune di `recipe.py` già nominano gli ingredienti senza quantità: si tengono solo
@@ -165,16 +165,16 @@ def _avvertenze(ricetta: Ricetta) -> list[str]:
     return righe + [s for s in stimate if not any(s.split("»")[0] in r for r in righe)]
 
 
-def _riga_fonte(ricetta: Ricetta) -> str:
+def _riga_fonte(ricetta: Recipe) -> str:
     """L'attribuzione. Non è un dettaglio di cortesia: la ricetta è di chi l'ha fatta, e il
     procedimento riformulato ha senso solo se resta il rimando all'originale (docs/legale.md)."""
-    if not ricetta.fonte:
+    if not ricetta.source:
         return ""
-    autore, url = ricetta.fonte.autore, ricetta.fonte.url
+    autore, url = ricetta.source.author, ricetta.source.url
     if autore and url:
-        return testo(ricetta.lingua, "ricetta_di", autore=autore, url=url)
+        return testo(ricetta.language, "ricetta_di", autore=autore, url=url)
     if autore:
-        return testo(ricetta.lingua, "ricetta_di_senza_url", autore=autore)
+        return testo(ricetta.language, "ricetta_di_senza_url", autore=autore)
     return url or ""
 
 
@@ -183,7 +183,7 @@ def _riga_fonte(ricetta: Ricetta) -> str:
 # --------------------------------------------------------------------------------------
 
 
-def verso_markdown(ricetta: Ricetta) -> str:
+def verso_markdown(ricetta: Recipe) -> str:
     """La ricetta in Markdown. Nessuna dipendenza: è testo."""
     righe: list[str] = []
     numero_passo = 0
@@ -206,12 +206,12 @@ def verso_markdown(ricetta: Ricetta) -> str:
             righe.append(f"{numero_passo}. {blocco.testo}")
 
     corpo = "\n".join(righe).strip()
-    return f"{corpo}\n\n---\n\n" + testo(ricetta.lingua, "chiusura_md") + "\n"
+    return f"{corpo}\n\n---\n\n" + testo(ricetta.language, "chiusura_md") + "\n"
 
 
-def scrivi_markdown(ricetta: Ricetta, cartella: Path | str) -> Path:
+def scrivi_markdown(ricetta: Recipe, cartella: Path | str) -> Path:
     """Scrive la ricetta come file `.md`. Ritorna il percorso creato."""
-    percorso = percorso_libero(cartella, ricetta.nome_file(), ESTENSIONE_MARKDOWN)
+    percorso = free_path(cartella, ricetta.file_name(), ESTENSIONE_MARKDOWN)
     percorso.write_text(verso_markdown(ricetta), encoding="utf-8")
     return percorso
 
@@ -254,7 +254,7 @@ class ErroreDocumento(RuntimeError):
     """L'export non è stato prodotto. Il messaggio deve dire cosa fare."""
 
 
-def scrivi_pdf(ricetta: Ricetta, cartella: Path | str) -> Path:
+def scrivi_pdf(ricetta: Recipe, cartella: Path | str) -> Path:
     """Scrive la ricetta come PDF impaginato. Ritorna il percorso creato."""
     try:
         from reportlab.lib.enums import TA_JUSTIFY
@@ -330,15 +330,15 @@ def scrivi_pdf(ricetta: Ricetta, cartella: Path | str) -> Path:
         canvas.saveState()
         canvas.setFont("Helvetica-Oblique", 7.5)
         canvas.setFillGray(0.55)
-        canvas.drawString(20 * mm, 11 * mm, _testo_pdf(testo(ricetta.lingua, "piede")))
+        canvas.drawString(20 * mm, 11 * mm, _testo_pdf(testo(ricetta.language, "piede")))
         if canvas.getPageNumber() > 1 or documento.page > 1:
             canvas.drawRightString(A4[0] - 20 * mm, 11 * mm, str(canvas.getPageNumber()))
         canvas.restoreState()
 
-    percorso = percorso_libero(cartella, ricetta.nome_file(), ESTENSIONE_PDF)
+    percorso = free_path(cartella, ricetta.file_name(), ESTENSIONE_PDF)
     SimpleDocTemplate(
         str(percorso), pagesize=A4,
         leftMargin=20 * mm, rightMargin=20 * mm, topMargin=18 * mm, bottomMargin=20 * mm,
-        title=_testo_pdf(ricetta.titolo), author="Reel2Recipe",
+        title=_testo_pdf(ricetta.title), author="Reel2Recipe",
     ).build(contenuto, onFirstPage=piede, onLaterPages=piede)
     return percorso

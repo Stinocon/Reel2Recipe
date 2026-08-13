@@ -30,7 +30,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import paths
-from .recipe import Ricetta
+from .recipe import Recipe, stored_field
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS ricette (
@@ -107,7 +107,7 @@ class Library:
             c.execute("DROP TABLE ricette_fts")
             c.executescript(SCHEMA)
             for r in c.execute("SELECT id, dati FROM ricette").fetchall():
-                self._index(c, r["id"], Ricetta.from_dict(json.loads(r["dati"])))
+                self._index(c, r["id"], Recipe.from_dict(json.loads(r["dati"])))
 
     # ---- lifecycle ----------------------------------------------------------------
 
@@ -131,14 +131,14 @@ class Library:
 
     # ---- writing ------------------------------------------------------------------
 
-    def save(self, recipe: Ricetta, overwrite: bool = True) -> int:
+    def save(self, recipe: Recipe, overwrite: bool = True) -> int:
         """Saves a recipe and returns its id.
 
         If a recipe with the same source URL already exists it is updated rather than
         creating a second one: re-importing the same reel has to correct the existing
         entry, not fill the library with duplicates.
         """
-        url = recipe.fonte.url if recipe.fonte else None
+        url = recipe.source.url if recipe.source else None
         if url and (existing := self.id_for_url(url)) is not None:
             if not overwrite:
                 return existing
@@ -153,17 +153,17 @@ class Library:
                                         ha_incertezze, creata_il, aggiornata_il)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    recipe.titolo, data, url,
-                    recipe.fonte.autore if recipe.fonte else None,
-                    recipe.fonte.piattaforma if recipe.fonte else None,
-                    int(recipe.ha_incertezze), now, now,
+                    recipe.title, data, url,
+                    recipe.source.author if recipe.source else None,
+                    recipe.source.platform if recipe.source else None,
+                    int(recipe.has_uncertainties), now, now,
                 ),
             )
             identifier = int(cursor.lastrowid)
             self._index(c, identifier, recipe)
         return identifier
 
-    def update(self, identifier: int, recipe: Ricetta) -> None:
+    def update(self, identifier: int, recipe: Recipe) -> None:
         """Replaces an existing recipe — which is what happens when the user corrects an
         ingredient by hand in the interface."""
         with self._transaction() as c:
@@ -172,9 +172,9 @@ class Library:
                       SET titolo = ?, dati = ?, autore = ?, ha_incertezze = ?, aggiornata_il = ?
                     WHERE id = ?""",
                 (
-                    recipe.titolo, recipe.to_json(indent=None),
-                    recipe.fonte.autore if recipe.fonte else None,
-                    int(recipe.ha_incertezze), _now(), identifier,
+                    recipe.title, recipe.to_json(indent=None),
+                    recipe.source.author if recipe.source else None,
+                    int(recipe.has_uncertainties), _now(), identifier,
                 ),
             ).rowcount
             if not changed:
@@ -189,26 +189,26 @@ class Library:
         return bool(deleted)
 
     @staticmethod
-    def _index(c: sqlite3.Connection, identifier: int, recipe: Ricetta) -> None:
+    def _index(c: sqlite3.Connection, identifier: int, recipe: Recipe) -> None:
         c.execute(
             "INSERT INTO ricette_fts (rowid, titolo, ingredienti, procedimento, categorie) "
             "VALUES (?, ?, ?, ?, ?)",
             (
                 identifier,
-                recipe.titolo,
-                " ".join(i.name for i in recipe.ingredienti),
-                " ".join(recipe.procedimento),
-                " ".join(recipe.categorie),
+                recipe.title,
+                " ".join(i.name for i in recipe.ingredients),
+                " ".join(recipe.method),
+                " ".join(recipe.categories),
             ),
         )
 
     # ---- reading ------------------------------------------------------------------
 
-    def read(self, identifier: int) -> Ricetta | None:
+    def read(self, identifier: int) -> Recipe | None:
         row = self._conn.execute(
             "SELECT dati FROM ricette WHERE id = ?", (identifier,)
         ).fetchone()
-        return Ricetta.from_dict(json.loads(row["dati"])) if row else None
+        return Recipe.from_dict(json.loads(row["dati"])) if row else None
 
     def id_for_url(self, url: str) -> int | None:
         row = self._conn.execute("SELECT id FROM ricette WHERE url = ?", (url,)).fetchone()
@@ -220,8 +220,15 @@ class Library:
         Each entry holds the minimum needed to draw a card: id, title, author, number of
         ingredients and whether there are uncertainties to review.
 
-        The keys are still Italian on purpose: they mirror the stored JSON, and they change
-        together with `Recipe`'s fields, in one commit with the frontend that reads them.
+        The keys of what comes out are English, and they moved in the same commit as
+        `Recipe`'s fields and `web/app.js`, which is the only thing that reads them. They are
+        not *format*: nothing on disk is keyed this way — the SQL columns just above and the
+        stored JSON are, and both of those stayed as they were.
+
+        What is read out of the stored JSON goes through `stored_field`, for the same reason
+        `Recipe.from_dict` does: a recipe saved before the migration still has Italian keys in
+        its blob, and the listing is exactly where that would show up as a library full of
+        cards with no servings and no cover.
         """
         if search and search.strip():
             rows = self._conn.execute(
@@ -246,23 +253,23 @@ class Library:
             data = json.loads(row["dati"])
             result.append({
                 "id": row["id"],
-                "titolo": row["titolo"],
-                "autore": row["autore"],
+                "title": row["titolo"],
+                "author": row["autore"],
                 "url": row["url"],
-                "piattaforma": row["piattaforma"],
-                "ha_incertezze": bool(row["ha_incertezze"]),
-                "creata_il": row["creata_il"],
-                "porzioni": data.get("porzioni"),
-                "tempo_totale_min": data.get("tempo_totale_min"),
-                "categorie": data.get("categorie") or [],
-                "n_ingredienti": len(data.get("ingredienti") or []),
-                "copertina": (data.get("immagini") or [None])[0],
+                "platform": row["piattaforma"],
+                "has_uncertainties": bool(row["ha_incertezze"]),
+                "created_at": row["creata_il"],
+                "servings": stored_field(data, "servings"),
+                "total_time_min": stored_field(data, "total_time_min"),
+                "categories": stored_field(data, "categories") or [],
+                "n_ingredients": len(stored_field(data, "ingredients") or []),
+                "cover": (stored_field(data, "images") or [None])[0],
             })
         return result
 
-    def all_recipes(self) -> list[Ricetta]:
+    def all_recipes(self) -> list[Recipe]:
         rows = self._conn.execute("SELECT dati FROM ricette ORDER BY creata_il DESC").fetchall()
-        return [Ricetta.from_dict(json.loads(r["dati"])) for r in rows]
+        return [Recipe.from_dict(json.loads(r["dati"])) for r in rows]
 
     def count(self) -> int:
         return int(self._conn.execute("SELECT COUNT(*) AS n FROM ricette").fetchone()["n"])
