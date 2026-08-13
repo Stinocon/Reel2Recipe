@@ -383,25 +383,25 @@ def load_tables(folder: str | None = None) -> Tables:
     v = _read("vaghe.yaml")
 
     aliases = {_key(k): val for k, val in (u.get("alias") or {}).items()}
-    temp = u.get("temperatura") or {}
+    temp = u.get("temperature") or {}
 
     # Density: both the canonical name and every alias point at the same value.
     density: dict[str, float] = {}
     density_source: dict[str, str] = {}
     liquids: set[str] = set()
-    for name, entry in (d.get("ingredienti") or {}).items():
+    for name, entry in (d.get("ingredients") or {}).items():
         g_ml = float(entry["g_per_ml"])
-        source = entry.get("fonte", "")
+        source = entry.get("source", "")
         for label in [name, *(entry.get("alias") or [])]:
             k = _key(label)
             density[k] = g_ml
             density_source[k] = source
-            if entry.get("liquido"):
+            if entry.get("liquid"):
                 liquids.add(k)
 
     # Vague expressions: same again, canonical + aliases towards the same definition.
     vague: dict[str, dict] = {}
-    for name, entry in (v.get("espressioni") or {}).items():
+    for name, entry in (v.get("expressions") or {}).items():
         for label in [name, *(entry.get("alias") or [])]:
             vague[_key(label)] = dict(entry)
 
@@ -412,16 +412,16 @@ def load_tables(folder: str | None = None) -> Tables:
 
     return Tables(
         volume={_key(k): float(x) for k, x in (u.get("volume") or {}).items()},
-        weight={_key(k): float(x) for k, x in (u.get("peso") or {}).items()},
-        count=frozenset(_key(x) for x in (u.get("conteggio") or [])),
+        weight={_key(k): float(x) for k, x in (u.get("weight") or {}).items()},
+        count=frozenset(_key(x) for x in (u.get("count") or [])),
         aliases=aliases,
-        spoon_measures=frozenset(_key(x) for x in (u.get("misure_a_cucchiaio") or [])),
-        metric_volume=frozenset(_key(x) for x in (u.get("volume_metrico") or [])),
-        imperial_volume=frozenset(_key(x) for x in (u.get("volume_imperiale") or [])),
-        labels=per_language(u.get("etichette")),
-        plural=per_language(u.get("plurale")),
+        spoon_measures=frozenset(_key(x) for x in (u.get("spoon_measures") or [])),
+        metric_volume=frozenset(_key(x) for x in (u.get("metric_volume") or [])),
+        imperial_volume=frozenset(_key(x) for x in (u.get("imperial_volume") or [])),
+        labels=per_language(u.get("labels")),
+        plural=per_language(u.get("plural")),
         temperature_aliases={_key(k): x for k, x in (temp.get("alias") or {}).items()},
-        rounding_c=int(temp.get("arrotondamento_c", 5)),
+        rounding_c=int(temp.get("rounding_c", 5)),
         density=density,
         density_source=density_source,
         liquids=frozenset(liquids),
@@ -776,7 +776,7 @@ def _trailing_measure(name: str, tables: Tables) -> tuple[str, str] | None:
         tail = " ".join(words[-n:])
         key = _without_dots(_key(tail))
         for expression, entry in tables.vague.items():
-            if entry.get("senza_quantita") and _without_dots(_key(expression)) == key:
+            if entry.get("without_quantity") and _without_dots(_key(expression)) == key:
                 return " ".join(words[:-n]), tail
     return None
 
@@ -1084,13 +1084,13 @@ def _vague_value(definition: dict, system: str) -> tuple[float, str] | None:
     and converting the first into the second would give 0.018 oz — a number nobody carries out
     (see the header of `vaghe.yaml`).
     """
-    value = definition.get("valore")
+    value = definition.get("value")
     if not isinstance(value, dict):
         return None
     per_system = value.get(code_of(system)) or value.get(System.METRIC.value)
-    if not isinstance(per_system, dict) or per_system.get("quantita") is None:
+    if not isinstance(per_system, dict) or per_system.get("quantity") is None:
         return None
-    return float(per_system["quantita"]), per_system.get("unita", "g")
+    return float(per_system["quantity"]), per_system.get("unit", "g")
 
 
 def _vague_note(definition: dict, value: float, unit: str, system: str, language: str) -> str:
@@ -1100,7 +1100,7 @@ def _vague_note(definition: dict, value: float, unit: str, system: str, language
     number depends on the system, and the two diverge. Composed here it cannot contradict the
     quantity it accompanies.
     """
-    names = definition.get("nome") or {}
+    names = definition.get("name") or {}
     expression_name = names.get(code_of(language)) or names.get(Language.IT.value) or ""
     return f"{expression_name} ≈ {format_number(value, system)} {unit}".strip()
 
@@ -1127,13 +1127,13 @@ def _try_indeterminate(
         if not definition:
             k_nd = _without_dots(k)
             for vague_key, entry in tables.vague.items():
-                if entry.get("senza_quantita") and _contains_expression(k_nd, _without_dots(vague_key)):
+                if entry.get("without_quantity") and _contains_expression(k_nd, _without_dots(vague_key)):
                     definition = entry
                     break
-        if definition and definition.get("senza_quantita"):
+        if definition and definition.get("without_quantity"):
             # "q.b." in Italian, "to taste" in English: the rendering is in the table per
             # language.
-            renderings = definition.get("resa") or {}
+            renderings = definition.get("rendering") or {}
             rendering = renderings.get(code_of(language)) or renderings.get(Language.IT.value) or "q.b."
             q = Quantity(None, rendering, Provenance.INDETERMINATE, original)
             return Ingredient(name, q, notes, group)
@@ -1184,12 +1184,12 @@ def _try_vague(
         if not definition and (m := _RE_QUANTITY_WITH_UNIT.match(_key(str(raw)))):
             definition = tables.vague.get(_key(m.group(2)))
 
-        if not definition or definition.get("senza_quantita"):
+        if not definition or definition.get("without_quantity"):
             continue
 
         # Multipliers ("un paio", "una dozzina"): they do not produce a weight, they multiply
         # a count. If there is no unit to multiply, they count as pieces.
-        if (multiplier := definition.get("moltiplicatore")) is not None:
+        if (multiplier := definition.get("multiplier")) is not None:
             n = float(multiplier) * (number[0] if number else 1.0)
             q = Quantity(n, None, Provenance.COUNT, original)
             return Ingredient(name, q, notes, group)
