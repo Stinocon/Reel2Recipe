@@ -186,7 +186,7 @@ def lavora(
     modello_asr: str = asr.DEFAULT_MODEL,
     lingua_audio: str | None = asr.DEFAULT_LANGUAGE,
     modello_llm: str | None = None,
-    url_ollama: str = extract.URL_OLLAMA_PREDEFINITO,
+    url_ollama: str = extract.DEFAULT_OLLAMA_URL,
     salta_audio: bool = False,
     tabelle: Tables | None = None,
     # I due assi di uscita. `lingua_audio` sopra è un'altra cosa: è la lingua PARLATA nel
@@ -219,22 +219,22 @@ def lavora(
                                            quanti=len(media.author_comments)))
 
     su_avanzamento("estrazione", testo(lingua, "ricostruzione"))
-    esito_estrazione = extract.estrai_bozza(
-        didascalia=media.caption,
-        trascrizione=testo_trascrizione,
-        titolo=media.title,
-        modello=modello_llm,
+    esito_estrazione = extract.extract_draft(
+        caption=media.caption,
+        transcript=testo_trascrizione,
+        title=media.title,
+        model=modello_llm,
         url=url_ollama,
-        commenti_autore=media.author_comments,
-        lingua=code_of(lingua),
+        author_comments=media.author_comments,
+        language=code_of(lingua),
     )
 
-    if not esito_estrazione.e_una_ricetta:
+    if not esito_estrazione.is_a_recipe:
         raise NonEUnaRicetta(testo(lingua, "non_una_ricetta", etichetta=media.label()))
 
     su_avanzamento("conversione", testo(lingua, "conversione"))
     ricetta = from_draft(
-        esito_estrazione.bozza,
+        esito_estrazione.draft,
         source=Source.now(
             url=media.url,
             author=media.author,
@@ -253,12 +253,12 @@ def lavora(
     if not testo_trascrizione.strip():
         avvertenze.append(testo(lingua, "solo_didascalia"))
 
-    su_avanzamento("fatto", testo(lingua, "pronta", titolo=ricetta.title))
+    su_avanzamento("fatto", testo(lingua, "pronta", title=ricetta.title))
     return Esito(
         ricetta=ricetta,
         media=media,
         trascrizione=trascrizione,
-        modello=esito_estrazione.modello,
+        modello=esito_estrazione.model,
         avvertenze=avvertenze,
     )
 
@@ -281,14 +281,14 @@ def da_file(percorso: Path | str, didascalia: str = "",
     return lavora(media, su_avanzamento, **kwargs)
 
 
-def controlla_ambiente(url_ollama: str = extract.URL_OLLAMA_PREDEFINITO) -> dict:
+def controlla_ambiente(url_ollama: str = extract.DEFAULT_OLLAMA_URL) -> dict:
     """Stato dei componenti esterni, per la diagnostica di CLI e interfaccia.
 
     Serve a dare messaggi utili *prima* che qualcosa fallisca a metà lavorazione.
     """
     backend = asr.available_backends()
-    modelli = extract.modelli_disponibili(url_ollama)
-    ollama_ok = extract.ollama_attivo(url_ollama)
+    modelli = extract.available_models(url_ollama)
+    ollama_ok = extract.ollama_up(url_ollama)
     return {
         "ffmpeg": audio.ffmpeg_available(),
         "yt_dlp": acquire.ytdlp_available(),
@@ -299,7 +299,7 @@ def controlla_ambiente(url_ollama: str = extract.URL_OLLAMA_PREDEFINITO) -> dict
         # Quale modello suggerire a chi non ne ha nessuno. Viene da qui e non è scritto nella
         # pagina, perché una stringa duplicata nel frontend invecchia da sola: consigliava il
         # 7b mentre l'add-on installava il 14b.
-        "modello_consigliato": extract.MODELLI_PREFERITI[0],
+        "modello_consigliato": extract.PREFERRED_MODELS[0],
         "llm_pronto": ollama_ok and bool(modelli),
         # Il minimo per poter lavorare qualcosa: senza LLM non si struttura nulla.
         "pronto": ollama_ok and bool(modelli),

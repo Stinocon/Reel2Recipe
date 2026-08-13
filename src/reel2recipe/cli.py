@@ -49,7 +49,7 @@ def _pare_un_url(testo: str) -> bool:
 def comando_cook(args) -> int:
     from . import pipeline
     from .acquire import AcquisitionError
-    from .extract import ErroreEstrazione
+    from .extract import ExtractionError
     from .store import Library
 
     sorgente = args.sorgente
@@ -75,7 +75,7 @@ def comando_cook(args) -> int:
     except pipeline.NonEUnaRicetta as e:
         print(errore(f"\n✗ {e}"))
         return 2
-    except (AcquisitionError, ErroreEstrazione) as e:
+    except (AcquisitionError, ExtractionError) as e:
         print(errore(f"\n✗ {e}"))
         return 1
 
