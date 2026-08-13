@@ -264,7 +264,14 @@ def _chiave(testo: str) -> str:
     spazi normalizzati. Serve a far combaciare "Farina 00", "farina 00 " e "FARINA 00"."""
     testo = unicodedata.normalize("NFD", testo.strip().lower())
     testo = "".join(c for c in testo if unicodedata.category(c) != "Mn")
-    testo = testo.replace("'", "'")
+    # Apostrofi tipografici (U+2019, U+2018) verso quello ASCII. Una riga con questo intento
+    # c'era già, ma metteva l'apostrofo ASCII al posto di se stesso: non faceva niente, e a
+    # rileggerla sembrava a posto. Costava caro, perché l'apostrofo curvo è quello che
+    # scrivono di default le tastiere iOS e le didascalie di Instagram. Con quello, la voce
+    # «bicchiere d'acqua» di `vaghe.yaml` non veniva più trovata: invece di «200 ml acqua»
+    # dichiarato come stima usciva «1 bicchiere d'acqua acqua» con provenienza `dichiarato`,
+    # cioè una riga senza senso presentata come dato certo.
+    testo = testo.replace("’", "'").replace("‘", "'")
     testo = re.sub(r"[^\w\s'°/.-]", " ", testo)
     return re.sub(r"\s+", " ", testo).strip()
 
