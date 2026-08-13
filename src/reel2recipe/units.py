@@ -1,45 +1,43 @@
-"""units.py — normalizzazione deterministica delle quantità. Il cuore qualitativo del progetto.
+"""units.py — deterministic normalisation of quantities. The qualitative heart of the project.
 
-PRINCIPIO: l'LLM estrae, il codice converte.
+PRINCIPLE: the LLM extracts, the code converts.
 
-Un modello linguistico a cui si chiede "quanti grammi sono 1 cup di farina?" produce un
-numero plausibile. A volte è 120, a volte 128, a volte 150, e per lo zucchero magari
-ripete lo stesso numero della farina — che è sbagliato del 67%. Il modello non sta
-calcolando, sta ricordando male.
+Ask a language model "how many grams is 1 cup of flour?" and it produces a plausible number.
+Sometimes 120, sometimes 128, sometimes 150, and for sugar it may well repeat the same number
+it gave for flour — which is wrong by 67%. The model is not calculating, it is misremembering.
 
-Qui invece non si indovina niente: le quantità arrivano grezze da `extract.py`
-(`quantita_raw`, `unita_raw`, esattamente come dette o scritte nel reel) e vengono
-convertite con le tabelle versionate in `data/`. Se una conversione non è possibile —
-tipicamente un volume di un ingrediente di cui non conosciamo la densità — **non si
-inventa**: si conserva l'unità originale e si dichiara la lacuna.
+Here nothing is guessed: quantities arrive raw from `extract.py` (`quantita_raw`, `unita_raw`,
+exactly as spoken or written in the reel) and are converted with the versioned tables in
+`data/`. When a conversion is not possible — typically a volume of an ingredient whose density
+we do not know — **nothing is invented**: the original unit is kept and the gap is declared.
 
-Ogni quantità prodotta porta con sé la propria `provenienza`, così l'interfaccia può
-distinguere a colpo d'occhio un dato dichiarato dal reel da una stima nostra.
+Every quantity produced carries its own `provenance`, so the interface can tell at a glance a
+figure declared by the reel from an estimate of ours.
 
-Le tabelle sono tre, in `data/`:
-  - `unita.yaml`    conversioni esatte fra unità (cup→ml, oz→g, °F→°C), etichette per lingua
-  - `densita.yaml`  densità per ingrediente, per il passaggio volume→peso
-  - `vaghe.yaml`    le misure "a occhio" (q.b., un pizzico, a pinch, a drizzle)
+There are three tables, in `data/`:
+  - `unita.yaml`    exact conversions between units (cup→ml, oz→g, °F→°C), labels per language
+  - `densita.yaml`  density per ingredient, for the volume→weight step
+  - `vaghe.yaml`    eyeball measures (q.b., un pizzico, a pinch, a drizzle)
 
-DUE ASSI, NON UNO: `sistema` e `lingua`.
+TWO AXES, NOT ONE: `system` and `language`.
 
-`sistema` (metrico/imperiale) decide **i numeri**, quindi si fissa qui, alla conversione.
-`lingua` (it/en) decide **le parole**: etichette delle unità e messaggi di lacuna. Non
-coincidono — un australiano legge in inglese e cucina in grammi — e tenerli separati è
-l'unico modo di servire entrambi.
+`system` (metric/imperial) decides **the numbers**, so it is settled here, at the conversion.
+`language` (it/en) decides **the words**: unit labels and gap messages. They do not coincide —
+an Australian reads in English and cooks in grams — and keeping them apart is the only way to
+serve both.
 
-Il sistema si applica alla quantità **grezza**, non a valle di una conversione intermedia.
-"1 cup di farina" resta "1 cup" per chi cucina in imperiale invece di diventare 120 g e poi
-tornare 0,83 cup: un doppio arrotondamento produce numeri che nessun misurino sa fare. Per
-la stessa ragione, verso l'imperiale non si attraversa la densità: un volume resta volume,
-un peso resta peso.
+The system applies to the **raw** quantity, not downstream of an intermediate conversion.
+"1 cup of flour" stays "1 cup" for someone cooking in imperial rather than becoming 120 g and
+then coming back as 0.83 cup: a double rounding produces numbers no measuring cup can make.
+For the same reason, nothing crosses density on the way to imperial: a volume stays a volume,
+a weight stays a weight.
 """
 
 from __future__ import annotations
 
 import re
 import unicodedata
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, replace
 from enum import Enum
 from functools import lru_cache
 from pathlib import Path
@@ -47,411 +45,412 @@ from pathlib import Path
 import yaml
 
 # --------------------------------------------------------------------------------------
-# Provenienza di una quantità: da dove viene il numero che mostriamo.
+# Provenance of a quantity: where the number we show comes from.
 # --------------------------------------------------------------------------------------
 
 
-class Lingua(str, Enum):
-    """La lingua delle etichette e dei messaggi. Decide *come si scrive* una quantità."""
+class Language(str, Enum):
+    """The language of labels and messages. Decides *how a quantity is written*."""
 
     IT = "it"
     EN = "en"
 
 
-class Sistema(str, Enum):
-    """Il sistema di misura di destinazione. Decide *quanto vale* una quantità.
+class System(str, Enum):
+    """The target system of measurement. Decides *what a quantity is worth*.
 
-    La differenza con `Lingua` non è pedanteria: un australiano legge in inglese e cucina in
-    grammi, e a un italiano può servire una ricetta in cup per seguire un video americano.
-    Gli assi sono due perché nella realtà non coincidono.
+    The difference from `Language` is not pedantry: an Australian reads in English and cooks
+    in grams, and an Italian may want a recipe in cups in order to follow an American video.
+    There are two axes because in reality they do not coincide.
     """
 
-    METRICO = "metrico"
-    IMPERIALE = "imperiale"
+    METRIC = "metrico"
+    IMPERIAL = "imperiale"
 
 
-# Messaggi rivolti a chi cucina. Stanno qui e non nelle tabelle di `data/` perché sono
-# stringhe di programma, non dati di conversione: cambiano col codice che li produce.
-MESSAGGI: dict[str, dict[str, str]] = {
+# Messages addressed to whoever is cooking. They live here and not in the `data/` tables
+# because they are program strings, not conversion data: they change with the code that
+# produces them.
+MESSAGES: dict[str, dict[str, str]] = {
     "it": {
-        "assente": "quantità non indicata nel reel per «{nome}»",
-        "non_interpretabile": "quantità «{originale}» non interpretabile per «{nome}»",
-        "unita_ignota": "unità «{unita}» non riconosciuta per «{nome}»: lasciata invariata",
-        "qualita_non_unita": ("quantità non indicata nel reel per «{nome}» («{unita}» è una "
+        "absent": "quantità non indicata nel reel per «{name}»",
+        "unreadable": "quantità «{original}» non interpretabile per «{name}»",
+        "unknown_unit": "unità «{unit}» non riconosciuta per «{name}»: lasciata invariata",
+        "quality_not_unit": ("quantità non indicata nel reel per «{name}» («{unit}» è una "
                              "qualità dell'ingrediente, non un'unità)"),
-        "indeterminata": "quantità indeterminata («{originale}») per «{nome}»",
-        "densita_ignota": ("densità sconosciuta per «{nome}»: quantità lasciata in volume, "
-                           "non convertita in peso"),
-        "stima_vaga": "«{originale}» è una misura a occhio: il valore per «{nome}» è una stima",
-        "unita_senza_conversione": "unità «{unita}» priva di conversione nelle tabelle",
-        "unita_contraddittoria": ("per «{nome}» la quantità diceva «{dentro}» ma l'unità diceva "
-                                  "«{fuori}»: si è usata «{dentro}», che sta insieme al suo "
-                                  "numero — verifica sulla fonte"),
+        "indeterminate": "quantità indeterminata («{original}») per «{name}»",
+        "unknown_density": ("densità sconosciuta per «{name}»: quantità lasciata in volume, "
+                            "non convertita in peso"),
+        "vague_estimate": "«{original}» è una misura a occhio: il valore per «{name}» è una stima",
+        "unit_without_conversion": "unità «{unit}» priva di conversione nelle tabelle",
+        "contradictory_unit": ("per «{name}» la quantità diceva «{inside}» ma l'unità diceva "
+                               "«{outside}»: si è usata «{inside}», che sta insieme al suo "
+                               "numero — verifica sulla fonte"),
     },
     "en": {
-        "assente": "no quantity given in the reel for «{nome}»",
-        "non_interpretabile": "quantity «{originale}» could not be read for «{nome}»",
-        "unita_ignota": "unit «{unita}» not recognised for «{nome}»: left as it was",
-        "qualita_non_unita": ("no quantity given in the reel for «{nome}» («{unita}» describes "
+        "absent": "no quantity given in the reel for «{name}»",
+        "unreadable": "quantity «{original}» could not be read for «{name}»",
+        "unknown_unit": "unit «{unit}» not recognised for «{name}»: left as it was",
+        "quality_not_unit": ("no quantity given in the reel for «{name}» («{unit}» describes "
                              "the ingredient, it is not a unit)"),
-        "indeterminata": "open-ended quantity («{originale}») for «{nome}»",
-        "densita_ignota": ("density unknown for «{nome}»: kept as a volume, not converted "
-                           "to weight"),
-        "stima_vaga": "«{originale}» is an eyeball measure: the value for «{nome}» is an estimate",
-        "unita_senza_conversione": "unit «{unita}» has no conversion in the tables",
-        "unita_contraddittoria": ("for «{nome}» the amount said «{dentro}» but the unit said "
-                                  "«{fuori}»: «{dentro}» was used, as it belongs with its own "
-                                  "number — check against the source"),
+        "indeterminate": "open-ended quantity («{original}») for «{name}»",
+        "unknown_density": ("density unknown for «{name}»: kept as a volume, not converted "
+                            "to weight"),
+        "vague_estimate": "«{original}» is an eyeball measure: the value for «{name}» is an estimate",
+        "unit_without_conversion": "unit «{unit}» has no conversion in the tables",
+        "contradictory_unit": ("for «{name}» the amount said «{inside}» but the unit said "
+                               "«{outside}»: «{inside}» was used, as it belongs with its own "
+                               "number — check against the source"),
     },
 }
 
 
-def sigla(valore) -> str:
-    """Il valore testuale di un enum, o la stringa così com'è.
+def code_of(value) -> str:
+    """The textual value of an enum, or the string as it is.
 
-    Serve perché `str()` su un enum che eredita da `str` NON dà il valore ma il nome
-    qualificato: `str(Sistema.IMPERIALE)` è "Sistema.IMPERIALE", non "imperiale". È un
-    inciampo classico, e qui costava caro: il confronto falliva sempre in silenzio e il
-    ramo imperiale non veniva mai imboccato.
+    Needed because `str()` on an enum that inherits from `str` does NOT give the value but
+    the qualified name: `str(System.IMPERIAL)` is "System.IMPERIAL", not "imperiale". It is a
+    classic trip-up, and here it cost dearly: the comparison always failed silently and the
+    imperial branch was never taken.
     """
-    return valore.value if isinstance(valore, Enum) else str(valore)
+    return value.value if isinstance(value, Enum) else str(value)
 
 
-Catalogo = dict[str, dict[str, str]]   # lingua → chiave → testo
+Catalogue = dict[str, dict[str, str]]   # language → key → text
 
 
-def testo_da(catalogo: Catalogo, lingua: str, chiave: str, **dati) -> str:
-    """Una stringa da un catalogo per lingua, con ripiego sull'italiano.
+def text_from(catalogue: Catalogue, language: str, key: str, **data) -> str:
+    """A string from a per-language catalogue, falling back to Italian.
 
-    Sta qui, e non accanto a ciascun catalogo, perché di cataloghi ce ne sono ormai
-    parecchi — i messaggi di conversione qui sotto, le intestazioni degli export in
-    `mela.py` e `documenti.py`, le note sulle temperature in `recipe.py`, l'avanzamento in
-    `pipeline.py` — e la funzione per leggerli era già stata ricopiata tre volte identica.
+    It lives here, and not next to each catalogue, because there are quite a few catalogues by
+    now — the conversion messages just above, the export headings in `mela.py` and
+    `documenti.py`, the temperature notes in `recipe.py`, the progress lines in `pipeline.py` —
+    and the function to read them had already been copied out three times identically.
 
-    Il ripiego è a due livelli e i due servono a cose diverse: una **lingua** non prevista
-    non deve far sparire il messaggio, e una **chiave** tradotta a metà nemmeno. Meglio una
-    frase italiana dentro un'uscita inglese che un `KeyError` a metà export, o un buco dove
-    doveva esserci una lacuna dichiarata.
+    The fallback has two levels and the two serve different purposes: an unforeseen **language**
+    must not make the message disappear, and neither must a half-translated **key**. Better an
+    Italian sentence inside English output than a `KeyError` halfway through an export, or a
+    hole where a declared gap should have been.
     """
-    per_lingua = catalogo.get(sigla(lingua), catalogo["it"])
-    return per_lingua.get(chiave, catalogo["it"][chiave]).format(**dati)
+    per_language = catalogue.get(code_of(language), catalogue["it"])
+    return per_language.get(key, catalogue["it"][key]).format(**data)
 
 
-def messaggio(lingua: str, chiave: str, **dati) -> str:
-    """Un messaggio di conversione nella lingua richiesta."""
-    return testo_da(MESSAGGI, lingua, chiave, **dati)
+def message(language: str, key: str, **data) -> str:
+    """A conversion message in the requested language."""
+    return text_from(MESSAGES, language, key, **data)
 
 
-class Provenienza(str, Enum):
-    ASSENTE = "assente"                      # il reel non dava alcuna quantità
-    DICHIARATO = "dichiarato"                # già nell'unità giusta, nessuna conversione
-    CONVERTITO_UNITA = "convertito:unita"    # conversione esatta (oz→g, cup→ml, °F→°C)
-    CONVERTITO_DENSITA = "convertito:densita"  # volume→peso tramite densita.yaml
-    CONTEGGIO = "conteggio"                  # pezzi contati: 2 uova, 3 spicchi
-    STIMATO_VAGHE = "stimato:vaghe"          # stima da vaghe.yaml — dichiarata come tale
-    INDETERMINATO = "indeterminato"          # "q.b.", "qualche": quantità non esprimibile
+class Provenance(str, Enum):
+    ABSENT = "assente"                        # the reel gave no quantity at all
+    DECLARED = "dichiarato"                   # already in the right unit, no conversion
+    CONVERTED_UNIT = "convertito:unita"       # exact conversion (oz→g, cup→ml, °F→°C)
+    CONVERTED_DENSITY = "convertito:densita"  # volume→weight via densita.yaml
+    COUNT = "conteggio"                       # counted pieces: 2 eggs, 3 cloves
+    ESTIMATED_VAGUE = "stimato:vaghe"         # estimate from vaghe.yaml — declared as such
+    INDETERMINATE = "indeterminato"           # "q.b.", "qualche": quantity not expressible
 
 
-# Provenienze che l'interfaccia deve evidenziare perché non sono un dato certo.
-PROVENIENZE_INCERTE = frozenset(
-    {Provenienza.STIMATO_VAGHE, Provenienza.INDETERMINATO, Provenienza.ASSENTE}
+# Provenances the interface must highlight, because they are not certain data.
+UNCERTAIN_PROVENANCES = frozenset(
+    {Provenance.ESTIMATED_VAGUE, Provenance.INDETERMINATE, Provenance.ABSENT}
 )
 
 
 # --------------------------------------------------------------------------------------
-# Modello dati
+# Data model
 # --------------------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
-class Quantita:
-    """Una quantità normalizzata. `valore_max` è valorizzato solo per gli intervalli
-    ("2-3 cucchiai"), dove conservare entrambi gli estremi è più onesto che sceglierne uno."""
+class Quantity:
+    """A normalised quantity. `value_max` is filled in only for ranges ("2-3 tablespoons"),
+    where keeping both ends is more honest than picking one."""
 
-    valore: float | None
-    unita: str | None
-    provenienza: Provenienza
-    testo_originale: str
-    valore_max: float | None = None
-    nota: str | None = None
-    # Il sistema in cui la quantità è espressa. Serve alla resa, non al valore: decide se
-    # 0,75 si scrive "0,75" o "3/4", e quella differenza la vede solo chi legge.
-    sistema: str = Sistema.METRICO.value
+    value: float | None
+    unit: str | None
+    provenance: Provenance
+    original_text: str
+    value_max: float | None = None
+    note: str | None = None
+    # The system the quantity is expressed in. It serves the rendering, not the value: it
+    # decides whether 0.75 is written "0,75" or "3/4", and only the reader sees that difference.
+    system: str = System.METRIC.value
 
     @property
-    def e_intervallo(self) -> bool:
-        return self.valore_max is not None and self.valore_max != self.valore
+    def is_range(self) -> bool:
+        return self.value_max is not None and self.value_max != self.value
 
-    def testo(self) -> str:
-        """Resa testuale della sola quantità, es. "200 g", "2-3 cucchiai", "3/4 cup"."""
-        if self.valore is None:
-            return self.unita or ""
-        num = formatta_numero(self.valore, self.sistema)
-        if self.e_intervallo:
-            num = f"{num}-{formatta_numero(self.valore_max, self.sistema)}"
-        return f"{num} {self.unita}".strip() if self.unita else num
+    def text(self) -> str:
+        """Textual rendering of the quantity alone, e.g. "200 g", "2-3 cucchiai", "3/4 cup"."""
+        if self.value is None:
+            return self.unit or ""
+        num = format_number(self.value, self.system)
+        if self.is_range:
+            num = f"{num}-{format_number(self.value_max, self.system)}"
+        return f"{num} {self.unit}".strip() if self.unit else num
 
 
 @dataclass(frozen=True)
-class Ingrediente:
-    """Un ingrediente normalizzato, pronto per l'export."""
+class Ingredient:
+    """A normalised ingredient, ready for export."""
 
-    nome: str
-    quantita: Quantita
-    note: str | None = None
-    gruppo: str | None = None
-    lacuna: str | None = None
+    name: str
+    quantity: Quantity
+    notes: str | None = None
+    group: str | None = None
+    gap: str | None = None
 
-    def riga_mela(self) -> str:
-        """Riga nel formato che il parser di Mela sa leggere.
+    def mela_line(self) -> str:
+        """A line in the format Mela's parser can read.
 
-        Mela riconosce nativamente quantità e unità in italiano, quindi la forma giusta è
-        la stringa piana "200 g farina 00" — non una struttura nostra. Il testo fra
-        parentesi è trattato da Mela come commento: ci mettiamo l'equivalente in grammi
-        quando conserviamo l'unità originale, e le note dell'ingrediente.
+        Mela natively recognises quantities and units in Italian, so the right shape is the
+        plain string "200 g farina 00" — not a structure of ours. Text in brackets is treated
+        by Mela as a comment: that is where we put the equivalent in grams when we keep the
+        original unit, and the ingredient's own notes.
         """
-        commenti = [c for c in (self.quantita.nota, self.note) if c]
-        coda = f" ({'; '.join(commenti)})" if commenti else ""
+        comments = [c for c in (self.quantity.note, self.notes) if c]
+        tail = f" ({'; '.join(comments)})" if comments else ""
 
-        if self.quantita.provenienza is Provenienza.INDETERMINATO:
-            # Convenzione italiana: il "q.b." segue il nome ("sale q.b."), non lo precede.
-            marcatore = self.quantita.unita or "q.b."
-            return f"{self.nome} {marcatore}{coda}".strip()
+        if self.quantity.provenance is Provenance.INDETERMINATE:
+            # Italian convention: "q.b." follows the name ("sale q.b."), it does not precede it.
+            marker = self.quantity.unit or "q.b."
+            return f"{self.name} {marker}{tail}".strip()
 
-        # I modelli a volte ripetono l'unità di conteggio nel nome ("2 uova" con nome
-        # "uova"): "2 uova uova" è brutto e sbagliato. Se l'unità è già nel nome, si
-        # tiene solo il numero.
-        testo_quantita = self.quantita.testo()
-        if self.quantita.unita and _ripetuta_nel_nome(self.quantita.unita, self.nome):
-            testo_quantita = formatta_numero(self.quantita.valore)
-            if self.quantita.e_intervallo:
-                testo_quantita = f"{testo_quantita}-{formatta_numero(self.quantita.valore_max)}"
+        # Models sometimes repeat the counting unit inside the name ("2 uova" with name
+        # "uova"): "2 uova uova" is both ugly and wrong. If the unit is already in the name,
+        # only the number is kept.
+        quantity_text = self.quantity.text()
+        if self.quantity.unit and _repeated_in_name(self.quantity.unit, self.name):
+            quantity_text = format_number(self.quantity.value)
+            if self.quantity.is_range:
+                quantity_text = f"{quantity_text}-{format_number(self.quantity.value_max)}"
 
-        if not testo_quantita:
-            return f"{self.nome}{coda}".strip()
-        return f"{testo_quantita} {self.nome}{coda}".strip()
+        if not quantity_text:
+            return f"{self.name}{tail}".strip()
+        return f"{quantity_text} {self.name}{tail}".strip()
 
 
 # --------------------------------------------------------------------------------------
-# Caricamento delle tabelle
+# Loading the tables
 # --------------------------------------------------------------------------------------
 
 
-def _singolare_plurale(parola: str) -> set[str]:
-    """Varianti banali singolare/plurale italiane, per confronti tolleranti
-    ("uovo"/"uova", "spicchio"/"spicchi"). Non è morfologia completa, solo i casi frequenti."""
-    forme = {parola}
-    if parola.endswith(("a", "o", "e")):
-        forme.add(parola[:-1] + "i")
-        forme.add(parola[:-1] + "e")
-    if parola.endswith("i"):
-        forme.update({parola[:-1] + "o", parola[:-1] + "a", parola[:-1] + "e"})
-    return forme
+def _singular_plural(word: str) -> set[str]:
+    """Trivial Italian singular/plural variants, for tolerant comparisons ("uovo"/"uova",
+    "spicchio"/"spicchi"). Not full morphology, only the frequent cases."""
+    forms = {word}
+    if word.endswith(("a", "o", "e")):
+        forms.add(word[:-1] + "i")
+        forms.add(word[:-1] + "e")
+    if word.endswith("i"):
+        forms.update({word[:-1] + "o", word[:-1] + "a", word[:-1] + "e"})
+    return forms
 
 
-def _ripetuta_nel_nome(unita: str, nome: str) -> bool:
-    """Vero se l'etichetta dell'unità coincide con una parola del nome ingrediente
-    (a meno di singolare/plurale). Serve a non scrivere "2 uova uova"."""
-    parole_nome = set(_chiave(nome).split())
-    for forma in _singolare_plurale(_chiave(unita)):
-        if forma in parole_nome:
+def _repeated_in_name(unit: str, name: str) -> bool:
+    """True if the unit label coincides with a word of the ingredient name (up to
+    singular/plural). It is what stops us writing "2 uova uova"."""
+    name_words = set(_key(name).split())
+    for form in _singular_plural(_key(unit)):
+        if form in name_words:
             return True
     return False
 
 
-def _chiave(testo: str) -> str:
-    """Chiave di confronto: minuscolo, senza accenti, senza punteggiatura marginale,
-    spazi normalizzati. Serve a far combaciare "Farina 00", "farina 00 " e "FARINA 00"."""
-    testo = unicodedata.normalize("NFD", testo.strip().lower())
-    testo = "".join(c for c in testo if unicodedata.category(c) != "Mn")
-    # Apostrofi tipografici (U+2019, U+2018) verso quello ASCII. Una riga con questo intento
-    # c'era già, ma metteva l'apostrofo ASCII al posto di se stesso: non faceva niente, e a
-    # rileggerla sembrava a posto. Costava caro, perché l'apostrofo curvo è quello che
-    # scrivono di default le tastiere iOS e le didascalie di Instagram. Con quello, la voce
-    # «bicchiere d'acqua» di `vaghe.yaml` non veniva più trovata: invece di «200 ml acqua»
-    # dichiarato come stima usciva «1 bicchiere d'acqua acqua» con provenienza `dichiarato`,
-    # cioè una riga senza senso presentata come dato certo.
-    testo = testo.replace("’", "'").replace("‘", "'")
-    testo = re.sub(r"[^\w\s'°/.-]", " ", testo)
-    return re.sub(r"\s+", " ", testo).strip()
+def _key(text: str) -> str:
+    """Comparison key: lower case, no accents, no marginal punctuation, normalised spaces.
+    It is what makes "Farina 00", "farina 00 " and "FARINA 00" match."""
+    text = unicodedata.normalize("NFD", text.strip().lower())
+    text = "".join(c for c in text if unicodedata.category(c) != "Mn")
+    # Typographic apostrophes (U+2019, U+2018) to the ASCII one. A line with this intent was
+    # already here, but it put the ASCII apostrophe in place of itself: it did nothing, and on
+    # a re-read it looked fine. It cost dearly, because the curly apostrophe is what iOS
+    # keyboards and Instagram captions write by default. With that one, the `vaghe.yaml` entry
+    # "bicchiere d'acqua" was no longer found: instead of "200 ml acqua" declared as an
+    # estimate, out came "1 bicchiere d'acqua acqua" with provenance `dichiarato` — a
+    # meaningless line presented as certain data.
+    text = text.replace("’", "'").replace("‘", "'")
+    text = re.sub(r"[^\w\s'°/.-]", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
 
 
 @dataclass(frozen=True)
-class Tabelle:
+class Tables:
     volume: dict[str, float]
-    peso: dict[str, float]
-    conteggio: frozenset[str]
-    alias: dict[str, str]
-    misure_a_cucchiaio: frozenset[str]
-    volume_metrico: frozenset[str]
-    volume_imperiale: frozenset[str]
-    etichette: dict[str, dict[str, str]]   # lingua → unità canonica → forma corrente
-    plurale: dict[str, dict[str, str]]     # lingua → singolare → plurale
-    destinazione: dict[str, dict[str, list[str]]]   # sistema → "peso"/"volume" → unità
-    alias_temperatura: dict[str, str]
-    arrotondamento_c: int
-    densita: dict[str, float]          # chiave normalizzata (nome o alias) → g/ml
-    densita_fonte: dict[str, str]      # stessa chiave → nota di provenienza del dato
-    liquidi: frozenset[str]            # ingredienti che si misurano a volume, non a peso
-    vaghe: dict[str, dict]             # chiave normalizzata → definizione
+    weight: dict[str, float]
+    count: frozenset[str]
+    aliases: dict[str, str]
+    spoon_measures: frozenset[str]
+    metric_volume: frozenset[str]
+    imperial_volume: frozenset[str]
+    labels: dict[str, dict[str, str]]   # language → canonical unit → current form
+    plural: dict[str, dict[str, str]]   # language → singular → plural
+    target: dict[str, dict[str, list[str]]]   # system → "peso"/"volume" → units
+    temperature_aliases: dict[str, str]
+    rounding_c: int
+    density: dict[str, float]          # normalised key (name or alias) → g/ml
+    density_source: dict[str, str]     # same key → provenance note for the datum
+    liquids: frozenset[str]            # ingredients measured by volume, not by weight
+    vague: dict[str, dict]             # normalised key → definition
     indeterminate: frozenset[str]
 
-    def etichetta(self, unita: str | None, valore: float | None,
-                  lingua: str = Lingua.IT) -> str | None:
-        """Etichetta da mostrare: nella forma corrente della lingua richiesta, al plurale
-        se il numero lo richiede. "2 tbsp" diventa "2 cucchiai" in italiano, e "2 cucchiai"
-        diventa "2 tbsp" in inglese — la tabella è simmetrica."""
-        if not unita:
+    def label(self, unit: str | None, value: float | None,
+              language: str = Language.IT) -> str | None:
+        """The label to show: in the current form of the requested language, plural if the
+        number calls for it. "2 tbsp" becomes "2 cucchiai" in Italian, and "2 cucchiai"
+        becomes "2 tbsp" in English — the table is symmetric."""
+        if not unit:
             return None
-        l = sigla(lingua)
-        u = self.etichette.get(l, {}).get(unita, unita)
-        if valore is not None and abs(valore - 1.0) > 1e-9:
-            return self.plurale.get(l, {}).get(u, u)
+        l = code_of(language)
+        u = self.labels.get(l, {}).get(unit, unit)
+        if value is not None and abs(value - 1.0) > 1e-9:
+            return self.plural.get(l, {}).get(u, u)
         return u
 
-    def unita_destinazione(self, sistema: str, dimensione: str) -> list[str]:
-        """Le unità in cui esprimere un risultato, dalla più grande alla più piccola."""
-        return self.destinazione.get(sigla(sistema), {}).get(dimensione, [])
+    def target_units(self, system: str, dimension: str) -> list[str]:
+        """The units a result is to be expressed in, from the largest to the smallest."""
+        return self.target.get(code_of(system), {}).get(dimension, [])
 
-    def e_gia_nel_sistema(self, unita: str, sistema: str) -> bool:
-        """Vero se l'unità è già eseguibile nel sistema di destinazione, e quindi va
-        lasciata in pace. "500 ml" per un metrico e "1 cup" per un imperiale sono entrambe
-        misure che si eseguono così come sono: convertirle è una perdita netta."""
-        if sigla(sistema) == Sistema.METRICO.value:
-            return unita in self.volume_metrico or unita == "g"
-        return unita in self.volume_imperiale or unita in ("oz", "lb")
+    def is_already_in_system(self, unit: str, system: str) -> bool:
+        """True if the unit can already be executed in the target system, and is therefore to
+        be left alone. "500 ml" for a metric cook and "1 cup" for an imperial one are both
+        measures you carry out exactly as they are: converting them is a net loss."""
+        if code_of(system) == System.METRIC.value:
+            return unit in self.metric_volume or unit == "g"
+        return unit in self.imperial_volume or unit in ("oz", "lb")
 
-    def e_liquido(self, nome_ingrediente: str) -> bool:
-        """Vero per gli ingredienti che in cucina si misurano a volume (acqua, latte,
-        olio, vino). Per questi convertire in grammi è formalmente corretto ma
-        praticamente peggiore: nessuno pesa il latte."""
-        trovata = self._voce_densita(nome_ingrediente)
-        return trovata is not None and trovata[0] in self.liquidi
+    def is_liquid(self, ingredient_name: str) -> bool:
+        """True for ingredients that in a kitchen are measured by volume (water, milk, oil,
+        wine). For these, converting to grams is formally correct but practically worse:
+        nobody weighs milk."""
+        found = self._density_entry(ingredient_name)
+        return found is not None and found[0] in self.liquids
 
-    def unita_canonica(self, grezza: str | None) -> str | None:
-        """Riporta un'unità alla sua forma canonica passando per gli alias. `None` se
-        la stringa non corrisponde a nessuna unità nota."""
-        if not grezza:
+    def canonical_unit(self, raw: str | None) -> str | None:
+        """Brings a unit back to its canonical form by way of the aliases. `None` if the
+        string matches no known unit."""
+        if not raw:
             return None
-        k = _chiave(grezza).rstrip(".")
-        if k in self.alias:
-            return self.alias[k]
-        if k in self.volume or k in self.peso or k in self.conteggio:
+        k = _key(raw).rstrip(".")
+        if k in self.aliases:
+            return self.aliases[k]
+        if k in self.volume or k in self.weight or k in self.count:
             return k
         return None
 
-    def _voce_densita(self, nome_ingrediente: str) -> tuple[str, float, str] | None:
-        """Trova la voce di `densita.yaml` che corrisponde a un nome di ingrediente.
+    def _density_entry(self, ingredient_name: str) -> tuple[str, float, str] | None:
+        """Finds the `densita.yaml` entry matching an ingredient name.
 
-        La ricerca è tollerante: prima il nome intero, poi — se non basta — la voce di
-        tabella più lunga contenuta nel nome. Così "farina 00 setacciata" trova
-        "farina 00", e fra "farina" e "farina integrale" vince la seconda perché più
-        specifica. Ritorna `None` se non c'è corrispondenza: in quel caso NON si converte.
+        The search is tolerant: first the whole name, then — if that is not enough — the
+        longest table entry contained in the name. That way "farina 00 setacciata" finds
+        "farina 00", and between "farina" and "farina integrale" the second wins because it is
+        more specific. Returns `None` when there is no match: in that case we do NOT convert.
         """
-        k = _chiave(nome_ingrediente)
-        if k in self.densita:
-            return k, self.densita[k], self.densita_fonte[k]
-        candidati = [voce for voce in self.densita if re.search(rf"\b{re.escape(voce)}\b", k)]
-        if not candidati:
+        k = _key(ingredient_name)
+        if k in self.density:
+            return k, self.density[k], self.density_source[k]
+        candidates = [entry for entry in self.density if re.search(rf"\b{re.escape(entry)}\b", k)]
+        if not candidates:
             return None
-        migliore = max(candidati, key=len)
-        return migliore, self.densita[migliore], self.densita_fonte[migliore]
+        best = max(candidates, key=len)
+        return best, self.density[best], self.density_source[best]
 
-    def densita_per(self, nome_ingrediente: str) -> tuple[float, str] | None:
-        """Densità in g/ml e relativa fonte, o `None` se l'ingrediente non è in tabella."""
-        trovata = self._voce_densita(nome_ingrediente)
-        return (trovata[1], trovata[2]) if trovata else None
+    def density_for(self, ingredient_name: str) -> tuple[float, str] | None:
+        """Density in g/ml and its source, or `None` if the ingredient is not in the table."""
+        found = self._density_entry(ingredient_name)
+        return (found[1], found[2]) if found else None
 
 
-def _percorso_dati_predefinito() -> Path:
-    """`data/` sta alla radice del repo, due livelli sopra questo file
-    (`src/reel2recipe/units.py` → `src/reel2recipe` → `src` → radice)."""
+def _default_data_path() -> Path:
+    """`data/` sits at the root of the repo, two levels above this file
+    (`src/reel2recipe/units.py` → `src/reel2recipe` → `src` → root)."""
     return Path(__file__).resolve().parents[2] / "data"
 
 
 @lru_cache(maxsize=4)
-def carica_tabelle(cartella: str | None = None) -> Tabelle:
-    """Carica e indicizza le tre tabelle. Il risultato è in cache: i file si leggono
-    una volta sola per processo."""
-    base = Path(cartella) if cartella else _percorso_dati_predefinito()
+def load_tables(folder: str | None = None) -> Tables:
+    """Loads and indexes the three tables. The result is cached: the files are read once per
+    process."""
+    base = Path(folder) if folder else _default_data_path()
 
-    def _leggi(nome: str) -> dict:
-        percorso = base / nome
-        if not percorso.is_file():
+    def _read(name: str) -> dict:
+        path = base / name
+        if not path.is_file():
             raise FileNotFoundError(
-                f"Tabella di conversione mancante: {percorso}. "
+                f"Tabella di conversione mancante: {path}. "
                 "Senza le tabelle non si converte nulla (e non si inventa nulla)."
             )
-        return yaml.safe_load(percorso.read_text(encoding="utf-8")) or {}
+        return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
-    u = _leggi("unita.yaml")
-    d = _leggi("densita.yaml")
-    v = _leggi("vaghe.yaml")
+    u = _read("unita.yaml")
+    d = _read("densita.yaml")
+    v = _read("vaghe.yaml")
 
-    alias = {_chiave(k): val for k, val in (u.get("alias") or {}).items()}
+    aliases = {_key(k): val for k, val in (u.get("alias") or {}).items()}
     temp = u.get("temperatura") or {}
 
-    # Densità: sia il nome canonico sia ogni alias puntano allo stesso valore.
-    densita: dict[str, float] = {}
-    densita_fonte: dict[str, str] = {}
-    liquidi: set[str] = set()
-    for nome, voce in (d.get("ingredienti") or {}).items():
-        g_ml = float(voce["g_per_ml"])
-        fonte = voce.get("fonte", "")
-        for etichetta in [nome, *(voce.get("alias") or [])]:
-            k = _chiave(etichetta)
-            densita[k] = g_ml
-            densita_fonte[k] = fonte
-            if voce.get("liquido"):
-                liquidi.add(k)
+    # Density: both the canonical name and every alias point at the same value.
+    density: dict[str, float] = {}
+    density_source: dict[str, str] = {}
+    liquids: set[str] = set()
+    for name, entry in (d.get("ingredienti") or {}).items():
+        g_ml = float(entry["g_per_ml"])
+        source = entry.get("fonte", "")
+        for label in [name, *(entry.get("alias") or [])]:
+            k = _key(label)
+            density[k] = g_ml
+            density_source[k] = source
+            if entry.get("liquido"):
+                liquids.add(k)
 
-    # Espressioni vaghe: idem, canonico + alias verso la stessa definizione.
-    vaghe: dict[str, dict] = {}
-    for nome, voce in (v.get("espressioni") or {}).items():
-        for etichetta in [nome, *(voce.get("alias") or [])]:
-            vaghe[_chiave(etichetta)] = dict(voce)
+    # Vague expressions: same again, canonical + aliases towards the same definition.
+    vague: dict[str, dict] = {}
+    for name, entry in (v.get("espressioni") or {}).items():
+        for label in [name, *(entry.get("alias") or [])]:
+            vague[_key(label)] = dict(entry)
 
-    per_lingua = lambda sezione: {   # noqa: E731 — due righe, un nome sarebbe rumore
-        lingua: {_chiave(k): x for k, x in (voci or {}).items()}
-        for lingua, voci in (sezione or {}).items()
+    per_language = lambda section: {   # noqa: E731 — two lines, a name would be noise
+        language: {_key(k): x for k, x in (entries or {}).items()}
+        for language, entries in (section or {}).items()
     }
 
-    return Tabelle(
-        volume={_chiave(k): float(x) for k, x in (u.get("volume") or {}).items()},
-        peso={_chiave(k): float(x) for k, x in (u.get("peso") or {}).items()},
-        conteggio=frozenset(_chiave(x) for x in (u.get("conteggio") or [])),
-        alias=alias,
-        misure_a_cucchiaio=frozenset(_chiave(x) for x in (u.get("misure_a_cucchiaio") or [])),
-        volume_metrico=frozenset(_chiave(x) for x in (u.get("volume_metrico") or [])),
-        volume_imperiale=frozenset(_chiave(x) for x in (u.get("volume_imperiale") or [])),
-        etichette=per_lingua(u.get("etichette")),
-        plurale=per_lingua(u.get("plurale")),
-        destinazione={
-            sistema: {dim: [_chiave(x) for x in unita] for dim, unita in (voci or {}).items()}
-            for sistema, voci in (u.get("destinazione") or {}).items()
+    return Tables(
+        volume={_key(k): float(x) for k, x in (u.get("volume") or {}).items()},
+        weight={_key(k): float(x) for k, x in (u.get("peso") or {}).items()},
+        count=frozenset(_key(x) for x in (u.get("conteggio") or [])),
+        aliases=aliases,
+        spoon_measures=frozenset(_key(x) for x in (u.get("misure_a_cucchiaio") or [])),
+        metric_volume=frozenset(_key(x) for x in (u.get("volume_metrico") or [])),
+        imperial_volume=frozenset(_key(x) for x in (u.get("volume_imperiale") or [])),
+        labels=per_language(u.get("etichette")),
+        plural=per_language(u.get("plurale")),
+        target={
+            system: {dim: [_key(x) for x in units] for dim, units in (entries or {}).items()}
+            for system, entries in (u.get("destinazione") or {}).items()
         },
-        alias_temperatura={_chiave(k): x for k, x in (temp.get("alias") or {}).items()},
-        arrotondamento_c=int(temp.get("arrotondamento_c", 5)),
-        densita=densita,
-        densita_fonte=densita_fonte,
-        liquidi=frozenset(liquidi),
-        vaghe=vaghe,
-        indeterminate=frozenset(_chiave(x) for x in (v.get("indeterminate") or [])),
+        temperature_aliases={_key(k): x for k, x in (temp.get("alias") or {}).items()},
+        rounding_c=int(temp.get("arrotondamento_c", 5)),
+        density=density,
+        density_source=density_source,
+        liquids=frozenset(liquids),
+        vague=vague,
+        indeterminate=frozenset(_key(x) for x in (v.get("indeterminate") or [])),
     )
 
 
 # --------------------------------------------------------------------------------------
-# Parsing dei numeri
+# Parsing numbers
 # --------------------------------------------------------------------------------------
 
-_FRAZIONI_UNICODE = {
+_UNICODE_FRACTIONS = {
     "½": "1/2", "⅓": "1/3", "⅔": "2/3", "¼": "1/4", "¾": "3/4",
     "⅕": "1/5", "⅖": "2/5", "⅗": "3/5", "⅘": "4/5",
     "⅙": "1/6", "⅚": "5/6", "⅐": "1/7", "⅛": "1/8",
     "⅜": "3/8", "⅝": "5/8", "⅞": "7/8", "⅑": "1/9", "⅒": "1/10",
 }
 
-_NUMERI_A_PAROLE = {
+_NUMBER_WORDS = {
     "un": 1.0, "uno": 1.0, "una": 1.0, "un'": 1.0,
     "due": 2.0, "tre": 3.0, "quattro": 4.0, "cinque": 5.0, "sei": 6.0,
     "sette": 7.0, "otto": 8.0, "nove": 9.0, "dieci": 10.0, "undici": 11.0,
@@ -459,820 +458,824 @@ _NUMERI_A_PAROLE = {
     "mezzo": 0.5, "mezza": 0.5, "meta": 0.5,
 }
 
-_SEPARATORI_INTERVALLO = re.compile(r"\s*(?:-|–|—|\bo\b|\ba\b|÷)\s*")
+_RANGE_SEPARATORS = re.compile(r"\s*(?:-|–|—|\bo\b|\ba\b|÷)\s*")
 
-_RE_MISTO = re.compile(r"^(\d+)\s+(\d+)\s*/\s*(\d+)$")   # "1 1/2"
-_RE_FRAZIONE = re.compile(r"^(\d+)\s*/\s*(\d+)$")        # "3/4"
-_RE_DECIMALE = re.compile(r"^\d+(?:[.,]\d+)?$")          # "1,5" o "1.5"
-
-
-def _espandi_frazioni_unicode(testo: str) -> str:
-    """"1½" → "1 1/2"; "½" → " 1/2". Lo spazio separatore evita che "1½" diventi "11/2"."""
-    for simbolo, ascii_ in _FRAZIONI_UNICODE.items():
-        testo = testo.replace(simbolo, f" {ascii_}")
-    return testo
+_RE_MIXED = re.compile(r"^(\d+)\s+(\d+)\s*/\s*(\d+)$")   # "1 1/2"
+_RE_FRACTION = re.compile(r"^(\d+)\s*/\s*(\d+)$")        # "3/4"
+_RE_DECIMAL = re.compile(r"^\d+(?:[.,]\d+)?$")           # "1,5" or "1.5"
 
 
-def _parse_scalare(testo: str) -> float | None:
-    """Un singolo numero: intero, decimale (virgola o punto), frazione, misto, o parola."""
-    t = _chiave(testo)
+def _expand_unicode_fractions(text: str) -> str:
+    """"1½" → "1 1/2"; "½" → " 1/2". The separating space stops "1½" becoming "11/2"."""
+    for symbol, ascii_ in _UNICODE_FRACTIONS.items():
+        text = text.replace(symbol, f" {ascii_}")
+    return text
+
+
+def _parse_scalar(text: str) -> float | None:
+    """A single number: integer, decimal (comma or point), fraction, mixed, or word."""
+    t = _key(text)
     if not t:
         return None
-    if m := _RE_MISTO.match(t):
-        intero, num, den = (float(x) for x in m.groups())
-        return intero + num / den if den else None
-    if m := _RE_FRAZIONE.match(t):
+    if m := _RE_MIXED.match(t):
+        whole, num, den = (float(x) for x in m.groups())
+        return whole + num / den if den else None
+    if m := _RE_FRACTION.match(t):
         num, den = (float(x) for x in m.groups())
         return num / den if den else None
-    if _RE_DECIMALE.match(t):
+    if _RE_DECIMAL.match(t):
         return float(t.replace(",", "."))
-    if t in _NUMERI_A_PAROLE:
-        return _NUMERI_A_PAROLE[t]
+    if t in _NUMBER_WORDS:
+        return _NUMBER_WORDS[t]
     return None
 
 
-# Una quantità che si porta dentro la propria unità: almeno una cifra, poi una coda di
-# lettere ("80g", "2 tbsp", "1 1/2 cup"). La coda deve essere alfabetica, così "1 1/2" e
-# "2-3" non vengono toccati.
-_RE_QUANTITA_CON_UNITA = re.compile(r"^(.*\d.*?)\s*([^\W\d_]+\.?)$", re.UNICODE)
+# A quantity carrying its own unit inside it: at least one digit, then a tail of letters
+# ("80g", "2 tbsp", "1 1/2 cup"). The tail has to be alphabetic, so that "1 1/2" and "2-3"
+# are left alone.
+_RE_QUANTITY_WITH_UNIT = re.compile(r"^(.*\d.*?)\s*([^\W\d_]+\.?)$", re.UNICODE)
 
 
-def _scorpora_unita(grezza: str | None, tabelle: Tabelle) -> tuple[tuple[float, float], str] | None:
-    """Separa l'unità rimasta attaccata alla quantità, se ne riconosce una.
+def _split_off_unit(raw: str | None, tables: Tables) -> tuple[tuple[float, float], str] | None:
+    """Separates the unit left stuck to the quantity, when it recognises one.
 
-    Ritorna `((minimo, massimo), unita_canonica)` oppure `None` se non c'è niente da
-    scorporare. Il numero viene riletto dalla sola parte numerica: `parse_quantita("1 1/2
-    cup")` cadrebbe sul suo ultimo tentativo e restituirebbe 1, non 1,5.
+    Returns `((minimum, maximum), canonical_unit)` or `None` if there is nothing to split off.
+    The number is re-read from the numeric part alone: `parse_quantity("1 1/2 cup")` would fall
+    through to its last attempt and return 1, not 1.5.
 
-    Le misure a occhio non passano di qui: "una tazza" si scorpora in ("una", "tazza"), ma
-    "tazza" non è un'unità di `unita.yaml` — sta in `vaghe.yaml` — quindi la funzione si
-    tira indietro e la gestisce `_prova_vaghe`, come deve.
+    Eyeball measures do not come through here: "una tazza" splits into ("una", "tazza"), but
+    "tazza" is not a unit of `unita.yaml` — it lives in `vaghe.yaml` — so this function backs
+    off and `_try_vague` handles it, as it should.
     """
-    if not grezza:
+    if not raw:
         return None
-    m = _RE_QUANTITA_CON_UNITA.match(_espandi_frazioni_unicode(str(grezza)).strip())
+    m = _RE_QUANTITY_WITH_UNIT.match(_expand_unicode_fractions(str(raw)).strip())
     if not m:
         return None
-    unita = tabelle.unita_canonica(m.group(2))
-    if unita is None:
+    unit = tables.canonical_unit(m.group(2))
+    if unit is None:
         return None
-    numero = parse_quantita(m.group(1))
-    return (numero, unita) if numero else None
+    number = parse_quantity(m.group(1))
+    return (number, unit) if number else None
 
 
-def parse_quantita(grezza: str | None) -> tuple[float, float] | None:
-    """Interpreta una quantità grezza come `(minimo, massimo)`.
+def parse_quantity(raw: str | None) -> tuple[float, float] | None:
+    """Reads a raw quantity as `(minimum, maximum)`.
 
-    Gestisce interi, decimali all'italiana ("1,5"), frazioni ("3/4", "1 1/2"), frazioni
-    unicode ("½"), numeri a parole ("due", "mezzo") e intervalli ("2-3", "2 o 3").
-    Ritorna `None` se non c'è alcun numero interpretabile — che non è un errore:
-    "q.b." e "un pizzico" non sono numeri e vengono trattati altrove.
+    Handles integers, Italian-style decimals ("1,5"), fractions ("3/4", "1 1/2"), unicode
+    fractions ("½"), numbers as words ("due", "mezzo") and ranges ("2-3", "2 o 3"). Returns
+    `None` when there is no readable number — which is not an error: "q.b." and "un pizzico"
+    are not numbers and are dealt with elsewhere.
     """
-    if grezza is None:
+    if raw is None:
         return None
-    testo = _espandi_frazioni_unicode(str(grezza)).strip()
-    if not testo:
+    text = _expand_unicode_fractions(str(raw)).strip()
+    if not text:
         return None
 
-    if diretto := _parse_scalare(testo):
-        return (diretto, diretto)
+    if direct := _parse_scalar(text):
+        return (direct, direct)
 
-    # Intervallo: si accetta solo se ENTRAMBI gli estremi sono numeri, altrimenti
-    # "sale-pepe" o "un a due" verrebbero letti come intervalli inesistenti.
-    parti = [p for p in _SEPARATORI_INTERVALLO.split(testo) if p.strip()]
-    if len(parti) == 2:
-        a, b = _parse_scalare(parti[0]), _parse_scalare(parti[1])
+    # Range: accepted only if BOTH ends are numbers, otherwise "sale-pepe" or "un a due"
+    # would be read as ranges that do not exist.
+    parts = [p for p in _RANGE_SEPARATORS.split(text) if p.strip()]
+    if len(parts) == 2:
+        a, b = _parse_scalar(parts[0]), _parse_scalar(parts[1])
         if a is not None and b is not None:
             return (min(a, b), max(a, b))
 
-    # Una coda alfabetica ("1 1/4 cups", "2/3 lb") non deve far cadere la lettura
-    # sull'ultimo tentativo qui sotto: quello vede solo la prima cifra e restituisce 1
-    # invece di 1,25, cioè una frazione che sparisce in silenzio. Si rilegge la sola parte
-    # numerica, che è esattamente ciò che `_scorpora_unita` sapeva già fare — ma lui viene
-    # interpellato solo quando l'unità manca, e questo errore non aspetta quel caso.
-    if m := _RE_QUANTITA_CON_UNITA.match(testo):
-        if (dalla_testa := parse_quantita(m.group(1))) is not None:
-            return dalla_testa
+    # An alphabetic tail ("1 1/4 cups", "2/3 lb") must not make the reading fall through to
+    # the last attempt below: that one sees only the first digit and returns 1 instead of
+    # 1.25, i.e. a fraction that vanishes silently. The numeric part alone is re-read, which
+    # is exactly what `_split_off_unit` already knew how to do — but it is only consulted when
+    # the unit is missing, and this error does not wait for that case.
+    if m := _RE_QUANTITY_WITH_UNIT.match(text):
+        if (from_the_head := parse_quantity(m.group(1))) is not None:
+            return from_the_head
 
-    # Ultimo tentativo: un numero in mezzo ad altro testo ("circa 200"). Qui non si arriva
-    # con una coda alfabetica, perché il caso qui sopra l'ha già intercettata.
-    if m := re.search(r"\d+(?:[.,]\d+)?", testo):
-        valore = float(m.group(0).replace(",", "."))
-        return (valore, valore)
+    # Last attempt: a number in the middle of other text ("circa 200"). We do not arrive here
+    # with an alphabetic tail, because the case just above has already caught it.
+    if m := re.search(r"\d+(?:[.,]\d+)?", text):
+        value = float(m.group(0).replace(",", "."))
+        return (value, value)
     return None
 
 
 # --------------------------------------------------------------------------------------
-# Arrotondamento e formattazione
+# Rounding and formatting
 # --------------------------------------------------------------------------------------
 
 
-def arrotonda_cucina(valore: float, unita: str | None) -> float:
-    """Arrotondamento con la precisione che serve davvero in cucina.
+def round_for_kitchen(value: float, unit: str | None) -> float:
+    """Rounding at the precision that actually matters in a kitchen.
 
-    Una bilancia da cucina legge il grammo, non il milligrammo: mostrare "119,9967 g"
-    sarebbe una precisione falsa. Sopra i 100 g si va a scatti di 5, perché nessuno pesa
-    237 g di farina. Le temperature seguono gli scatti del forno (5 °C / 25 °F).
+    A kitchen scale reads grams, not milligrams: showing "119,9967 g" would be false
+    precision. Above 100 g it goes in steps of 5, because nobody weighs 237 g of flour.
+    Temperatures follow the oven's steps (5 °C / 25 °F).
 
-    Le unità anglosassoni seguono una logica diversa: non si arrotondano a scatti decimali
-    ma a **frazioni**, perché è così che sono fatti i misurini. Un quarto di cup esiste come
-    oggetto fisico, 0,23 cup no.
+    Anglo-Saxon units follow a different logic: they are not rounded to decimal steps but to
+    **fractions**, because that is how measuring cups are made. A quarter cup exists as a
+    physical object; 0.23 cup does not.
     """
-    if unita == "°C":
-        return float(round(valore / 5) * 5)
-    if unita == "°F":
-        return float(round(valore / 25) * 25)
-    if unita in ("g", "ml"):
-        if valore < 10:
-            return round(valore * 2) / 2      # scatti di mezzo grammo
-        if valore < 100:
-            return float(round(valore))
-        return float(round(valore / 5) * 5)
-    if unita in ("cup", "tbsp", "tsp"):
-        return _arrotonda_a_frazione(valore)
-    if unita in ("oz", "lb"):
-        return round(valore * 4) / 4          # quarti di oncia
-    return round(valore, 2)
+    if unit == "°C":
+        return float(round(value / 5) * 5)
+    if unit == "°F":
+        return float(round(value / 25) * 25)
+    if unit in ("g", "ml"):
+        if value < 10:
+            return round(value * 2) / 2      # half-gram steps
+        if value < 100:
+            return float(round(value))
+        return float(round(value / 5) * 5)
+    if unit in ("cup", "tbsp", "tsp"):
+        return _round_to_fraction(value)
+    if unit in ("oz", "lb"):
+        return round(value * 4) / 4          # quarter ounces
+    return round(value, 2)
 
 
-# I denominatori che esistono davvero su un misurino: ottavi, terzi, quarti. Un sedicesimo
-# di cup non è una misura, è un numero.
-_FRAZIONI_UTILI = (1, 2, 3, 4, 8)
+# The denominators that really exist on a measuring cup: eighths, thirds, quarters. A
+# sixteenth of a cup is not a measure, it is a number.
+_USEFUL_FRACTIONS = (1, 2, 3, 4, 8)
 
 
-def _arrotonda_a_frazione(valore: float) -> float:
-    """Al più vicino fra i valori esprimibili con una frazione da cucina.
+def _round_to_fraction(value: float) -> float:
+    """To the nearest of the values expressible as a kitchen fraction.
 
-    Le frazioni ammesse sono quelle che un misurino sa fare: 1/8, 1/4, 1/3, 1/2, 2/3, 3/4.
-    Sopra le 3 unità si passa ai mezzi, perché "3 1/8 cup" è una precisione che nessuno
-    misura davvero.
+    The fractions allowed are the ones a measuring cup can make: 1/8, 1/4, 1/3, 1/2, 2/3, 3/4.
+    Above 3 units it moves to halves, because "3 1/8 cup" is a precision nobody actually
+    measures.
     """
-    if valore >= 3:
-        return round(valore * 2) / 2
-    candidati = {
-        round(intero + num / den, 6)
-        for den in _FRAZIONI_UTILI
+    if value >= 3:
+        return round(value * 2) / 2
+    candidates = {
+        round(whole + num / den, 6)
+        for den in _USEFUL_FRACTIONS
         for num in range(den)
-        for intero in range(0, 4)
+        for whole in range(0, 4)
     }
-    # Lo zero è escluso di proposito: una quantità che esiste non deve diventare "0 cup"
-    # per effetto dell'arrotondamento. Sotto un ottavo si tiene il valore com'è.
-    candidati.discard(0.0)
-    return min(candidati, key=lambda c: abs(c - valore))
+    # Zero is excluded on purpose: a quantity that exists must not become "0 cup" as an effect
+    # of the rounding. Below an eighth the value is kept as it is.
+    candidates.discard(0.0)
+    return min(candidates, key=lambda c: abs(c - value))
 
 
-# Frazioni scritte come le scrive un ricettario anglosassone.
-_FRAZIONI_TESTO = {
+# Fractions written the way an Anglo-Saxon recipe book writes them.
+_FRACTIONS_AS_TEXT = {
     0.125: "1/8", 0.25: "1/4", 0.333333: "1/3", 0.375: "3/8", 0.5: "1/2",
     0.625: "5/8", 0.666667: "2/3", 0.75: "3/4", 0.875: "7/8",
 }
 
 
-def formatta_numero(valore: float | None, sistema: str = Sistema.METRICO) -> str:
-    """Il numero come lo scriverebbe una ricetta, nel sistema richiesto.
+def format_number(value: float | None, system: str = System.METRIC) -> str:
+    """The number as a recipe would write it, in the requested system.
 
-    In metrico: decimali con la virgola, senza zeri inutili — "1,5". In imperiale:
-    **frazioni**, perché "0,75 cup" non si trova su nessun misurino mentre "3/4 cup" sì,
-    e i numeri misti si scrivono come "1 1/2".
+    In metric: decimals with a comma, without pointless zeros — "1,5". In imperial:
+    **fractions**, because "0,75 cup" is on no measuring cup while "3/4 cup" is, and mixed
+    numbers are written as "1 1/2".
     """
-    if valore is None:
+    if value is None:
         return ""
-    if abs(valore - round(valore)) < 1e-9:
-        return str(int(round(valore)))
+    if abs(value - round(value)) < 1e-9:
+        return str(int(round(value)))
 
-    if sigla(sistema) == Sistema.IMPERIALE.value:
-        intero = int(valore)
-        resto = round(valore - intero, 6)
-        for esatto, testo in _FRAZIONI_TESTO.items():
-            if abs(resto - esatto) < 0.005:
-                return f"{intero} {testo}" if intero else testo
-        # Nessuna frazione da cucina ci si avvicina: meglio un decimale onesto che una
-        # frazione inventata che poi non si riesce a misurare.
-        return f"{valore:.2f}".rstrip("0").rstrip(".")
+    if code_of(system) == System.IMPERIAL.value:
+        whole = int(value)
+        remainder = round(value - whole, 6)
+        for exact, text in _FRACTIONS_AS_TEXT.items():
+            if abs(remainder - exact) < 0.005:
+                return f"{whole} {text}" if whole else text
+        # No kitchen fraction comes close: better an honest decimal than an invented fraction
+        # that then cannot be measured.
+        return f"{value:.2f}".rstrip("0").rstrip(".")
 
-    return f"{valore:.2f}".rstrip("0").rstrip(".").replace(".", ",")
+    return f"{value:.2f}".rstrip("0").rstrip(".").replace(".", ",")
 
 
 # --------------------------------------------------------------------------------------
-# Normalizzazione di un ingrediente
+# Normalising an ingredient
 # --------------------------------------------------------------------------------------
 
-def unita_per_peso(grammi: float, sistema: str) -> tuple[float, str]:
-    """Il peso espresso nel sistema richiesto, con l'unità di grandezza giusta.
+def unit_for_weight(grams: float, system: str) -> tuple[float, str]:
+    """The weight expressed in the requested system, at the right order of magnitude.
 
-    Sotto la libbra si usano le once: "7 oz" è una misura che una cucina americana esegue,
-    "0,44 lb" no.
+    Below the pound it uses ounces: "7 oz" is a measure an American kitchen carries out,
+    "0,44 lb" is not.
     """
-    if sigla(sistema) == Sistema.METRICO.value:
-        return grammi, "g"
-    return (grammi / 453.59237, "lb") if grammi >= 453.59237 else (grammi / 28.349523125, "oz")
+    if code_of(system) == System.METRIC.value:
+        return grams, "g"
+    return (grams / 453.59237, "lb") if grams >= 453.59237 else (grams / 28.349523125, "oz")
 
 
-def unita_per_volume(ml: float, sistema: str, tabelle: Tabelle) -> tuple[float, str]:
-    """Il volume espresso nel sistema richiesto, con l'unità di grandezza giusta.
+def unit_for_volume(ml: float, system: str, tables: Tables) -> tuple[float, str]:
+    """The volume expressed in the requested system, at the right order of magnitude.
 
-    La soglia non è arbitraria: si sceglie l'unità più grande che dia ancora un numero
-    maneggiabile, come farebbe un ricettario. 5 ml sono un cucchiaino, non due centesimi
-    di cup.
+    The threshold is not arbitrary: it picks the largest unit that still gives a manageable
+    number, as a recipe book would. 5 ml is a teaspoon, not two hundredths of a cup.
     """
-    if sigla(sistema) == Sistema.METRICO.value:
+    if code_of(system) == System.METRIC.value:
         return ml, "ml"
-    if ml < tabelle.volume["tbsp"]:
-        return ml / tabelle.volume["tsp"], "tsp"
-    if ml < tabelle.volume["cup"] / 4:
-        return ml / tabelle.volume["tbsp"], "tbsp"
-    return ml / tabelle.volume["cup"], "cup"
+    if ml < tables.volume["tbsp"]:
+        return ml / tables.volume["tsp"], "tsp"
+    if ml < tables.volume["cup"] / 4:
+        return ml / tables.volume["tbsp"], "tbsp"
+    return ml / tables.volume["cup"], "cup"
 
 
-def _risolvi_unita_contraddittoria(
-    quantita_raw: str | None, unita_raw: str | None, nome: str, tabelle: Tabelle, lingua: str,
+def _resolve_contradictory_unit(
+    quantity_raw: str | None, unit_raw: str | None, name: str, tables: Tables, language: str,
 ) -> tuple[str, str, str] | None:
-    """La quantità si porta dentro un'unità che contraddice quella isolata dal modello.
+    """The quantity carries a unit inside it that contradicts the one the model isolated.
 
-    Succede quando il reel scrive la stessa dose in due modi e il modello ne mescola i
-    pezzi. Da «1¼ cups (300 ml) water» sono usciti `quantita_raw="1¼ cups"` e
-    `unita_raw="ml"`: il numero di una rappresentazione e l'unità dell'altra. Il prodotto
-    era "1 ml" d'acqua invece di 300, con provenienza `dichiarato` — cioè un numero
-    sbagliato presentato come certo, che è il guasto che questo progetto esiste per evitare.
+    This happens when the reel writes the same dose two ways and the model mixes their pieces.
+    Out of «1¼ cups (300 ml) water» came `quantita_raw="1¼ cups"` and `unita_raw="ml"`: the
+    number of one representation and the unit of the other. The product was "1 ml" of water
+    instead of 300, with provenance `dichiarato` — that is, a wrong number presented as
+    certain, which is the failure this project exists to prevent.
 
-    **Vince la coppia interna**, perché è l'unica internamente coerente: «1¼» e «cups»
-    stanno nello stesso pezzo di testo, il «ml» viene da un'altra parte della frase. Fuori
-    da questo caso la politica non cambia: se il modello ha isolato l'unità, la sua resta
-    quella buona.
+    **The internal pair wins**, because it is the only one internally coherent: «1¼» and
+    «cups» sit in the same piece of text, the «ml» comes from elsewhere in the sentence.
+    Outside this case the policy does not change: if the model isolated the unit, its one is
+    the good one.
 
-    Ma indovinare non basta. La discrepanza **si dichiara**, perché lì la fonte era ambigua
-    e chi cucina deve poterlo sapere: una lacuna dichiarata vale più di un numero silenzioso.
+    But guessing is not enough. The discrepancy **is declared**, because the source was
+    ambiguous right there and whoever is cooking has to be able to know it: a declared gap is
+    worth more than a silent number.
 
-    Ritorna `(quantita_riscritta, unita_riscritta, avviso)`, oppure `None` quando non c'è
-    nulla da risolvere — che è il caso di gran lunga più frequente.
+    Returns `(rewritten_quantity, rewritten_unit, warning)`, or `None` when there is nothing
+    to resolve — which is by far the most frequent case.
     """
-    if tabelle.unita_canonica(unita_raw) is None:
-        return None      # nessuna unità isolata riconoscibile: se ne occupa il motore
-    m = _RE_QUANTITA_CON_UNITA.match(_espandi_frazioni_unicode(str(quantita_raw or "")).strip())
+    if tables.canonical_unit(unit_raw) is None:
+        return None      # no recognisable isolated unit: the engine deals with it
+    m = _RE_QUANTITY_WITH_UNIT.match(_expand_unicode_fractions(str(quantity_raw or "")).strip())
     if not m:
-        return None      # la quantità è solo un numero: nessuna contraddizione possibile
-    interna = tabelle.unita_canonica(m.group(2))
-    if interna is None or interna == tabelle.unita_canonica(unita_raw):
-        return None      # o non è un'unità, o le due dicono la stessa cosa
-    return m.group(1), m.group(2), messaggio(
-        lingua, "unita_contraddittoria",
-        nome=nome, dentro=m.group(2), fuori=str(unita_raw).strip(),
+        return None      # the quantity is only a number: no contradiction possible
+    inner = tables.canonical_unit(m.group(2))
+    if inner is None or inner == tables.canonical_unit(unit_raw):
+        return None      # either it is not a unit, or the two say the same thing
+    return m.group(1), m.group(2), message(
+        language, "contradictory_unit",
+        name=name, inside=m.group(2), outside=str(unit_raw).strip(),
     )
 
 
-def _unita_fra_parentesi(unita_raw: str | None, tabelle: Tabelle) -> str | None:
-    """Il contenuto di un'«unità» che è in realtà una parola fra parentesi.
+def _unit_in_brackets(unit_raw: str | None, tables: Tables) -> str | None:
+    """The content of a "unit" that is in fact a word in brackets.
 
-    Da «1 melanzana bianca (facoltativa)» il modello produce `unita_raw="(facoltativa)"`, e
-    l'ingrediente veniva reso «1 (facoltativa) melanzana bianca». La regola che degrada una
-    non-unità a nota non scattava, perché richiede che manchi il numero — e qui il numero c'è.
+    Out of «1 melanzana bianca (facoltativa)» the model produces `unita_raw="(facoltativa)"`,
+    and the ingredient came out as «1 (facoltativa) melanzana bianca». The rule that demotes a
+    non-unit to a note did not fire, because it requires the number to be missing — and here
+    the number is there.
 
-    «Nessuna unità si scrive fra parentesi» sembra un criterio sufficiente, e non lo è: il
-    modello scrive anche `unita_raw="(g)"`, e `_chiave` toglie già le parentesi, quindi prima
-    di questo controllo «200» + «(g)» si convertiva benissimo. Degradarlo a nota lo
-    trasformava in un conteggio di duecento farine — un numero sbagliato senza nemmeno una
-    lacuna. Quindi si guarda **dentro** le parentesi: se è un'unità nota, non si tocca nulla.
+    "No unit is written in brackets" looks like a sufficient criterion, and it is not: the
+    model also writes `unita_raw="(g)"`, and `_key` already strips brackets, so before this
+    check «200» + «(g)» converted perfectly well. Demoting it to a note turned it into a count
+    of two hundred flours — a wrong number without even a gap. So we look **inside** the
+    brackets: if it is a known unit, nothing is touched.
     """
-    testo = str(unita_raw or "").strip()
-    if len(testo) <= 2 or not (testo.startswith("(") and testo.endswith(")")):
+    text = str(unit_raw or "").strip()
+    if len(text) <= 2 or not (text.startswith("(") and text.endswith(")")):
         return None
-    dentro = testo[1:-1].strip()
-    if not dentro or tabelle.unita_canonica(dentro) is not None:
+    inside = text[1:-1].strip()
+    if not inside or tables.canonical_unit(inside) is not None:
         return None
-    return dentro
+    return inside
 
 
-_RE_PARENTESI_IN_CODA = re.compile(r"^(.*?)\s*\(([^()]*)\)\s*$")
+_RE_TRAILING_BRACKETS = re.compile(r"^(.*?)\s*\(([^()]*)\)\s*$")
 
 
-def _misura_in_coda(nome: str, tabelle: Tabelle) -> tuple[str, str] | None:
-    """La misura che il modello ha attaccato in fondo al nome invece di metterla nel campo.
+def _trailing_measure(name: str, tables: Tables) -> tuple[str, str] | None:
+    """The measure the model stuck at the end of the name instead of putting it in the field.
 
-    Succede in due forme, viste entrambe su reel veri, e con lo stesso esito: il codice non
-    vedeva alcuna indicazione e dichiarava «quantità non indicata nel reel» — una lacuna
-    **falsa**, perché il reel aveva indicato eccome. Una lacuna che mente vale meno di
-    nessuna lacuna, perché insegna a non fidarsi nemmeno di quelle vere, e su quel meccanismo
-    poggia l'onestà di tutto il prodotto.
+    It happens in two forms, both seen on real reels, and with the same outcome: the code saw
+    no indication at all and declared «quantità non indicata nel reel» — a **false** gap,
+    because the reel had indicated it perfectly well. A gap that lies is worth less than no gap
+    at all, because it teaches you not to trust even the true ones, and the honesty of the
+    whole product rests on that mechanism.
 
-    1. **Fra parentesi**, qualunque misura a occhio nota: «sale (un pizzico)» diventa una
-       stima dichiarata invece di un buco. Le parentesi sono un segnale forte che quel testo
-       annota la quantità; un parentetico che non è una misura — «crema di cocco (lattina di
-       cocco parte sopra più grassa)» — non compare in `vaghe.yaml` e resta dov'è.
-    2. **In chiaro**, solo la famiglia di «q.b.»: «semi di sesamo q.b.». Qui si resta stretti
-       di proposito, perché senza parentesi il rischio di rubare una parola al nome è reale.
+    1. **In brackets**, any known eyeball measure: «sale (un pizzico)» becomes a declared
+       estimate instead of a hole. Brackets are a strong signal that the text annotates the
+       quantity; a parenthetical that is not a measure — «crema di cocco (lattina di cocco
+       parte sopra più grassa)» — does not appear in `vaghe.yaml` and stays where it is.
+    2. **In the open**, only the «q.b.» family: «semi di sesamo q.b.». Here we stay deliberately
+       strict, because without brackets the risk of stealing a word from the name is real.
 
-    Il confronto è **esatto e ancorato in coda**, mai per contenimento: «pomodori poco maturi»
-    non deve diventare una quantità indeterminata perché una parola vaga compare nel mezzo. E
-    il nome non può essere fatto solo dell'espressione, o resterebbe vuoto.
+    The comparison is **exact and anchored at the end**, never by containment: «pomodori poco
+    maturi» must not become an open-ended quantity because a vague word appears in the middle.
+    And the name cannot consist of the expression alone, or it would be left empty.
 
-    Ritorna `(nome_ripulito, misura)` oppure `None`.
+    Returns `(cleaned_name, measure)` or `None`.
     """
-    testo = str(nome or "").strip()
+    text = str(name or "").strip()
 
-    if m := _RE_PARENTESI_IN_CODA.match(testo):
-        resto, dentro = m.group(1).strip(), m.group(2).strip()
-        # Almeno due parole: «(un pizzico)» è una dose, «(noce)» è la varietà della frutta
-        # secca e «(tazza)» il recipiente. Molte voci di `vaghe.yaml` hanno alias di una
-        # parola sola — noce, presa, punta, tazza, bicchiere, filo — che fra parentesi dopo
-        # un nome quasi sempre lo qualificano invece di dosarlo.
-        if resto and len(dentro.split()) >= 2 and _chiave(dentro) in tabelle.vaghe:
-            return resto, dentro
+    if m := _RE_TRAILING_BRACKETS.match(text):
+        rest, inside = m.group(1).strip(), m.group(2).strip()
+        # At least two words: «(un pizzico)» is a dose, «(noce)» is the kind of nut and
+        # «(tazza)» the container. Many `vaghe.yaml` entries have single-word aliases — noce,
+        # presa, punta, tazza, bicchiere, filo — which in brackets after a name almost always
+        # qualify it rather than dose it.
+        if rest and len(inside.split()) >= 2 and _key(inside) in tables.vague:
+            return rest, inside
 
-    parole = testo.split()
+    words = text.split()
     for n in (3, 2, 1):          # "quanto basta", "a piacere", "q.b."
-        if len(parole) <= n:
+        if len(words) <= n:
             continue
-        coda = " ".join(parole[-n:])
-        chiave = _senza_punti(_chiave(coda))
-        for espressione, voce in tabelle.vaghe.items():
-            if voce.get("senza_quantita") and _senza_punti(_chiave(espressione)) == chiave:
-                return " ".join(parole[:-n]), coda
+        tail = " ".join(words[-n:])
+        key = _without_dots(_key(tail))
+        for expression, entry in tables.vague.items():
+            if entry.get("senza_quantita") and _without_dots(_key(expression)) == key:
+                return " ".join(words[:-n]), tail
     return None
 
 
-def normalizza_ingrediente(
-    nome: str,
-    quantita_raw: str | None = None,
-    unita_raw: str | None = None,
-    note: str | None = None,
-    gruppo: str | None = None,
-    tabelle: Tabelle | None = None,
-    sistema: str = Sistema.METRICO,
-    lingua: str = Lingua.IT,
-) -> Ingrediente:
-    """Come `_normalizza_ingrediente`, ma prima rimette in sesto gli ingressi malformati.
+def normalise_ingredient(
+    name: str,
+    quantity_raw: str | None = None,
+    unit_raw: str | None = None,
+    notes: str | None = None,
+    group: str | None = None,
+    tables: Tables | None = None,
+    system: str = System.METRIC,
+    language: str = Language.IT,
+) -> Ingredient:
+    """Like `_normalise_ingredient`, but first it puts malformed inputs back in order.
 
-    Sta fuori dal motore di conversione e non dentro perché è un problema di **lettura**,
-    non di conversione: quando arriva una coppia coerente il motore fa già la cosa giusta.
-    Tenerlo qui lascia intatta la parte più delicata del progetto.
+    It sits outside the conversion engine and not inside it because this is a problem of
+    **reading**, not of conversion: when a coherent pair arrives, the engine already does the
+    right thing. Keeping it here leaves the most delicate part of the project untouched.
     """
-    t = tabelle or carica_tabelle()
+    t = tables or load_tables()
 
-    # Una parola fra parentesi che NON sia un'unità nota è una nota sull'ingrediente.
-    if (fra_parentesi := _unita_fra_parentesi(unita_raw, t)) is not None:
-        note, unita_raw = _unisci_note(note, fra_parentesi), ""
+    # A word in brackets that is NOT a known unit is a note about the ingredient.
+    if (in_brackets := _unit_in_brackets(unit_raw, t)) is not None:
+        notes, unit_raw = _merge_notes(notes, in_brackets), ""
 
-    # Una misura finita altrove è comunque un'indicazione, e va letta come tale invece di
-    # produrre una lacuna che dice il falso. Solo quando non c'è nessun'altra quantità: se il
-    # modello ne ha già isolata una, ciò che sta nel nome o nelle note è un commento.
+    # A measure that ended up elsewhere is still an indication, and is to be read as such
+    # rather than producing a gap that says something false. Only when there is no other
+    # quantity: if the model has already isolated one, what sits in the name or in the notes
+    # is a comment.
     #
-    # Il modello ha tre modi di sbagliare campo, visti tutti e tre: dentro il nome («semi di
-    # sesamo q.b.»), fra parentesi nel nome («sale (un pizzico)») e — quando proprio non sa
-    # dove metterlo — nelle note. Il terzo l'ha trovato la suite di regressione, non un reel.
-    if not str(quantita_raw or "").strip() and not str(unita_raw or "").strip():
-        if spostata := _misura_in_coda(nome, t):
-            nome, quantita_raw = spostata
-        elif (nota := str(note or "").strip().strip("()").strip()) and _chiave(nota) in t.vaghe:
-            quantita_raw, note = nota, None
+    # The model has three ways of getting the field wrong, all three of them seen: inside the
+    # name («semi di sesamo q.b.»), in brackets within the name («sale (un pizzico)») and —
+    # when it really does not know where to put it — in the notes. The third was found by the
+    # regression suite, not by a reel.
+    if not str(quantity_raw or "").strip() and not str(unit_raw or "").strip():
+        if moved := _trailing_measure(name, t):
+            name, quantity_raw = moved
+        elif (from_notes := str(notes or "").strip().strip("()").strip()) and _key(from_notes) in t.vague:
+            quantity_raw, notes = from_notes, None
 
-    avviso: str | None = None
-    if riscritta := _risolvi_unita_contraddittoria(quantita_raw, unita_raw, nome, t, lingua):
-        quantita_raw, unita_raw, avviso = riscritta
+    warning: str | None = None
+    if rewritten := _resolve_contradictory_unit(quantity_raw, unit_raw, name, t, language):
+        quantity_raw, unit_raw, warning = rewritten
 
-    ingrediente = _normalizza_ingrediente(nome, quantita_raw, unita_raw, note, gruppo,
-                                          t, sistema, lingua)
-    if not avviso:
-        return ingrediente
-    # Le lacune non si sostituiscono a vicenda: se il motore ne aveva già una (una densità
-    # sconosciuta, per esempio) valgono entrambe. `Ingrediente` è congelato, quindi si
-    # ricostruisce invece di modificarlo.
+    ingredient = _normalise_ingredient(name, quantity_raw, unit_raw, notes, group,
+                                       t, system, language)
+    if not warning:
+        return ingredient
+    # Gaps do not replace one another: if the engine already had one (an unknown density, say)
+    # both hold. `Ingredient` is frozen, so it is rebuilt rather than modified.
     return replace(
-        ingrediente,
-        lacuna=f"{avviso}; {ingrediente.lacuna}" if ingrediente.lacuna else avviso,
+        ingredient,
+        gap=f"{warning}; {ingredient.gap}" if ingredient.gap else warning,
     )
 
 
-def _normalizza_ingrediente(
-    nome: str,
-    quantita_raw: str | None = None,
-    unita_raw: str | None = None,
-    note: str | None = None,
-    gruppo: str | None = None,
-    tabelle: Tabelle | None = None,
-    sistema: str = Sistema.METRICO,
-    lingua: str = Lingua.IT,
-) -> Ingrediente:
-    """Porta un ingrediente grezzo nel sistema di destinazione, o dichiara perché non è possibile.
+def _normalise_ingredient(
+    name: str,
+    quantity_raw: str | None = None,
+    unit_raw: str | None = None,
+    notes: str | None = None,
+    group: str | None = None,
+    tables: Tables | None = None,
+    system: str = System.METRIC,
+    language: str = Language.IT,
+) -> Ingredient:
+    """Brings a raw ingredient into the target system, or declares why that is not possible.
 
-    `quantita_raw` e `unita_raw` sono ciò che il reel diceva o scriveva, non toccati
-    dall'LLM. Tutta la conversione avviene qui.
+    `quantity_raw` and `unit_raw` are what the reel said or wrote, untouched by the LLM. All
+    the conversion happens here.
 
-    I due assi fanno cose diverse e vanno tenuti distinti. **`sistema` decide i numeri**:
-    scegliere metrico o imperiale cambia il valore, quindi va fissato qui, alla conversione.
-    **`lingua` decide le parole**: etichette delle unità e messaggi di lacuna.
+    The two axes do different things and are to be kept apart. **`system` decides the
+    numbers**: choosing metric or imperial changes the value, so it is settled here, at the
+    conversion. **`language` decides the words**: unit labels and gap messages.
 
-    Il sistema si applica alla quantità **grezza**, non a valle di una conversione
-    intermedia. È la ragione per cui "1 cup di farina" resta "1 cup" per chi cucina in
-    imperiale invece di diventare 120 g e poi tornare 0,83 cup: un doppio arrotondamento
-    produce numeri che nessun misurino sa fare.
+    The system applies to the **raw** quantity, not downstream of an intermediate conversion.
+    That is why "1 cup of flour" stays "1 cup" for someone cooking in imperial rather than
+    becoming 120 g and then coming back as 0.83 cup: a double rounding produces numbers no
+    measuring cup can make.
     """
-    t = tabelle or carica_tabelle()
-    nome = (nome or "").strip()
-    originale = " ".join(x for x in (str(quantita_raw or "").strip(), str(unita_raw or "").strip()) if x)
+    t = tables or load_tables()
+    name = (name or "").strip()
+    original = " ".join(x for x in (str(quantity_raw or "").strip(), str(unit_raw or "").strip()) if x)
 
-    # 1. Nessuna quantità nel reel.
-    if not originale:
-        return Ingrediente(
-            nome=nome, note=note, gruppo=gruppo,
-            quantita=Quantita(None, None, Provenienza.ASSENTE, ""),
-            lacuna=messaggio(lingua, "assente", nome=nome),
+    # 1. No quantity in the reel.
+    if not original:
+        return Ingredient(
+            name=name, notes=notes, group=group,
+            quantity=Quantity(None, None, Provenance.ABSENT, ""),
+            gap=message(language, "absent", name=name),
         )
 
-    # 2. Espressioni che non esprimono una quantità ("q.b.") o la lasciano indeterminata
-    #    ("qualche"): non si stima, si conserva la dicitura e si segnala.
-    if esito := _prova_indeterminate(nome, originale, quantita_raw, unita_raw, note, gruppo,
-                                     t, lingua):
-        return esito
+    # 2. Expressions that express no quantity ("q.b.") or leave it open-ended ("qualche"):
+    #    nothing is estimated, the wording is kept and flagged.
+    if outcome := _try_indeterminate(name, original, quantity_raw, unit_raw, notes, group,
+                                     t, language):
+        return outcome
 
-    numero = parse_quantita(quantita_raw)
-    unita = t.unita_canonica(unita_raw)
+    number = parse_quantity(quantity_raw)
+    unit = t.canonical_unit(unit_raw)
 
-    # 2-bis. Il modello non sempre separa numero e unità: capita che `quantita_raw` arrivi
-    #    come "80g" o "1 1/2 cup" con `unita_raw` vuoto. Senza questo recupero l'unità
-    #    andrebbe persa e il numero finirebbe interpretato come un conteggio di pezzi —
-    #    "80g di maiale" diventava "80 maiale". Si recupera solo quando l'unità manca del
-    #    tutto: se il modello l'ha isolata, la sua resta quella buona.
-    if unita is None and not str(unita_raw or "").strip():
-        if (scorporata := _scorpora_unita(quantita_raw, t)) is not None:
-            numero, unita = scorporata
+    # 2-bis. The model does not always separate number and unit: `quantita_raw` can arrive as
+    #    "80g" or "1 1/2 cup" with `unita_raw` empty. Without this recovery the unit would be
+    #    lost and the number would end up read as a count of pieces — "80g di maiale" became
+    #    "80 maiale". It is recovered only when the unit is missing entirely: if the model
+    #    isolated one, its one is the good one.
+    if unit is None and not str(unit_raw or "").strip():
+        if (split_off := _split_off_unit(quantity_raw, t)) is not None:
+            number, unit = split_off
 
-    # 3. Misure a occhio con un valore tipico ("un pizzico", "un filo d'olio").
-    if esito := _prova_vaghe(nome, originale, numero, unita_raw, quantita_raw, note, gruppo,
-                             t, sistema, lingua):
-        return esito
+    # 3. Eyeball measures with a typical value ("un pizzico", "un filo d'olio").
+    if outcome := _try_vague(name, original, number, unit_raw, quantity_raw, notes, group,
+                             t, system, language):
+        return outcome
 
-    # 4. Unità non riconosciuta.
-    if unita is None and unita_raw:
-        testo_unita = str(unita_raw).strip()
+    # 4. Unit not recognised.
+    if unit is None and unit_raw:
+        unit_text = str(unit_raw).strip()
 
-        # 4a. Senza un numero davanti, una parola non riconosciuta NON è un'unità: è un
-        #     attributo dell'ingrediente che il modello ha infilato nel campo sbagliato
-        #     ("Dashi in polvere" arriva come nome="Dashi", unita_raw="polvere"). Trattarla
-        #     da unità la mette davanti al nome e produce "polvere Dashi". Diventa invece
-        #     una nota fra parentesi — che Mela legge come commento — e la quantità resta
-        #     onestamente assente.
-        if numero is None:
-            q = Quantita(None, None, Provenienza.ASSENTE, originale)
-            return Ingrediente(
-                nome, q, _unisci_note(note, testo_unita), gruppo,
-                lacuna=messaggio(lingua, "qualita_non_unita", nome=nome, unita=testo_unita),
+        # 4a. Without a number in front of it, an unrecognised word is NOT a unit: it is an
+        #     attribute of the ingredient that the model put in the wrong field ("Dashi in
+        #     polvere" arrives as name="Dashi", unita_raw="polvere"). Treating it as a unit
+        #     puts it in front of the name and produces "polvere Dashi". It becomes a note in
+        #     brackets instead — which Mela reads as a comment — and the quantity stays
+        #     honestly absent.
+        if number is None:
+            q = Quantity(None, None, Provenance.ABSENT, original)
+            return Ingredient(
+                name, q, _merge_notes(notes, unit_text), group,
+                gap=message(language, "quality_not_unit", name=name, unit=unit_text),
             )
 
-        # 4b. C'è un numero: l'unità sconosciuta si conserva intatta accanto ad esso, che è
-        #     meglio che forzarla in uno schema che non le appartiene.
-        q = Quantita(
-            numero[0],
-            testo_unita,
-            Provenienza.DICHIARATO,
-            originale,
-            valore_max=numero[1],
+        # 4b. There is a number: the unknown unit is kept intact next to it, which is better
+        #     than forcing it into a scheme it does not belong to.
+        q = Quantity(
+            number[0],
+            unit_text,
+            Provenance.DECLARED,
+            original,
+            value_max=number[1],
         )
-        return Ingrediente(nome, q, note, gruppo,
-                           lacuna=messaggio(lingua, "unita_ignota", unita=unita_raw, nome=nome))
+        return Ingredient(name, q, notes, group,
+                          gap=message(language, "unknown_unit", unit=unit_raw, name=name))
 
-    # 5. Nessun numero interpretabile.
-    if numero is None:
-        q = Quantita(None, str(unita_raw or "").strip() or None, Provenienza.ASSENTE, originale)
-        return Ingrediente(nome, q, note, gruppo,
-                           lacuna=messaggio(lingua, "non_interpretabile", originale=originale, nome=nome))
+    # 5. No readable number.
+    if number is None:
+        q = Quantity(None, str(unit_raw or "").strip() or None, Provenance.ABSENT, original)
+        return Ingredient(name, q, notes, group,
+                          gap=message(language, "unreadable", original=original, name=name))
 
-    minimo, massimo = numero
+    minimum, maximum = number
 
-    # 6. Conteggio di pezzi: non si converte. "2 uova" resta "2 uova"; se `vaghe.yaml`
-    #    conosce un peso tipico lo aggiungiamo come commento, senza sostituire il conteggio.
-    if unita is None or unita in t.conteggio:
-        return _come_conteggio(nome, minimo, massimo, unita, unita_raw, originale, note,
-                              gruppo, t, sistema, lingua)
+    # 6. A count of pieces: not converted. "2 uova" stays "2 uova"; if `vaghe.yaml` knows a
+    #    typical weight we add it as a comment, without replacing the count.
+    if unit is None or unit in t.count:
+        return _as_count(name, minimum, maximum, unit, unit_raw, original, notes,
+                         group, t, system, language)
 
-    # 7. Misure a cucchiaio. Non si convertono mai: il cucchiaino ce l'hanno tutti in casa,
-    #    la bilancia di precisione no. Si traduce solo l'etichetta ("2 tbsp" → "2 cucchiai")
-    #    e si mette l'equivalente fra parentesi, che Mela tratta come commento.
-    if unita in t.misure_a_cucchiaio:
-        return _come_misura_a_cucchiaio(nome, minimo, massimo, unita, originale, note, gruppo,
-                                       t, sistema, lingua)
+    # 7. Spoon measures. Never converted: everybody has a teaspoon at home, a precision scale
+    #    not so much. Only the label is translated ("2 tbsp" → "2 cucchiai") and the
+    #    equivalent goes in brackets, which Mela treats as a comment.
+    if unit in t.spoon_measures:
+        return _as_spoon_measure(name, minimum, maximum, unit, original, notes, group,
+                                 t, system, language)
 
-    # 8. Peso: conversione esatta, nessuna densità in gioco.
-    if unita in t.peso:
-        grammi_min, grammi_max = minimo * t.peso[unita], massimo * t.peso[unita]
-        val_min, u = unita_per_peso(grammi_min, sistema)
-        val_max, _ = unita_per_peso(grammi_max, sistema)
-        # "Dichiarato" solo se l'unità di partenza è già quella di arrivo: altrimenti c'è
-        # stata una conversione, e va detto.
-        prov = Provenienza.DICHIARATO if unita == u else Provenienza.CONVERTITO_UNITA
-        return _confeziona(nome, val_min, val_max, u, prov, originale, note, gruppo, sistema)
+    # 8. Weight: exact conversion, no density in play.
+    if unit in t.weight:
+        grams_min, grams_max = minimum * t.weight[unit], maximum * t.weight[unit]
+        val_min, u = unit_for_weight(grams_min, system)
+        val_max, _ = unit_for_weight(grams_max, system)
+        # "Declared" only if the starting unit is already the arriving one: otherwise a
+        # conversion took place, and that has to be said.
+        prov = Provenance.DECLARED if unit == u else Provenance.CONVERTED_UNIT
+        return _finalise(name, val_min, val_max, u, prov, original, notes, group, system)
 
     # 9. Volume.
-    if unita in t.volume:
-        ml_min, ml_max = minimo * t.volume[unita], massimo * t.volume[unita]
+    if unit in t.volume:
+        ml_min, ml_max = minimum * t.volume[unit], maximum * t.volume[unit]
 
-        def come_volume(provenienza: Provenienza) -> Ingrediente:
-            val_min, u = unita_per_volume(ml_min, sistema, t)
-            val_max, _ = unita_per_volume(ml_max, sistema, t)
-            prov = Provenienza.DICHIARATO if unita == u else provenienza
-            return _confeziona(nome, val_min, val_max, u, prov, originale, note, gruppo, sistema)
+        def as_volume(provenance: Provenance) -> Ingredient:
+            val_min, u = unit_for_volume(ml_min, system, t)
+            val_max, _ = unit_for_volume(ml_max, system, t)
+            prov = Provenance.DECLARED if unit == u else provenance
+            return _finalise(name, val_min, val_max, u, prov, original, notes, group, system)
 
-        # 9a. Già eseguibile nel sistema richiesto: "500 ml" per chi cucina in metrico e
-        #     "1 cup" per chi cucina in imperiale si usano così come sono. Convertirle
-        #     sarebbe una perdita netta.
-        if t.e_gia_nel_sistema(unita, sistema):
-            return come_volume(Provenienza.CONVERTITO_UNITA)
+        # 9a. Already executable in the requested system: "500 ml" for someone cooking in
+        #     metric and "1 cup" for someone cooking in imperial are used exactly as they are.
+        #     Converting them would be a net loss.
+        if t.is_already_in_system(unit, system):
+            return as_volume(Provenance.CONVERTED_UNIT)
 
-        # 9b. Liquido: resta un volume, solo espresso nel sistema di destinazione. Nessuna
-        #     densità in gioco — nessuno pesa il latte, in nessun paese.
-        if t.e_liquido(nome):
-            return come_volume(Provenienza.CONVERTITO_UNITA)
+        # 9b. Liquid: it stays a volume, only expressed in the target system. No density in
+        #     play — nobody weighs milk, in any country.
+        if t.is_liquid(name):
+            return as_volume(Provenance.CONVERTED_UNIT)
 
-        # 9c. Secco con densità nota, e destinazione metrica: è il caso per cui esiste
-        #     `densita.yaml`. Verso l'imperiale NON si attraversa la densità: un volume
-        #     resta un volume, perché "200 g di farina" reso in cup darebbe 1,67 cup, cioè
-        #     un numero che nessun misurino sa fare. La fonte del dato non diventa una nota
-        #     per l'utente: è documentazione della tabella, e contiene parentesi che
-        #     confonderebbero il parser di Mela.
-        if sigla(sistema) == Sistema.METRICO.value and (trovata := t.densita_per(nome)) is not None:
-            g_per_ml, _ = trovata
-            return _confeziona(nome, ml_min * g_per_ml, ml_max * g_per_ml, "g",
-                               Provenienza.CONVERTITO_DENSITA, originale, note, gruppo, sistema)
+        # 9c. Dry with a known density, and a metric destination: this is the case
+        #     `densita.yaml` exists for. Towards imperial density is NOT crossed: a volume
+        #     stays a volume, because "200 g of flour" rendered in cups would give 1.67 cup,
+        #     i.e. a number no measuring cup can make. The source of the datum does not become
+        #     a note for the user: it is documentation of the table, and it contains brackets
+        #     that would confuse Mela's parser.
+        if code_of(system) == System.METRIC.value and (found := t.density_for(name)) is not None:
+            g_per_ml, _ = found
+            return _finalise(name, ml_min * g_per_ml, ml_max * g_per_ml, "g",
+                             Provenance.CONVERTED_DENSITY, original, notes, group, system)
 
-        # 9d. Densità sconosciuta: si conserva il volume e si dichiara la lacuna. Qui NON
-        #     si inventa una densità plausibile.
-        ingr = come_volume(Provenienza.CONVERTITO_UNITA)
-        if sigla(sistema) == Sistema.METRICO.value:
-            return replace(ingr, lacuna=messaggio(lingua, "densita_ignota", nome=nome))
+        # 9d. Density unknown: the volume is kept and the gap is declared. Here we do NOT
+        #     invent a plausible density.
+        ingr = as_volume(Provenance.CONVERTED_UNIT)
+        if code_of(system) == System.METRIC.value:
+            return replace(ingr, gap=message(language, "unknown_density", name=name))
         return ingr
 
-    # Difensivo: un'unità presente negli alias ma in nessuna tabella è un errore di dati.
-    q = Quantita(minimo, unita, Provenienza.DICHIARATO, originale, valore_max=massimo)
-    return Ingrediente(nome, q, note, gruppo,
-                       lacuna=messaggio(lingua, "unita_senza_conversione", unita=unita))
+    # Defensive: a unit present in the aliases but in no table is a data error.
+    q = Quantity(minimum, unit, Provenance.DECLARED, original, value_max=maximum)
+    return Ingredient(name, q, notes, group,
+                      gap=message(language, "unit_without_conversion", unit=unit))
 
 
-def _unisci_note(*pezzi: str | None) -> str | None:
-    presenti = [p.strip() for p in pezzi if p and p.strip()]
-    return "; ".join(dict.fromkeys(presenti)) or None
+def _merge_notes(*pieces: str | None) -> str | None:
+    present = [p.strip() for p in pieces if p and p.strip()]
+    return "; ".join(dict.fromkeys(present)) or None
 
 
-def _confeziona(
-    nome: str, valore_min: float, valore_max: float, unita: str, provenienza: Provenienza,
-    originale: str, note: str | None, gruppo: str | None,
-    sistema: str = Sistema.METRICO, lingua: str = Lingua.IT, tabelle: Tabelle | None = None,
-) -> Ingrediente:
-    """Arrotonda alla precisione da cucina e costruisce l'ingrediente finale."""
-    q = Quantita(
-        arrotonda_cucina(valore_min, unita), unita, provenienza, originale,
-        valore_max=arrotonda_cucina(valore_max, unita), sistema=sigla(sistema),
+def _finalise(
+    name: str, value_min: float, value_max: float, unit: str, provenance: Provenance,
+    original: str, notes: str | None, group: str | None,
+    system: str = System.METRIC, language: str = Language.IT, tables: Tables | None = None,
+) -> Ingredient:
+    """Rounds to kitchen precision and builds the final ingredient."""
+    q = Quantity(
+        round_for_kitchen(value_min, unit), unit, provenance, original,
+        value_max=round_for_kitchen(value_max, unit), system=code_of(system),
     )
-    return Ingrediente(nome, q, note, gruppo)
+    return Ingredient(name, q, notes, group)
 
 
-def _come_misura_a_cucchiaio(
-    nome: str, minimo: float, massimo: float, unita: str, originale: str,
-    note: str | None, gruppo: str | None, tabelle: Tabelle,
-    sistema: str = Sistema.METRICO, lingua: str = Lingua.IT,
-) -> Ingrediente:
-    """Cucchiai e cucchiaini restano tali, con l'equivalente in peso o volume fra parentesi.
+def _as_spoon_measure(
+    name: str, minimum: float, maximum: float, unit: str, original: str,
+    notes: str | None, group: str | None, tables: Tables,
+    system: str = System.METRIC, language: str = Language.IT,
+) -> Ingredient:
+    """Spoons and teaspoons stay as they are, with the equivalent in weight or volume in
+    brackets.
 
-    "1 cucchiaino di lievito" è un'istruzione che si esegue; "4 g" richiede una bilancia
-    che pochi hanno. Convertirla sarebbe una perdita netta di usabilità. L'unica cosa che
-    si tocca è l'etichetta, se arriva in inglese: "2 tbsp" → "2 cucchiai".
+    "1 teaspoon of baking powder" is an instruction you carry out; "4 g" calls for a scale few
+    people have. Converting it would be a net loss of usability. The only thing touched is the
+    label, if it arrives in English: "2 tbsp" → "2 cucchiai".
     """
-    ml_min, ml_max = minimo * tabelle.volume[unita], massimo * tabelle.volume[unita]
+    ml_min, ml_max = minimum * tables.volume[unit], maximum * tables.volume[unit]
 
-    # L'equivalente fra parentesi segue il sistema di destinazione: a un americano "≈ 25 g"
-    # non dice nulla, e a un italiano "≈ 0,9 oz" nemmeno.
-    if not tabelle.e_liquido(nome) and (trovata := tabelle.densita_per(nome)) is not None:
-        g_per_ml, _ = trovata
-        eq_min, unita_eq = unita_per_peso(ml_min * g_per_ml, sistema)
-        eq_max, _ = unita_per_peso(ml_max * g_per_ml, sistema)
+    # The equivalent in brackets follows the target system: "≈ 25 g" says nothing to an
+    # American, and "≈ 0,9 oz" says nothing to an Italian.
+    if not tables.is_liquid(name) and (found := tables.density_for(name)) is not None:
+        g_per_ml, _ = found
+        eq_min, eq_unit = unit_for_weight(ml_min * g_per_ml, system)
+        eq_max, _ = unit_for_weight(ml_max * g_per_ml, system)
     else:
-        eq_min, unita_eq = unita_per_volume(ml_min, sistema, tabelle)
-        eq_max, _ = unita_per_volume(ml_max, sistema, tabelle)
-    eq_min, eq_max = arrotonda_cucina(eq_min, unita_eq), arrotonda_cucina(eq_max, unita_eq)
+        eq_min, eq_unit = unit_for_volume(ml_min, system, tables)
+        eq_max, _ = unit_for_volume(ml_max, system, tables)
+    eq_min, eq_max = round_for_kitchen(eq_min, eq_unit), round_for_kitchen(eq_max, eq_unit)
 
-    testo_eq = formatta_numero(eq_min, sistema)
+    eq_text = format_number(eq_min, system)
     if eq_max != eq_min:
-        testo_eq = f"{testo_eq}-{formatta_numero(eq_max, sistema)}"
+        eq_text = f"{eq_text}-{format_number(eq_max, system)}"
 
-    # L'equivalente serve solo se aggiunge qualcosa: per chi cucina in imperiale, "2 tbsp
-    # (≈ 2 tbsp)" è rumore. Si mostra quando l'unità dell'equivalente è diversa da quella
-    # della quantità.
-    nota = f"≈ {testo_eq} {unita_eq}" if unita_eq != unita else None
+    # The equivalent is only worth having if it adds something: for someone cooking in
+    # imperial, "2 tbsp (≈ 2 tbsp)" is noise. It is shown when the equivalent's unit differs
+    # from the quantity's.
+    note = f"≈ {eq_text} {eq_unit}" if eq_unit != unit else None
 
-    q = Quantita(
-        minimo, tabelle.etichetta(unita, massimo, lingua), Provenienza.DICHIARATO, originale,
-        valore_max=massimo, nota=nota, sistema=sigla(sistema),
+    q = Quantity(
+        minimum, tables.label(unit, maximum, language), Provenance.DECLARED, original,
+        value_max=maximum, note=note, system=code_of(system),
     )
-    return Ingrediente(nome, q, note, gruppo)
+    return Ingredient(name, q, notes, group)
 
 
-def _come_conteggio(
-    nome: str, minimo: float, massimo: float, unita: str | None, unita_raw: str | None,
-    originale: str, note: str | None, gruppo: str | None, tabelle: Tabelle,
-    sistema: str = Sistema.METRICO, lingua: str = Lingua.IT,
-) -> Ingrediente:
-    """Pezzi contati. Il conteggio resta il dato primario; il peso tipico, se noto,
-    diventa un commento fra parentesi."""
-    grezza = unita or (str(unita_raw).strip() if unita_raw else None)
-    nota = None
-    if grezza and (definizione := tabelle.vaghe.get(_chiave(grezza))):
-        if (tipico := _valore_vago(definizione, sistema)) is not None:
-            quantita_tipica, u = tipico
-            totale = arrotonda_cucina(quantita_tipica * massimo, u)
-            nota = f"≈ {formatta_numero(totale, sistema)} {u}"
-    etichetta = tabelle.etichetta(unita, massimo, lingua) if unita else grezza
-    q = Quantita(minimo, etichetta, Provenienza.CONTEGGIO, originale,
-                 valore_max=massimo, nota=nota, sistema=sigla(sistema))
-    return Ingrediente(nome, q, note, gruppo)
+def _as_count(
+    name: str, minimum: float, maximum: float, unit: str | None, unit_raw: str | None,
+    original: str, notes: str | None, group: str | None, tables: Tables,
+    system: str = System.METRIC, language: str = Language.IT,
+) -> Ingredient:
+    """Counted pieces. The count stays the primary datum; the typical weight, if known,
+    becomes a comment in brackets."""
+    raw = unit or (str(unit_raw).strip() if unit_raw else None)
+    note = None
+    if raw and (definition := tables.vague.get(_key(raw))):
+        if (typical := _vague_value(definition, system)) is not None:
+            typical_quantity, u = typical
+            total = round_for_kitchen(typical_quantity * maximum, u)
+            note = f"≈ {format_number(total, system)} {u}"
+    label = tables.label(unit, maximum, language) if unit else raw
+    q = Quantity(minimum, label, Provenance.COUNT, original,
+                 value_max=maximum, note=note, system=code_of(system))
+    return Ingredient(name, q, notes, group)
 
 
-def _valore_vago(definizione: dict, sistema: str) -> tuple[float, str] | None:
-    """Il valore tipico di una misura a occhio, nel sistema richiesto.
+def _vague_value(definition: dict, system: str) -> tuple[float, str] | None:
+    """The typical value of an eyeball measure, in the requested system.
 
-    Sta in tabella per sistema e non si calcola: un pizzico è 0,5 g in metrico e 1/8 tsp in
-    imperiale, e convertire il primo nel secondo darebbe 0,018 oz — un numero che nessuno
-    esegue (v. l'intestazione di `vaghe.yaml`).
+    It is in the table and not calculated: a pinch is 0.5 g in metric and 1/8 tsp in imperial,
+    and converting the first into the second would give 0.018 oz — a number nobody carries out
+    (see the header of `vaghe.yaml`).
     """
-    valore = definizione.get("valore")
-    if not isinstance(valore, dict):
+    value = definition.get("valore")
+    if not isinstance(value, dict):
         return None
-    per_sistema = valore.get(sigla(sistema)) or valore.get(Sistema.METRICO.value)
-    if not isinstance(per_sistema, dict) or per_sistema.get("quantita") is None:
+    per_system = value.get(code_of(system)) or value.get(System.METRIC.value)
+    if not isinstance(per_system, dict) or per_system.get("quantita") is None:
         return None
-    return float(per_sistema["quantita"]), per_sistema.get("unita", "g")
+    return float(per_system["quantita"]), per_system.get("unita", "g")
 
 
-def _nota_vaga(definizione: dict, valore: float, unita: str, sistema: str, lingua: str) -> str:
-    """La nota che spiega una stima, composta dal valore effettivo.
+def _vague_note(definition: dict, value: float, unit: str, system: str, language: str) -> str:
+    """The note explaining an estimate, composed from the actual value.
 
-    Non si scrive in tabella: scritta a mano dipenderebbe dalla lingua mentre il numero
-    dipende dal sistema, e le due cose divergono. Componendola qui non può contraddire la
-    quantità che accompagna.
+    It is not written in the table: written by hand it would depend on the language while the
+    number depends on the system, and the two diverge. Composed here it cannot contradict the
+    quantity it accompanies.
     """
-    nomi = definizione.get("nome") or {}
-    nome_espressione = nomi.get(sigla(lingua)) or nomi.get(Lingua.IT.value) or ""
-    return f"{nome_espressione} ≈ {formatta_numero(valore, sistema)} {unita}".strip()
+    names = definition.get("nome") or {}
+    expression_name = names.get(code_of(language)) or names.get(Language.IT.value) or ""
+    return f"{expression_name} ≈ {format_number(value, system)} {unit}".strip()
 
 
-def _prova_indeterminate(
-    nome: str, originale: str, quantita_raw: str | None, unita_raw: str | None,
-    note: str | None, gruppo: str | None, tabelle: Tabelle, lingua: str = Lingua.IT,
-) -> Ingrediente | None:
-    """"q.b.", "qualche", "un po'": nessun numero da estrarre, e va detto chiaramente.
+def _try_indeterminate(
+    name: str, original: str, quantity_raw: str | None, unit_raw: str | None,
+    notes: str | None, group: str | None, tables: Tables, language: str = Language.IT,
+) -> Ingredient | None:
+    """"q.b.", "qualche", "un po'": no number to extract, and that has to be said clearly.
 
-    Il match tollera che l'espressione sia annegata in una stringa più lunga: i modelli
-    a volte producono unita_raw="burro q.b." invece di isolare il "q.b.". In quel caso il
-    nome resta quello del campo `nome` e l'ingrediente diventa "burro q.b.".
+    The match tolerates the expression being buried in a longer string: models sometimes
+    produce unita_raw="burro q.b." instead of isolating the "q.b.". In that case the name stays
+    the one in the `name` field and the ingredient becomes "burro q.b.".
     """
-    for grezzo in (quantita_raw, unita_raw, originale):
-        if not grezzo:
+    for raw in (quantity_raw, unit_raw, original):
+        if not raw:
             continue
-        k = _chiave(str(grezzo)).rstrip(".")
-        parole = set(k.split())
-        definizione = tabelle.vaghe.get(k) or tabelle.vaghe.get(_chiave(str(grezzo)))
-        # Match esatto, oppure l'espressione compare come token nella stringa
-        # ("q.b." dentro "burro q.b."). Il confronto ignora i punti, che rendono
-        # "q.b." difficile da tokenizzare in modo affidabile.
-        if not definizione:
-            k_np = _senza_punti(k)
-            for chiave_vaga, voce in tabelle.vaghe.items():
-                if voce.get("senza_quantita") and _contiene_espressione(k_np, _senza_punti(chiave_vaga)):
-                    definizione = voce
+        k = _key(str(raw)).rstrip(".")
+        words = set(k.split())
+        definition = tables.vague.get(k) or tables.vague.get(_key(str(raw)))
+        # Exact match, or the expression appears as a token in the string ("q.b." inside
+        # "burro q.b."). The comparison ignores dots, which make "q.b." hard to tokenise
+        # reliably.
+        if not definition:
+            k_nd = _without_dots(k)
+            for vague_key, entry in tables.vague.items():
+                if entry.get("senza_quantita") and _contains_expression(k_nd, _without_dots(vague_key)):
+                    definition = entry
                     break
-        if definizione and definizione.get("senza_quantita"):
-            # "q.b." in italiano, "to taste" in inglese: la resa sta in tabella per lingua.
-            rese = definizione.get("resa") or {}
-            resa = rese.get(sigla(lingua)) or rese.get(Lingua.IT.value) or "q.b."
-            q = Quantita(None, resa, Provenienza.INDETERMINATO, originale)
-            return Ingrediente(nome, q, note, gruppo)
-        if k in tabelle.indeterminate or (parole & tabelle.indeterminate):
-            q = Quantita(None, str(grezzo).strip(), Provenienza.INDETERMINATO, originale)
-            return Ingrediente(
-                nome, q, note, gruppo,
-                lacuna=messaggio(lingua, "indeterminata", originale=str(grezzo).strip(), nome=nome),
+        if definition and definition.get("senza_quantita"):
+            # "q.b." in Italian, "to taste" in English: the rendering is in the table per
+            # language.
+            renderings = definition.get("resa") or {}
+            rendering = renderings.get(code_of(language)) or renderings.get(Language.IT.value) or "q.b."
+            q = Quantity(None, rendering, Provenance.INDETERMINATE, original)
+            return Ingredient(name, q, notes, group)
+        if k in tables.indeterminate or (words & tables.indeterminate):
+            q = Quantity(None, str(raw).strip(), Provenance.INDETERMINATE, original)
+            return Ingredient(
+                name, q, notes, group,
+                gap=message(language, "indeterminate", original=str(raw).strip(), name=name),
             )
     return None
 
 
-def _senza_punti(testo: str) -> str:
-    """Normalizza via i punti per il confronto delle sigle: "q.b." → "qb"."""
-    return re.sub(r"\.", "", testo)
+def _without_dots(text: str) -> str:
+    """Normalises dots away for comparing abbreviations: "q.b." → "qb"."""
+    return re.sub(r"\.", "", text)
 
 
-def _contiene_espressione(testo: str, espressione: str) -> bool:
-    """Vero se `espressione` (già normalizzata) compare come sequenza di token in `testo`.
-    Evita i falsi positivi da sottostringa: "qb" non deve scattare dentro "sqb"."""
-    tok_testo = testo.split()
-    tok_esp = espressione.split()
-    if not tok_esp:
+def _contains_expression(text: str, expression: str) -> bool:
+    """True if `expression` (already normalised) appears as a token sequence in `text`.
+    Avoids substring false positives: "qb" must not fire inside "sqb"."""
+    text_tokens = text.split()
+    expression_tokens = expression.split()
+    if not expression_tokens:
         return False
-    for i in range(len(tok_testo) - len(tok_esp) + 1):
-        if tok_testo[i:i + len(tok_esp)] == tok_esp:
+    for i in range(len(text_tokens) - len(expression_tokens) + 1):
+        if text_tokens[i:i + len(expression_tokens)] == expression_tokens:
             return True
     return False
 
 
-def _prova_vaghe(
-    nome: str, originale: str, numero: tuple[float, float] | None, unita_raw: str | None,
-    quantita_raw: str | None, note: str | None, gruppo: str | None, tabelle: Tabelle,
-    sistema: str = Sistema.METRICO, lingua: str = Lingua.IT,
-) -> Ingrediente | None:
-    """Misure a occhio con un valore tipico. Il risultato è marcato `stimato:vaghe`
-    e porta in nota il perché — non deve mai passare per un dato certo."""
-    for grezzo in (unita_raw, quantita_raw, originale):
-        if not grezzo:
+def _try_vague(
+    name: str, original: str, number: tuple[float, float] | None, unit_raw: str | None,
+    quantity_raw: str | None, notes: str | None, group: str | None, tables: Tables,
+    system: str = System.METRIC, language: str = Language.IT,
+) -> Ingredient | None:
+    """Eyeball measures with a typical value. The result is marked `stimato:vaghe` and carries
+    the reason in a note — it must never pass for certain data."""
+    for raw in (unit_raw, quantity_raw, original):
+        if not raw:
             continue
-        definizione = tabelle.vaghe.get(_chiave(str(grezzo)))
+        definition = tables.vague.get(_key(str(raw)))
 
-        # Le didascalie scrivono «1 presa di sale», «1 bel pizzico»: un numerale davanti
-        # all'espressione. Il match esatto non lo vedeva e l'ingrediente finiva come
-        # conteggio — «1 sale», cioè un sale. Si riprova sulla sola coda; il fattore
-        # moltiplicativo lo applica già `numero` qui sotto, quindi «2 pizzichi» varrebbe
-        # il doppio senza aggiungere altro.
-        if not definizione and (m := _RE_QUANTITA_CON_UNITA.match(_chiave(str(grezzo)))):
-            definizione = tabelle.vaghe.get(_chiave(m.group(2)))
+        # Captions write «1 presa di sale», «1 bel pizzico»: a numeral in front of the
+        # expression. The exact match did not see it and the ingredient ended up as a count —
+        # «1 sale», that is, one salt. It is retried on the tail alone; the multiplying factor
+        # is already applied by `number` below, so «2 pizzichi» would be worth double without
+        # adding anything else.
+        if not definition and (m := _RE_QUANTITY_WITH_UNIT.match(_key(str(raw)))):
+            definition = tables.vague.get(_key(m.group(2)))
 
-        if not definizione or definizione.get("senza_quantita"):
+        if not definition or definition.get("senza_quantita"):
             continue
 
-        # Moltiplicatori ("un paio", "una dozzina"): non producono un peso, moltiplicano
-        # un conteggio. Se non c'è un'unità da moltiplicare, valgono come pezzi.
-        if (moltiplicatore := definizione.get("moltiplicatore")) is not None:
-            n = float(moltiplicatore) * (numero[0] if numero else 1.0)
-            q = Quantita(n, None, Provenienza.CONTEGGIO, originale)
-            return Ingrediente(nome, q, note, gruppo)
+        # Multipliers ("un paio", "una dozzina"): they do not produce a weight, they multiply
+        # a count. If there is no unit to multiply, they count as pieces.
+        if (multiplier := definition.get("moltiplicatore")) is not None:
+            n = float(multiplier) * (number[0] if number else 1.0)
+            q = Quantity(n, None, Provenance.COUNT, original)
+            return Ingredient(name, q, notes, group)
 
-        if (tipico := _valore_vago(definizione, sistema)) is None:
+        if (typical := _vague_value(definition, system)) is None:
             continue
-        valore, unita = tipico
-        conteggio = numero[1] if numero else 1.0
-        conteggio_min = numero[0] if numero else 1.0
-        q = Quantita(
-            arrotonda_cucina(valore * conteggio_min, unita),
-            unita,
-            Provenienza.STIMATO_VAGHE,
-            originale,
-            valore_max=arrotonda_cucina(valore * conteggio, unita),
-            nota=_nota_vaga(definizione, valore, unita, sistema, lingua),
-            sistema=sigla(sistema),
+        value, unit = typical
+        count = number[1] if number else 1.0
+        count_min = number[0] if number else 1.0
+        q = Quantity(
+            round_for_kitchen(value * count_min, unit),
+            unit,
+            Provenance.ESTIMATED_VAGUE,
+            original,
+            value_max=round_for_kitchen(value * count, unit),
+            note=_vague_note(definition, value, unit, system, language),
+            system=code_of(system),
         )
-        return Ingrediente(
-            nome, q, note, gruppo,
-            lacuna=messaggio(lingua, "stima_vaga", originale=originale, nome=nome),
+        return Ingredient(
+            name, q, notes, group,
+            gap=message(language, "vague_estimate", original=original, name=name),
         )
     return None
 
 
 # --------------------------------------------------------------------------------------
-# Temperature nel testo libero del procedimento
+# Temperatures in the free text of the method
 # --------------------------------------------------------------------------------------
 
 _RE_FAHRENHEIT = re.compile(r"(\d{2,3})\s*°?\s*F\b", re.IGNORECASE)
 _RE_CELSIUS = re.compile(r"(\d{2,3})\s*°?\s*C\b", re.IGNORECASE)
 
 
-def fahrenheit_in_celsius(gradi_f: float, arrotondamento: int = 5) -> float:
-    celsius = (gradi_f - 32.0) * 5.0 / 9.0
-    return float(round(celsius / arrotondamento) * arrotondamento)
+def fahrenheit_to_celsius(degrees_f: float, rounding: int = 5) -> float:
+    celsius = (degrees_f - 32.0) * 5.0 / 9.0
+    return float(round(celsius / rounding) * rounding)
 
 
-def celsius_in_fahrenheit(gradi_c: float, arrotondamento: int = 25) -> float:
-    """Verso i Fahrenheit si arrotonda a 25: le manopole dei forni americani sono tarate
-    così (325, 350, 375), e un "347 °F" non corrisponderebbe a nessuna posizione."""
-    fahrenheit = gradi_c * 9.0 / 5.0 + 32.0
-    return float(round(fahrenheit / arrotondamento) * arrotondamento)
+def celsius_to_fahrenheit(degrees_c: float, rounding: int = 25) -> float:
+    """Towards Fahrenheit the rounding is to 25: American oven dials are calibrated that way
+    (325, 350, 375), and a "347 °F" would match no position on them."""
+    fahrenheit = degrees_c * 9.0 / 5.0 + 32.0
+    return float(round(fahrenheit / rounding) * rounding)
 
 
-def converti_temperature_nel_testo(
-    testo: str, tabelle: Tabelle | None = None, sistema: str = Sistema.METRICO,
+def convert_temperatures_in_text(
+    text: str, tables: Tables | None = None, system: str = System.METRIC,
 ) -> tuple[str, list[str]]:
-    """Porta le temperature nella scala del sistema di destinazione.
+    """Brings temperatures into the scale of the target system.
 
-    Un reel anglosassone dice "bake at 350°F" e un forno italiano non ha quella scala; uno
-    italiano dice "180 °C" e un forno americano nemmeno. La conversione va quindi nei due
-    sensi, secondo chi legge.
+    An Anglo-Saxon reel says "bake at 350°F" and an Italian oven does not have that scale; an
+    Italian one says "180 °C" and an American oven does not either. The conversion therefore
+    goes both ways, according to who is reading.
 
-    Ritorna il testo convertito e l'elenco delle sostituzioni fatte, perché ogni modifica al
-    testo dell'autore va tracciata e non applicata di nascosto.
+    Returns the converted text and the list of substitutions made, because every change to the
+    author's text is to be tracked and not applied on the quiet.
     """
-    t = tabelle or carica_tabelle()
-    sostituzioni: list[str] = []
-    verso_metrico = sigla(sistema) == Sistema.METRICO.value
+    t = tables or load_tables()
+    substitutions: list[str] = []
+    towards_metric = code_of(system) == System.METRIC.value
 
-    def _sostituisci(m: re.Match[str]) -> str:
-        gradi = float(m.group(1))
-        # Sotto una certa soglia non è quasi mai una temperatura di cottura ("cuoci 20
-        # minuti a fuoco medio" contiene numeri che non sono gradi): meglio non toccare.
-        if verso_metrico and gradi < 100:
+    def _substitute(m: re.Match[str]) -> str:
+        degrees = float(m.group(1))
+        # Below a certain threshold it is almost never a cooking temperature ("cuoci 20 minuti
+        # a fuoco medio" contains numbers that are not degrees): better not to touch it.
+        if towards_metric and degrees < 100:
             return m.group(0)
-        if not verso_metrico and gradi < 40:
+        if not towards_metric and degrees < 40:
             return m.group(0)
 
-        if verso_metrico:
-            convertita, unita = fahrenheit_in_celsius(gradi, t.arrotondamento_c), "°C"
+        if towards_metric:
+            converted, unit = fahrenheit_to_celsius(degrees, t.rounding_c), "°C"
         else:
-            convertita, unita = celsius_in_fahrenheit(gradi), "°F"
-        reso = f"{formatta_numero(convertita)} {unita}"
-        sostituzioni.append(f"{m.group(0).strip()} → {reso}")
-        return reso
+            converted, unit = celsius_to_fahrenheit(degrees), "°F"
+        rendered = f"{format_number(converted)} {unit}"
+        substitutions.append(f"{m.group(0).strip()} → {rendered}")
+        return rendered
 
-    espressione = _RE_FAHRENHEIT if verso_metrico else _RE_CELSIUS
-    return espressione.sub(_sostituisci, testo), sostituzioni
+    expression = _RE_FAHRENHEIT if towards_metric else _RE_CELSIUS
+    return expression.sub(_substitute, text), substitutions

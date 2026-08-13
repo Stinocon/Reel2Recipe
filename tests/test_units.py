@@ -16,22 +16,22 @@ import re
 import pytest
 
 from reel2recipe.units import (
-    Lingua,
-    Provenienza,
-    Sistema,
-    arrotonda_cucina,
-    carica_tabelle,
-    converti_temperature_nel_testo,
-    fahrenheit_in_celsius,
-    formatta_numero,
-    normalizza_ingrediente,
-    parse_quantita,
+    Language,
+    Provenance,
+    System,
+    round_for_kitchen,
+    load_tables,
+    convert_temperatures_in_text,
+    fahrenheit_to_celsius,
+    format_number,
+    normalise_ingredient,
+    parse_quantity,
 )
 
 
 @pytest.fixture(scope="module")
 def t():
-    return carica_tabelle()
+    return load_tables()
 
 
 # ----------------------------------------------------------------------------------
@@ -67,19 +67,19 @@ def t():
     ],
 )
 def test_parse_quantita(grezza, atteso):
-    assert parse_quantita(grezza) == atteso
+    assert parse_quantity(grezza) == atteso
 
 
 def test_parse_quantita_senza_numeri():
     """"q.b." non è un numero: deve dare None, non 0. Sono cose diverse."""
-    assert parse_quantita("q.b.") is None
-    assert parse_quantita("") is None
-    assert parse_quantita(None) is None
+    assert parse_quantity("q.b.") is None
+    assert parse_quantity("") is None
+    assert parse_quantity(None) is None
 
 
 def test_parse_non_inventa_intervalli():
     """Un trattino fra due parole non è un intervallo."""
-    assert parse_quantita("sale-pepe") is None
+    assert parse_quantity("sale-pepe") is None
 
 
 # ----------------------------------------------------------------------------------
@@ -89,33 +89,33 @@ def test_parse_non_inventa_intervalli():
 
 def test_cup_di_farina_fa_120_grammi(t):
     """236,5882365 ml × 0,5072 g/ml = 119,997 g → arrotondato a 120 g."""
-    i = normalizza_ingrediente("farina 00", "1", "cup", tabelle=t)
-    assert (i.quantita.valore, i.quantita.unita) == (120.0, "g")
-    assert i.quantita.provenienza is Provenienza.CONVERTITO_DENSITA
-    assert i.lacuna is None
-    assert i.riga_mela().startswith("120 g farina 00")
+    i = normalise_ingredient("farina 00", "1", "cup", tables=t)
+    assert (i.quantity.value, i.quantity.unit) == (120.0, "g")
+    assert i.quantity.provenance is Provenance.CONVERTED_DENSITY
+    assert i.gap is None
+    assert i.mela_line().startswith("120 g farina 00")
 
 
 def test_cup_di_zucchero_non_pesa_come_la_farina(t):
     """Il punto di tutto il progetto: stesso volume, peso diverso del 67%."""
-    farina = normalizza_ingrediente("farina 00", "1", "cup", tabelle=t)
-    zucchero = normalizza_ingrediente("zucchero semolato", "1", "cup", tabelle=t)
-    assert zucchero.quantita.valore == 200.0
-    assert farina.quantita.valore == 120.0
-    assert zucchero.quantita.valore > farina.quantita.valore
+    farina = normalise_ingredient("farina 00", "1", "cup", tables=t)
+    zucchero = normalise_ingredient("zucchero semolato", "1", "cup", tables=t)
+    assert zucchero.quantity.value == 200.0
+    assert farina.quantity.value == 120.0
+    assert zucchero.quantity.value > farina.quantity.value
 
 
 def test_once_in_grammi(t):
     """8 oz × 28,349523125 = 226,8 g → arrotondato a scatti di 5 = 225 g."""
-    i = normalizza_ingrediente("burro", "8", "oz", tabelle=t)
-    assert (i.quantita.valore, i.quantita.unita) == (225.0, "g")
-    assert i.quantita.provenienza is Provenienza.CONVERTITO_UNITA
+    i = normalise_ingredient("burro", "8", "oz", tables=t)
+    assert (i.quantity.value, i.quantity.unit) == (225.0, "g")
+    assert i.quantity.provenance is Provenance.CONVERTED_UNIT
 
 
 def test_grammi_restano_grammi(t):
-    i = normalizza_ingrediente("farina 00", "250", "g", tabelle=t)
-    assert (i.quantita.valore, i.quantita.unita) == (250.0, "g")
-    assert i.quantita.provenienza is Provenienza.DICHIARATO
+    i = normalise_ingredient("farina 00", "250", "g", tables=t)
+    assert (i.quantity.value, i.quantity.unit) == (250.0, "g")
+    assert i.quantity.provenance is Provenance.DECLARED
 
 
 @pytest.mark.parametrize(
@@ -135,9 +135,9 @@ def test_unita_attaccata_alla_quantita(t, quantita_raw, nome, valore, unita):
     numero veniva letto come un conteggio di pezzi: "80g di maiale" diventava "80 maiale",
     cioè ottanta maiali. È il caso visto su un reel vero.
     """
-    i = normalizza_ingrediente(nome, quantita_raw, None, tabelle=t)
-    assert (i.quantita.valore, i.quantita.unita) == (valore, unita)
-    assert i.quantita.provenienza is not Provenienza.CONTEGGIO
+    i = normalise_ingredient(nome, quantita_raw, None, tables=t)
+    assert (i.quantity.value, i.quantity.unit) == (valore, unita)
+    assert i.quantity.provenance is not Provenance.COUNT
 
 
 @pytest.mark.parametrize(
@@ -156,17 +156,17 @@ def test_una_qualita_senza_numero_non_diventa_un_unita(t, nome, unita_raw, attes
     arrivato così in Mela e nel PDF. Diventa invece una nota fra parentesi. Caso visto
     davvero, su un reel vero.
     """
-    i = normalizza_ingrediente(nome, None, unita_raw, tabelle=t)
-    assert i.riga_mela() == atteso
-    assert i.quantita.provenienza is Provenienza.ASSENTE
-    assert i.lacuna, "la quantità resta assente e va dichiarata"
+    i = normalise_ingredient(nome, None, unita_raw, tables=t)
+    assert i.mela_line() == atteso
+    assert i.quantity.provenance is Provenance.ABSENT
+    assert i.gap, "la quantità resta assente e va dichiarata"
 
 
 def test_con_un_numero_l_unita_sconosciuta_si_conserva(t):
     """Speculare al precedente: se il numero c'è, «3 grappoli» è una misura vera anche se
     non sappiamo convertirla, e va conservata com'è invece di essere degradata a nota."""
-    i = normalizza_ingrediente("pomodori", "3", "grappoli", tabelle=t)
-    assert i.riga_mela() == "3 grappoli pomodori"
+    i = normalise_ingredient("pomodori", "3", "grappoli", tables=t)
+    assert i.mela_line() == "3 grappoli pomodori"
 
 
 @pytest.mark.parametrize(
@@ -177,15 +177,15 @@ def test_con_un_numero_l_unita_sconosciuta_si_conserva(t):
 def test_lo_scorporo_non_tocca_conteggi_e_misure_a_occhio(t, quantita_raw, nome):
     """Il recupero dell'unità deve restare cieco a ciò che non è un'unità di `unita.yaml`:
     "tazza" e "pizzico" stanno in `vaghe.yaml` e vanno gestiti da lì, non convertiti qui."""
-    i = normalizza_ingrediente(nome, quantita_raw, None, tabelle=t)
-    assert i.quantita.provenienza in {
-        Provenienza.CONTEGGIO, Provenienza.INDETERMINATO, Provenienza.STIMATO_VAGHE,
+    i = normalise_ingredient(nome, quantita_raw, None, tables=t)
+    assert i.quantity.provenance in {
+        Provenance.COUNT, Provenance.INDETERMINATE, Provenance.ESTIMATED_VAGUE,
     }
 
 
 def test_chili_in_grammi(t):
-    i = normalizza_ingrediente("patate", "1,5", "kg", tabelle=t)
-    assert (i.quantita.valore, i.quantita.unita) == (1500.0, "g")
+    i = normalise_ingredient("patate", "1,5", "kg", tables=t)
+    assert (i.quantity.value, i.quantity.unit) == (1500.0, "g")
 
 
 # ----------------------------------------------------------------------------------
@@ -196,37 +196,37 @@ def test_chili_in_grammi(t):
 def test_densita_sconosciuta_non_si_inventa(t):
     """"1 cup di gorgonzola" non è convertibile in peso: nessuna densità in tabella.
     Il comportamento corretto è restare in volume e dichiararlo."""
-    i = normalizza_ingrediente("gorgonzola", "1", "cup", tabelle=t)
-    assert i.quantita.unita == "ml"
-    assert i.quantita.valore == pytest.approx(235.0, abs=5)
-    assert i.lacuna is not None and "densità sconosciuta" in i.lacuna
+    i = normalise_ingredient("gorgonzola", "1", "cup", tables=t)
+    assert i.quantity.unit == "ml"
+    assert i.quantity.value == pytest.approx(235.0, abs=5)
+    assert i.gap is not None and "densità sconosciuta" in i.gap
 
 
 def test_liquido_metrico_resta_in_volume(t):
     """"500 ml di latte" → 500 g sarebbe corretto in fisica e sbagliato in cucina."""
-    i = normalizza_ingrediente("latte", "500", "ml", tabelle=t)
-    assert (i.quantita.valore, i.quantita.unita) == (500.0, "ml")
-    assert i.quantita.provenienza is Provenienza.DICHIARATO
+    i = normalise_ingredient("latte", "500", "ml", tables=t)
+    assert (i.quantity.value, i.quantity.unit) == (500.0, "ml")
+    assert i.quantity.provenance is Provenance.DECLARED
 
 
 def test_liquido_anglosassone_va_in_millilitri_non_in_grammi(t):
     """1 cup di latte → 237 ml (non 244 g): il cuoco misura il latte, non lo pesa."""
-    i = normalizza_ingrediente("latte", "1", "cup", tabelle=t)
-    assert i.quantita.unita == "ml"
-    assert i.quantita.valore == pytest.approx(235.0, abs=5)
+    i = normalise_ingredient("latte", "1", "cup", tables=t)
+    assert i.quantity.unit == "ml"
+    assert i.quantity.value == pytest.approx(235.0, abs=5)
 
 
 def test_quantita_assente(t):
-    i = normalizza_ingrediente("prezzemolo", None, None, tabelle=t)
-    assert i.quantita.provenienza is Provenienza.ASSENTE
-    assert i.lacuna is not None
-    assert i.riga_mela() == "prezzemolo"
+    i = normalise_ingredient("prezzemolo", None, None, tables=t)
+    assert i.quantity.provenance is Provenance.ABSENT
+    assert i.gap is not None
+    assert i.mela_line() == "prezzemolo"
 
 
 def test_unita_non_riconosciuta_resta_intatta(t):
-    i = normalizza_ingrediente("misteri", "2", "cucchiaioni", tabelle=t)
-    assert i.lacuna is not None and "non riconosciuta" in i.lacuna
-    assert "cucchiaioni" in i.riga_mela()
+    i = normalise_ingredient("misteri", "2", "cucchiaioni", tables=t)
+    assert i.gap is not None and "non riconosciuta" in i.gap
+    assert "cucchiaioni" in i.mela_line()
 
 
 # ----------------------------------------------------------------------------------
@@ -236,11 +236,11 @@ def test_unita_non_riconosciuta_resta_intatta(t):
 
 def test_cucchiaino_resta_cucchiaino(t):
     """"1 cucchiaino di lievito" è eseguibile; "4 g" richiede una bilancia di precisione."""
-    i = normalizza_ingrediente("lievito per dolci", "1", "cucchiaino", tabelle=t)
-    assert i.quantita.unita == "cucchiaino"
-    assert i.quantita.valore == 1.0
-    assert i.quantita.nota is not None and "≈ 4 g" in i.quantita.nota
-    assert i.riga_mela() == "1 cucchiaino lievito per dolci (≈ 4 g)"
+    i = normalise_ingredient("lievito per dolci", "1", "cucchiaino", tables=t)
+    assert i.quantity.unit == "cucchiaino"
+    assert i.quantity.value == 1.0
+    assert i.quantity.note is not None and "≈ 4 g" in i.quantity.note
+    assert i.mela_line() == "1 cucchiaino lievito per dolci (≈ 4 g)"
 
 
 def test_tbsp_diventa_cucchiai_al_plurale(t):
@@ -249,16 +249,16 @@ def test_tbsp_diventa_cucchiai_al_plurale(t):
     L'olio è marcato `liquido` in `densita.yaml`, quindi l'equivalente si esprime in
     volume e non in peso: nessuno pesa l'olio, lo si versa.
     """
-    i = normalizza_ingrediente("olio di oliva", "2", "tbsp", tabelle=t)
-    assert i.quantita.unita == "cucchiai"
-    assert i.quantita.nota is not None and "30 ml" in i.quantita.nota
-    assert i.riga_mela().startswith("2 cucchiai olio di oliva")
+    i = normalise_ingredient("olio di oliva", "2", "tbsp", tables=t)
+    assert i.quantity.unit == "cucchiai"
+    assert i.quantity.note is not None and "30 ml" in i.quantity.note
+    assert i.mela_line().startswith("2 cucchiai olio di oliva")
 
 
 def test_cucchiaio_di_secco_riporta_i_grammi(t):
     """1 cucchiaio di cacao = 15 ml × 0,3593 = 5,4 g → arrotondato a 5,5 g."""
-    i = normalizza_ingrediente("cacao amaro", "1", "cucchiaio", tabelle=t)
-    assert i.quantita.nota is not None and "g" in i.quantita.nota
+    i = normalise_ingredient("cacao amaro", "1", "cucchiaio", tables=t)
+    assert i.quantity.note is not None and "g" in i.quantity.note
 
 
 # ----------------------------------------------------------------------------------
@@ -267,71 +267,71 @@ def test_cucchiaio_di_secco_riporta_i_grammi(t):
 
 
 def test_conteggio_resta_conteggio(t):
-    i = normalizza_ingrediente("uova", "3", None, tabelle=t)
-    assert i.quantita.provenienza is Provenienza.CONTEGGIO
-    assert i.riga_mela() == "3 uova"
+    i = normalise_ingredient("uova", "3", None, tables=t)
+    assert i.quantity.provenance is Provenance.COUNT
+    assert i.mela_line() == "3 uova"
 
 
 def test_spicchi_contati_con_peso_come_commento(t):
     """Il conteggio resta il dato primario; il peso tipico è solo un aiuto."""
-    i = normalizza_ingrediente("aglio", "2", "spicchi", tabelle=t)
-    assert i.quantita.provenienza is Provenienza.CONTEGGIO
-    assert i.quantita.unita == "spicchi"
-    assert i.quantita.nota is not None and "10 g" in i.quantita.nota
+    i = normalise_ingredient("aglio", "2", "spicchi", tables=t)
+    assert i.quantity.provenance is Provenance.COUNT
+    assert i.quantity.unit == "spicchi"
+    assert i.quantity.note is not None and "10 g" in i.quantity.note
 
 
 def test_qb_non_diventa_un_numero(t):
-    i = normalizza_ingrediente("sale", "q.b.", None, tabelle=t)
-    assert i.quantita.provenienza is Provenienza.INDETERMINATO
-    assert i.quantita.valore is None
-    assert i.riga_mela() == "sale q.b."
+    i = normalise_ingredient("sale", "q.b.", None, tables=t)
+    assert i.quantity.provenance is Provenance.INDETERMINATE
+    assert i.quantity.value is None
+    assert i.mela_line() == "sale q.b."
 
 
 def test_pizzico_e_una_stima_dichiarata(t):
-    i = normalizza_ingrediente("sale", "1", "pizzico", tabelle=t)
-    assert i.quantita.provenienza is Provenienza.STIMATO_VAGHE
-    assert i.quantita.valore == 0.5
-    assert i.lacuna is not None and "stima" in i.lacuna
+    i = normalise_ingredient("sale", "1", "pizzico", tables=t)
+    assert i.quantity.provenance is Provenance.ESTIMATED_VAGUE
+    assert i.quantity.value == 0.5
+    assert i.gap is not None and "stima" in i.gap
 
 
 def test_filo_di_olio(t):
-    i = normalizza_ingrediente("olio di oliva", "un", "filo", tabelle=t)
-    assert i.quantita.provenienza is Provenienza.STIMATO_VAGHE
-    assert (i.quantita.valore, i.quantita.unita) == (5.0, "ml")
+    i = normalise_ingredient("olio di oliva", "un", "filo", tables=t)
+    assert i.quantity.provenance is Provenance.ESTIMATED_VAGUE
+    assert (i.quantity.value, i.quantity.unit) == (5.0, "ml")
 
 
 def test_quantita_indeterminata_dichiarata(t):
-    i = normalizza_ingrediente("basilico", "qualche", "foglia", tabelle=t)
-    assert i.quantita.provenienza is Provenienza.INDETERMINATO
-    assert i.lacuna is not None
+    i = normalise_ingredient("basilico", "qualche", "foglia", tables=t)
+    assert i.quantity.provenance is Provenance.INDETERMINATE
+    assert i.gap is not None
 
 
 def test_nome_non_si_ripete_con_lunita_di_conteggio(t):
     """I modelli producono spesso unita="uova" e nome="uova": non deve uscire "2 uova uova"."""
-    i = normalizza_ingrediente("uova", "2", "uova", tabelle=t)
-    assert i.riga_mela() == "2 uova"
+    i = normalise_ingredient("uova", "2", "uova", tables=t)
+    assert i.mela_line() == "2 uova"
 
 
 def test_qb_riconosciuto_anche_dentro_una_stringa(t):
     """Un modello può mettere "burro q.b." tutto in unita_raw: va comunque riconosciuto."""
-    i = normalizza_ingrediente("burro", None, "burro q.b.", tabelle=t)
-    assert i.quantita.provenienza is Provenienza.INDETERMINATO
-    assert i.riga_mela() == "burro q.b."
+    i = normalise_ingredient("burro", None, "burro q.b.", tables=t)
+    assert i.quantity.provenance is Provenance.INDETERMINATE
+    assert i.mela_line() == "burro q.b."
 
 
 def test_densita_non_sporca_la_riga_con_la_fonte(t):
     """La fonte del dato di densità è documentazione, non un commento per l'utente:
     non deve finire fra parentesi nella riga (romperebbe anche il parser di Mela)."""
-    i = normalizza_ingrediente("farina 00", "1", "cup", tabelle=t)
-    assert i.riga_mela() == "120 g farina 00"
-    assert "cup" not in i.riga_mela()
+    i = normalise_ingredient("farina 00", "1", "cup", tables=t)
+    assert i.mela_line() == "120 g farina 00"
+    assert "cup" not in i.mela_line()
 
 
 def test_intervallo_conservato(t):
     """"2-3 cucchiai" non diventa "2,5 cucchiai": si tengono entrambi gli estremi."""
-    i = normalizza_ingrediente("olio di oliva", "2-3", "cucchiai", tabelle=t)
-    assert i.quantita.e_intervallo
-    assert "2-3" in i.riga_mela()
+    i = normalise_ingredient("olio di oliva", "2-3", "cucchiai", tables=t)
+    assert i.quantity.is_range
+    assert "2-3" in i.mela_line()
 
 
 # ----------------------------------------------------------------------------------
@@ -341,13 +341,13 @@ def test_intervallo_conservato(t):
 
 def test_fahrenheit_in_celsius():
     """(350 − 32) × 5/9 = 176,67 → arrotondato agli scatti del forno (5 °C) = 175 °C."""
-    assert fahrenheit_in_celsius(350) == 175.0
-    assert fahrenheit_in_celsius(180) == 80.0
-    assert fahrenheit_in_celsius(425) == 220.0
+    assert fahrenheit_to_celsius(350) == 175.0
+    assert fahrenheit_to_celsius(180) == 80.0
+    assert fahrenheit_to_celsius(425) == 220.0
 
 
 def test_conversione_temperature_nel_testo(t):
-    testo, sostituzioni = converti_temperature_nel_testo(
+    testo, sostituzioni = convert_temperatures_in_text(
         "Preriscalda il forno a 350°F e cuoci per 25 minuti.", t
     )
     assert "175 °C" in testo
@@ -357,7 +357,7 @@ def test_conversione_temperature_nel_testo(t):
 
 def test_numeri_piccoli_non_sono_temperature(t):
     """"cuoci 20 f..." non deve diventare una conversione: sotto i 100 °F non si tocca."""
-    testo, sostituzioni = converti_temperature_nel_testo("Aggiungi 20 g di farina.", t)
+    testo, sostituzioni = convert_temperatures_in_text("Aggiungi 20 g di farina.", t)
     assert sostituzioni == []
 
 
@@ -376,7 +376,7 @@ def test_numeri_piccoli_non_sono_temperature(t):
     ],
 )
 def test_arrotonda_cucina(valore, unita, atteso):
-    assert arrotonda_cucina(valore, unita) == atteso
+    assert round_for_kitchen(valore, unita) == atteso
 
 
 @pytest.mark.parametrize(
@@ -384,7 +384,7 @@ def test_arrotonda_cucina(valore, unita, atteso):
     [(120.0, "120"), (1.5, "1,5"), (0.5, "0,5"), (200.0, "200")],
 )
 def test_formatta_numero(valore, atteso):
-    assert formatta_numero(valore) == atteso
+    assert format_number(valore) == atteso
 
 
 # ----------------------------------------------------------------------------------
@@ -394,25 +394,25 @@ def test_formatta_numero(valore, atteso):
 
 def test_tabelle_caricate(t):
     assert t.volume["cup"] == pytest.approx(236.5882365)
-    assert t.peso["kg"] == 1000.0
-    assert "farina 00" in t.densita
-    assert "acqua" in t.liquidi
+    assert t.weight["kg"] == 1000.0
+    assert "farina 00" in t.density
+    assert "acqua" in t.liquids
 
 
 def test_alias_risolvono(t):
     for grezza, atteso in [("grammi", "g"), ("cucchiai", "cucchiaio"), ("tablespoons", "tbsp")]:
-        assert t.unita_canonica(grezza) == atteso
+        assert t.canonical_unit(grezza) == atteso
 
 
 def test_densita_trova_gli_alias(t):
     """"farina" e "all-purpose flour" devono trovare la stessa voce di "farina 00"."""
-    assert t.densita_per("farina")[0] == t.densita_per("farina 00")[0]
-    assert t.densita_per("all-purpose flour") is not None
+    assert t.density_for("farina")[0] == t.density_for("farina 00")[0]
+    assert t.density_for("all-purpose flour") is not None
 
 
 def test_densita_preferisce_la_voce_piu_specifica(t):
     """Fra "farina" e "farina integrale", per "farina integrale" deve vincere la seconda."""
-    assert t.densita_per("farina integrale")[0] != t.densita_per("farina 00")[0]
+    assert t.density_for("farina integrale")[0] != t.density_for("farina 00")[0]
 
 
 def test_ogni_voce_risolve_a_se_stessa(t):
@@ -426,8 +426,8 @@ def test_ogni_voce_risolve_a_se_stessa(t):
     Il rimedio non è nel codice ma nella tabella: ogni composto formabile va scritto per
     esteso (`latte di cocco` accanto a `cocco`). Questo test rende la regola non aggirabile.
     """
-    for nome in t.densita:
-        risolta = t._voce_densita(nome)
+    for nome in t.density:
+        risolta = t._density_entry(nome)
         assert risolta is not None and risolta[0] == nome, (
             f"«{nome}» risolve a «{risolta[0] if risolta else None}»: "
             f"la sua densità è irraggiungibile. Serve una voce esplicita per il composto."
@@ -441,7 +441,7 @@ def test_densita_plausibili(t):
     in polvere (0,36), il più pesante il miele (1,42). Un 5,072 al posto di 0,5072 passa
     inosservato all'occhio e non a questo test.
     """
-    for chiave, g_per_ml in t.densita.items():
+    for chiave, g_per_ml in t.density.items():
         assert 0.2 <= g_per_ml <= 2.0, f"densità implausibile per {chiave}: {g_per_ml} g/ml"
 
 
@@ -460,7 +460,7 @@ def test_ogni_densita_cita_una_fonte_nominata(t):
     dire da dove viene, quindi non lo rende verificabile da chi legge. La fonte deve
     nominare un riferimento che qualcun altro possa andare a controllare.
     """
-    for chiave, fonte in t.densita_fonte.items():
+    for chiave, fonte in t.density_source.items():
         assert fonte, f"densità senza fonte dichiarata: {chiave}"
         assert _FONTI_AMMESSE.match(fonte), (
             f"fonte non verificabile per «{chiave}»: {fonte!r}. "
@@ -488,41 +488,41 @@ def test_ogni_densita_cita_una_fonte_nominata(t):
     ],
 )
 def test_sistema_imperiale(t, nome, quantita_raw, unita_raw, atteso):
-    i = normalizza_ingrediente(nome, quantita_raw, unita_raw, tabelle=t,
-                               sistema=Sistema.IMPERIALE)
-    assert i.riga_mela() == atteso
+    i = normalise_ingredient(nome, quantita_raw, unita_raw, tables=t,
+                               system=System.IMPERIAL)
+    assert i.mela_line() == atteso
 
 
 def test_il_sistema_non_attraversa_la_densita_verso_l_imperiale(t):
     """Verso il metrico un volume secco diventa peso: è il motivo per cui esiste
     `densita.yaml`. Verso l'imperiale NO, e non è una dimenticanza: "200 g di farina" reso
     in cup darebbe 1,67 cup, un numero che nessun misurino sa fare."""
-    metrico = normalizza_ingrediente("farina 00", "1", "cup", tabelle=t)
-    assert metrico.quantita.provenienza is Provenienza.CONVERTITO_DENSITA
-    assert metrico.quantita.unita == "g"
+    metrico = normalise_ingredient("farina 00", "1", "cup", tables=t)
+    assert metrico.quantity.provenance is Provenance.CONVERTED_DENSITY
+    assert metrico.quantity.unit == "g"
 
-    imperiale = normalizza_ingrediente("farina 00", "1", "cup", tabelle=t,
-                                       sistema=Sistema.IMPERIALE)
-    assert imperiale.quantita.unita == "cup"
+    imperiale = normalise_ingredient("farina 00", "1", "cup", tables=t,
+                                       system=System.IMPERIAL)
+    assert imperiale.quantity.unit == "cup"
 
 
 @pytest.mark.parametrize(
     "lingua, atteso",
-    [(Lingua.IT, "sale q.b."), (Lingua.EN, "sale to taste")],
+    [(Language.IT, "sale q.b."), (Language.EN, "sale to taste")],
 )
 def test_la_lingua_cambia_le_etichette_non_i_nomi(t, lingua, atteso):
     """La lingua tocca ciò che scriviamo noi — unità, "q.b.", messaggi — non il nome
     dell'ingrediente, che viene dall'autore del reel e non si traduce a valle."""
-    i = normalizza_ingrediente("sale", None, "q.b.", tabelle=t, lingua=lingua)
-    assert i.riga_mela() == atteso
+    i = normalise_ingredient("sale", None, "q.b.", tables=t, language=lingua)
+    assert i.mela_line() == atteso
 
 
 def test_le_etichette_delle_unita_sono_simmetriche(t):
     """"tbsp" si dice cucchiaio in italiano e "cucchiaio" si dice tbsp in inglese: la
     tabella funziona nei due sensi, che è il punto della bidirezionalità."""
-    assert t.etichetta("tbsp", 2, Lingua.IT) == "cucchiai"
-    assert t.etichetta("cucchiaio", 2, Lingua.EN) == "tbsp"
-    assert t.etichetta("tbsp", 1, Lingua.IT) == "cucchiaio"
+    assert t.label("tbsp", 2, Language.IT) == "cucchiai"
+    assert t.label("cucchiaio", 2, Language.EN) == "tbsp"
+    assert t.label("tbsp", 1, Language.IT) == "cucchiaio"
 
 
 @pytest.mark.parametrize(
@@ -533,41 +533,41 @@ def test_le_etichette_delle_unita_sono_simmetriche(t):
 def test_l_imperiale_si_scrive_a_frazioni(valore, atteso):
     """Un misurino ha il quarto e il terzo di cup, non lo 0,23. Le frazioni non sono
     un vezzo tipografico: sono le misure che esistono fisicamente in cucina."""
-    assert formatta_numero(valore, Sistema.IMPERIALE) == atteso
+    assert format_number(valore, System.IMPERIAL) == atteso
 
 
 def test_il_metrico_resta_a_decimali_con_la_virgola():
-    assert formatta_numero(1.5) == "1,5"
-    assert formatta_numero(1.5, Sistema.METRICO) == "1,5"
+    assert format_number(1.5) == "1,5"
+    assert format_number(1.5, System.METRIC) == "1,5"
 
 
 def test_la_nota_di_una_stima_non_contraddice_il_numero(t):
     """La nota si compone dal valore, non si scrive in tabella. Scritta a mano dipendeva
     dalla lingua mentre il numero dipende dal sistema, e usciva "0,5 g (a pinch is about
     1/8 tsp)": una nota che smentisce la quantità che accompagna."""
-    for sistema in (Sistema.METRICO, Sistema.IMPERIALE):
-        for lingua in (Lingua.IT, Lingua.EN):
-            i = normalizza_ingrediente("sale", "un pizzico", None, tabelle=t,
-                                       sistema=sistema, lingua=lingua)
-            assert i.quantita.nota is not None
+    for sistema in (System.METRIC, System.IMPERIAL):
+        for lingua in (Language.IT, Language.EN):
+            i = normalise_ingredient("sale", "un pizzico", None, tables=t,
+                                       system=sistema, language=lingua)
+            assert i.quantity.note is not None
             # Il numero citato nella nota è esattamente quello della quantità.
-            assert formatta_numero(i.quantita.valore, sistema) in i.quantita.nota
-            assert i.quantita.unita in i.quantita.nota
+            assert format_number(i.quantity.value, sistema) in i.quantity.note
+            assert i.quantity.unit in i.quantity.note
 
 
 def test_nessun_equivalente_ridondante(t):
     """"2 tbsp (≈ 2 tbsp)" è rumore: l'equivalente si mostra solo se cambia unità."""
-    assert normalizza_ingrediente("olio di oliva", "2", "tbsp", tabelle=t,
-                                  sistema=Sistema.IMPERIALE).quantita.nota is None
-    assert normalizza_ingrediente("olio di oliva", "2", "tbsp", tabelle=t).quantita.nota is not None
+    assert normalise_ingredient("olio di oliva", "2", "tbsp", tables=t,
+                                  system=System.IMPERIAL).quantity.note is None
+    assert normalise_ingredient("olio di oliva", "2", "tbsp", tables=t).quantity.note is not None
 
 
 def test_temperature_verso_l_imperiale(t):
     """Speculare alla conversione verso i Celsius: un forno americano non ha la scala
     Celsius, quindi verso l'imperiale i gradi vanno in Fahrenheit, arrotondati a 25 come
     le manopole (325, 350, 375)."""
-    testo, sostituzioni = converti_temperature_nel_testo(
-        "Inforna a 180 °C per 20 minuti.", t, Sistema.IMPERIALE)
+    testo, sostituzioni = convert_temperatures_in_text(
+        "Inforna a 180 °C per 20 minuti.", t, System.IMPERIAL)
     assert "350 °F" in testo
     assert "180 °C" not in testo
     assert sostituzioni == ["180 °C → 350 °F"]
@@ -576,7 +576,7 @@ def test_temperature_verso_l_imperiale(t):
 def test_le_temperature_gia_nel_sistema_non_si_toccano(t):
     """Verso il metrico una temperatura già in Celsius resta com'è: nessuna conversione
     inutile, nessuna sostituzione fantasma nella traccia."""
-    testo, sostituzioni = converti_temperature_nel_testo("Inforna a 180 °C.", t, Sistema.METRICO)
+    testo, sostituzioni = convert_temperatures_in_text("Inforna a 180 °C.", t, System.METRIC)
     assert testo == "Inforna a 180 °C."
     assert sostituzioni == []
 
@@ -595,48 +595,48 @@ def test_le_temperature_gia_nel_sistema_non_si_toccano(t):
 def test_unita_dentro_la_quantita_vince_su_quella_isolata(t):
     """Fra le due, la coppia internamente coerente è «1¼ cups»: numero e unità stanno nello
     stesso pezzo di testo. Il «ml» veniva da un'altra parte della frase."""
-    ingr = normalizza_ingrediente("acqua", "1¼ cups", "ml", tabelle=t)
-    assert ingr.quantita.unita == "ml"          # l'acqua è liquida: resta un volume
-    assert 290 <= ingr.quantita.valore <= 300   # 1,25 cup ≈ 296 ml, non 1
-    assert ingr.lacuna is not None
+    ingr = normalise_ingredient("acqua", "1¼ cups", "ml", tables=t)
+    assert ingr.quantity.unit == "ml"          # l'acqua è liquida: resta un volume
+    assert 290 <= ingr.quantity.value <= 300   # 1,25 cup ≈ 296 ml, non 1
+    assert ingr.gap is not None
 
 
 def test_la_contraddizione_viene_dichiarata(t):
     """Indovinare non basta: se la fonte era ambigua, chi cucina deve saperlo."""
-    ingr = normalizza_ingrediente("acqua", "1¼ cups", "ml", tabelle=t)
-    assert "cups" in ingr.lacuna and "ml" in ingr.lacuna
+    ingr = normalise_ingredient("acqua", "1¼ cups", "ml", tables=t)
+    assert "cups" in ingr.gap and "ml" in ingr.gap
 
 
 def test_contraddizione_anche_in_inglese(t):
-    ingr = normalizza_ingrediente("water", "1¼ cups", "ml", tabelle=t, lingua="en")
-    assert "check against the source" in ingr.lacuna
+    ingr = normalise_ingredient("water", "1¼ cups", "ml", tables=t, language="en")
+    assert "check against the source" in ingr.gap
 
 
 def test_nessun_avviso_se_le_due_unita_concordano(t):
     """«2 cups» + «cup» dicono la stessa cosa: non c'è nulla da segnalare, e riempire le
     lacune di rumore le rende inutili quando contano davvero."""
-    assert normalizza_ingrediente("zucchero", "2 cups", "cup", tabelle=t).lacuna is None
+    assert normalise_ingredient("zucchero", "2 cups", "cup", tables=t).gap is None
 
 
 def test_la_politica_normale_non_cambia(t):
     """Quando la quantità è solo un numero, l'unità isolata dal modello resta quella buona."""
-    ingr = normalizza_ingrediente("mirin", "4", "cucchiai", tabelle=t)
-    assert ingr.quantita.unita == "cucchiai" and ingr.quantita.valore == 4
-    assert ingr.lacuna is None
+    ingr = normalise_ingredient("mirin", "4", "cucchiai", tables=t)
+    assert ingr.quantity.unit == "cucchiai" and ingr.quantity.value == 4
+    assert ingr.gap is None
 
 
 def test_unita_attaccata_senza_unita_isolata_resta_com_era(t):
     """Il percorso preesistente — «80g» con unita_raw vuoto — non deve essere toccato."""
-    ingr = normalizza_ingrediente("maiale", "80g", "", tabelle=t)
-    assert ingr.quantita.valore == 80 and ingr.quantita.unita == "g"
-    assert ingr.lacuna is None
+    ingr = normalise_ingredient("maiale", "80g", "", tables=t)
+    assert ingr.quantity.value == 80 and ingr.quantity.unit == "g"
+    assert ingr.gap is None
 
 
 def test_le_lacune_non_si_mangiano_a_vicenda(t):
     """Una densità sconosciuta e una contraddizione sono due cose da sapere, non una."""
-    ingr = normalizza_ingrediente("polvere di stelle", "2 cups", "ml", tabelle=t)
-    assert "cups" in ingr.lacuna
-    assert "densità" in ingr.lacuna
+    ingr = normalise_ingredient("polvere di stelle", "2 cups", "ml", tables=t)
+    assert "cups" in ingr.gap
+    assert "densità" in ingr.gap
 
 
 # ----------------------------------------------------------------------------------
@@ -654,10 +654,10 @@ def test_una_parola_fra_parentesi_non_e_un_unita(t):
     numero, e qui il numero c'è. Le parentesi bastano da sole: nessuna unità di misura si
     scrive fra parentesi.
     """
-    ingr = normalizza_ingrediente("melanzana bianca", "1", "(facoltativa)", tabelle=t)
-    assert ingr.riga_mela() == "1 melanzana bianca (facoltativa)"
-    assert ingr.quantita.provenienza is Provenienza.CONTEGGIO
-    assert ingr.lacuna is None
+    ingr = normalise_ingredient("melanzana bianca", "1", "(facoltativa)", tables=t)
+    assert ingr.mela_line() == "1 melanzana bianca (facoltativa)"
+    assert ingr.quantity.provenance is Provenance.COUNT
+    assert ingr.gap is None
 
 
 @pytest.mark.parametrize("nome", ["semi di sesamo q.b.", "olio q.b.", "burro a piacere"])
@@ -668,37 +668,37 @@ def test_qb_attaccato_al_nome_resta_una_quantita_indeterminata(t, nome):
     una lacuna falsa, perché il reel aveva indicato eccome. Una lacuna che mente vale meno
     di nessuna lacuna, perché insegna a non fidarsi delle altre.
     """
-    ingr = normalizza_ingrediente(nome, "", "", tabelle=t)
-    assert ingr.quantita.provenienza is Provenienza.INDETERMINATO
-    assert ingr.riga_mela().endswith("q.b.")
-    assert not ingr.riga_mela().endswith("q.b. q.b."), "il marcatore non va ripetuto"
+    ingr = normalise_ingredient(nome, "", "", tables=t)
+    assert ingr.quantity.provenance is Provenance.INDETERMINATE
+    assert ingr.mela_line().endswith("q.b.")
+    assert not ingr.mela_line().endswith("q.b. q.b."), "il marcatore non va ripetuto"
 
 
 def test_una_parola_vaga_nel_mezzo_del_nome_non_conta(t):
     """Il confronto è ancorato in coda ed esatto: «pomodori poco maturi» è un ingrediente
     senza quantità, non una quantità indeterminata. Un match per contenimento qui
     trasformerebbe mezzo ricettario in «q.b.»."""
-    ingr = normalizza_ingrediente("pomodori poco maturi", "", "", tabelle=t)
-    assert ingr.quantita.provenienza is Provenienza.ASSENTE
-    assert "poco maturi" in ingr.riga_mela()
+    ingr = normalise_ingredient("pomodori poco maturi", "", "", tables=t)
+    assert ingr.quantity.provenance is Provenance.ABSENT
+    assert "poco maturi" in ingr.mela_line()
 
 
 def test_un_nome_fatto_solo_dell_espressione_resta_intatto(t):
     """Staccare «q.b.» da un nome che è solo «q.b.» lascerebbe un ingrediente senza nome."""
-    assert normalizza_ingrediente("q.b.", "", "", tabelle=t).riga_mela() == "q.b."
+    assert normalise_ingredient("q.b.", "", "", tables=t).mela_line() == "q.b."
 
 
 def test_qb_isolato_nell_unita_continua_a_funzionare(t):
     """Il percorso preesistente non si tocca."""
-    ingr = normalizza_ingrediente("sale", "", "q.b.", tabelle=t)
-    assert ingr.quantita.provenienza is Provenienza.INDETERMINATO
-    assert ingr.riga_mela() == "sale q.b."
+    ingr = normalise_ingredient("sale", "", "q.b.", tables=t)
+    assert ingr.quantity.provenance is Provenance.INDETERMINATE
+    assert ingr.mela_line() == "sale q.b."
 
 
 def test_il_messaggio_italiano_ha_le_parentesi_bilanciate(t):
     """Finisce nelle note dei file esportati: una parentesi spaiata si vede."""
-    ingr = normalizza_ingrediente("Dashi", None, "polvere", tabelle=t)
-    assert ingr.lacuna.count("(") == ingr.lacuna.count(")")
+    ingr = normalise_ingredient("Dashi", None, "polvere", tables=t)
+    assert ingr.gap.count("(") == ingr.gap.count(")")
 
 
 @pytest.mark.parametrize(
@@ -709,29 +709,29 @@ def test_misura_a_occhio_fra_parentesi_nel_nome(t, nome, valore, unita):
     """«1 bel pizzico di sale» arriva dal modello come nome="sale (un pizzico)" e quantità
     vuota. Dichiarare "quantità non indicata" sarebbe falso: la misura c'è, è a occhio, e
     `vaghe.yaml` sa quanto pesa. Terza variante dello stesso pattern, da un reel vero."""
-    ingr = normalizza_ingrediente(nome, "", "", tabelle=t)
-    assert (ingr.quantita.valore, ingr.quantita.unita) == (valore, unita)
-    assert ingr.quantita.provenienza is Provenienza.STIMATO_VAGHE
-    assert ingr.lacuna, "una stima va sempre dichiarata come tale"
+    ingr = normalise_ingredient(nome, "", "", tables=t)
+    assert (ingr.quantity.value, ingr.quantity.unit) == (valore, unita)
+    assert ingr.quantity.provenance is Provenance.ESTIMATED_VAGUE
+    assert ingr.gap, "una stima va sempre dichiarata come tale"
 
 
 def test_un_parentetico_che_non_e_una_misura_resta_una_nota(t):
     """Il criterio non sono le parentesi ma il fatto che dentro ci sia una misura nota.
     «crema di cocco (lattina di cocco parte sopra più grassa)» descrive l'ingrediente."""
     nome = "crema di cocco (lattina di cocco parte sopra più grassa)"
-    ingr = normalizza_ingrediente(nome, "70", "g", tabelle=t)
-    assert (ingr.quantita.valore, ingr.quantita.unita) == (70.0, "g")
-    assert "lattina" in ingr.riga_mela()
+    ingr = normalise_ingredient(nome, "70", "g", tables=t)
+    assert (ingr.quantity.value, ingr.quantity.unit) == (70.0, "g")
+    assert "lattina" in ingr.mela_line()
 
 
 def test_una_misura_gia_isolata_vince_sul_parentetico(t):
     """Se il modello ha già messo una quantità nel suo campo, il parentetico è una nota."""
-    ingr = normalizza_ingrediente("sale (un pizzico)", "5", "g", tabelle=t)
-    assert (ingr.quantita.valore, ingr.quantita.unita) == (5.0, "g")
+    ingr = normalise_ingredient("sale (un pizzico)", "5", "g", tables=t)
+    assert (ingr.quantity.value, ingr.quantity.unit) == (5.0, "g")
 
 
 def test_un_nome_fatto_solo_del_parentetico_resta_intatto(t):
-    assert normalizza_ingrediente("(un pizzico)", "", "", tabelle=t).riga_mela() == "(un pizzico)"
+    assert normalise_ingredient("(un pizzico)", "", "", tables=t).mela_line() == "(un pizzico)"
 
 
 @pytest.mark.parametrize("apostrofo", ["'", "’", "‘"])
@@ -740,9 +740,9 @@ def test_l_apostrofo_tipografico_non_nasconde_una_misura_vaga(t, apostrofo):
     `vaghe.yaml` sono scritte con quello ASCII. Senza normalizzarli, «bicchiere d'acqua»
     usciva come «1 bicchiere d'acqua acqua» con provenienza `dichiarato`: una riga senza
     senso presentata come dato certo, che è il guasto che questo progetto esiste per evitare."""
-    ingr = normalizza_ingrediente("acqua", "1", f"bicchiere d{apostrofo}acqua", tabelle=t)
-    assert ingr.quantita.provenienza is Provenienza.STIMATO_VAGHE
-    assert (ingr.quantita.valore, ingr.quantita.unita) == (200.0, "ml")
+    ingr = normalise_ingredient("acqua", "1", f"bicchiere d{apostrofo}acqua", tables=t)
+    assert ingr.quantity.provenance is Provenance.ESTIMATED_VAGUE
+    assert (ingr.quantity.value, ingr.quantity.unit) == (200.0, "ml")
 
 
 @pytest.mark.parametrize("nota", ["q.b.", "(q.b.)", "un pizzico"])
@@ -750,22 +750,22 @@ def test_una_misura_finita_nelle_note_resta_una_misura(t, nota):
     """Quarta variante dello stesso pattern, e l'unica trovata da un test invece che da un
     reel: quando il modello non sa dove mettere «q.b.» lo infila in `note`. Il codice non
     vedeva alcuna indicazione e dichiarava «quantità non indicata nel reel»."""
-    ingr = normalizza_ingrediente("sale", "", "", note=nota, tabelle=t)
-    assert ingr.quantita.provenienza in {Provenienza.INDETERMINATO, Provenienza.STIMATO_VAGHE}
+    ingr = normalise_ingredient("sale", "", "", notes=nota, tables=t)
+    assert ingr.quantity.provenance in {Provenance.INDETERMINATE, Provenance.ESTIMATED_VAGUE}
 
 
 @pytest.mark.parametrize("nota", ["a temperatura ambiente", "tritata", "a grappolo"])
 def test_una_nota_vera_resta_una_nota(t, nota):
     """Il criterio è che la nota sia una misura NOTA, non che ci sia una nota."""
-    ingr = normalizza_ingrediente("burro", "", "", note=nota, tabelle=t)
-    assert ingr.quantita.provenienza is Provenienza.ASSENTE
-    assert nota in ingr.riga_mela()
+    ingr = normalise_ingredient("burro", "", "", notes=nota, tables=t)
+    assert ingr.quantity.provenance is Provenance.ABSENT
+    assert nota in ingr.mela_line()
 
 
 def test_una_quantita_gia_presente_lascia_la_nota_dov_e(t):
-    ingr = normalizza_ingrediente("farina", "250", "g", note="q.b.", tabelle=t)
-    assert (ingr.quantita.valore, ingr.quantita.unita) == (250.0, "g")
-    assert "q.b." in ingr.riga_mela()
+    ingr = normalise_ingredient("farina", "250", "g", notes="q.b.", tables=t)
+    assert (ingr.quantity.value, ingr.quantity.unit) == (250.0, "g")
+    assert "q.b." in ingr.mela_line()
 
 
 @pytest.mark.parametrize(
@@ -781,16 +781,16 @@ def test_un_numerale_non_annulla_la_misura_a_occhio(t, grezza, valore):
     """«1 presa di sale» e «1 bel pizzico» compaiono tali e quali nelle didascalie. La ricerca
     faceva match esatto, non trovava «1 presa» dove la tabella ha «presa», e l'ingrediente
     finiva come conteggio: «1 sale», cioè un sale."""
-    ingr = normalizza_ingrediente("sale", grezza, "", tabelle=t)
-    assert ingr.quantita.provenienza is Provenienza.STIMATO_VAGHE, ingr.riga_mela()
-    assert ingr.quantita.valore == valore
+    ingr = normalise_ingredient("sale", grezza, "", tables=t)
+    assert ingr.quantity.provenance is Provenance.ESTIMATED_VAGUE, ingr.mela_line()
+    assert ingr.quantity.value == valore
 
 
 def test_un_numerale_con_un_unita_vera_resta_una_conversione(t):
     """Il ripiego sulla coda non deve rubare i casi che hanno un'unità vera."""
-    ingr = normalizza_ingrediente("farina 00", "2", "cucchiai", tabelle=t)
-    assert ingr.quantita.provenienza is not Provenienza.STIMATO_VAGHE
-    assert ingr.quantita.unita == "cucchiai"
+    ingr = normalise_ingredient("farina 00", "2", "cucchiai", tables=t)
+    assert ingr.quantity.provenance is not Provenance.ESTIMATED_VAGUE
+    assert ingr.quantity.unit == "cucchiai"
 
 
 @pytest.mark.parametrize("unita_raw, valore, unita", [("(g)", 200.0, "g"), ("(ml)", 200.0, "ml")])
@@ -798,14 +798,14 @@ def test_un_unita_vera_fra_parentesi_non_diventa_una_nota(t, unita_raw, valore, 
     """«Nessuna unità si scrive fra parentesi» è un criterio quasi giusto, e il quasi costava
     caro: il modello scrive anche `unita_raw="(g)"`, e degradarlo a nota faceva di «200 g di
     farina» un conteggio di duecento farine, senza nemmeno una lacuna."""
-    ingr = normalizza_ingrediente("farina 00", "200", unita_raw, tabelle=t)
-    assert (ingr.quantita.valore, ingr.quantita.unita) == (valore, unita)
-    assert ingr.quantita.provenienza is not Provenienza.CONTEGGIO
+    ingr = normalise_ingredient("farina 00", "200", unita_raw, tables=t)
+    assert (ingr.quantity.value, ingr.quantity.unit) == (valore, unita)
+    assert ingr.quantity.provenance is not Provenance.COUNT
 
 
 @pytest.mark.parametrize("nome", ["frutta secca (noce)", "cioccolato (tazza)", "vino (bicchiere)"])
 def test_un_parentetico_di_una_parola_qualifica_l_ingrediente(t, nome):
     """Molte voci di `vaghe.yaml` hanno alias di una parola — noce, tazza, bicchiere — che
     fra parentesi dopo un nome ne indicano la varietà o il recipiente, non la dose."""
-    ingr = normalizza_ingrediente(nome, "", "", tabelle=t)
-    assert ingr.quantita.provenienza is Provenienza.ASSENTE, ingr.riga_mela()
+    ingr = normalise_ingredient(nome, "", "", tables=t)
+    assert ingr.quantity.provenance is Provenance.ABSENT, ingr.mela_line()

@@ -95,8 +95,8 @@ il codice la leggeva alla lettera. È una distinzione che vale la pena tenere a 
 davanti a un numero sbagliato la tentazione è mettere le mani in `units.py` — e quattro volte
 su quattro sarebbe stata l'analisi sbagliata.
 
-Per questo `normalizza_ingrediente` è un **involucro** che rimette in sesto l'ingresso prima
-di chiamare `_normalizza_ingrediente`, che è il motore vero. Con una coppia coerente il motore
+Per questo `normalise_ingredient` è un **involucro** che rimette in sesto l'ingresso prima
+di chiamare `_normalise_ingredient`, che è il motore vero. Con una coppia coerente il motore
 fa già la cosa giusta, e la parte più delicata del progetto resta intatta.
 
 Cosa raddrizza l'involucro:

@@ -196,14 +196,14 @@ def test_export_in_inglese_traduce_l_involucro(tmp_path):
     (per quello serve una nuova estrazione). Qui si verifica ciò che il CODICE controlla:
     le intestazioni.
     """
-    from reel2recipe.units import Lingua, Sistema
+    from reel2recipe.units import Language, System
     r = da_bozza(
         {"titolo": "Pancakes",
          "ingredienti": [{"quantita_raw": "1", "unita_raw": "cup", "nome": "flour"}],
          "procedimento": ["Mix everything."], "confidenza": {},
          "lacune": ["the reel did not say how many eggs"]},
         fonte=Fonte.adesso(url="https://x/y", autore="baker"),
-        lingua=Lingua.EN, sistema=Sistema.IMPERIALE,
+        lingua=Language.EN, sistema=System.IMPERIAL,
     )
     md = verso_markdown(r)
     assert "## Ingredients" in md and "## Method" in md

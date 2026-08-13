@@ -33,7 +33,7 @@ from .mela import scrivi_melarecipe, scrivi_melarecipes, verso_melarecipe
 from .paths import REPO_ROOT, export_folder
 from .recipe import Ricetta
 from .store import Library
-from .units import Catalogo, testo_da
+from .units import Catalogue, text_from
 
 CARTELLA_WEB = REPO_ROOT / "web"
 
@@ -45,7 +45,7 @@ CARTELLA_WEB = REPO_ROOT / "web"
 # tutt'altro — la lingua in cui produrre la ricetta. Due nomi diversi perche' sono due
 # cose diverse, e chiamarle uguale sarebbe costato un difetto silenzioso appena i due
 # valori divergono.
-TESTI: Catalogo = {
+TESTI: Catalogue = {
     "it": {
         "serve_url": "Serve l'URL di un reel.",
         "lavoro_sconosciuto": "Lavoro sconosciuto.",
@@ -65,7 +65,7 @@ TESTI: Catalogo = {
 
 def testo(lingua: str, chiave: str, **dati) -> str:
     """Un errore dell'API nella lingua dell'interfaccia."""
-    return testo_da(TESTI, lingua, chiave, **dati)
+    return text_from(TESTI, lingua, chiave, **dati)
 
 
 # --------------------------------------------------------------------------------------
