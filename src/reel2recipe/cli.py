@@ -1,14 +1,17 @@
-"""cli.py — Reel2Recipe da line di command.
+"""cli.py — Reel2Recipe from the command line.
 
-    r2r cook <url|file>       estrae una recipe e la salva in library
-    r2r batch <cartella|.txt> lavora molti reel in serie
-    r2r list [--cerca ...]    elenca / cerca nella library
-    r2r export <id|--tutte>   esporta in .melarecipe / .melarecipes, markdown o pdf
-    r2r elimina <id>          elimina una recipe dal ricettario
-    r2r serve                 avvia l'interfaccia web su http://localhost:8500
-    r2r check                 verifica che tutti i componenti siano pronti
+    r2r cook <url|file>       extract a recipe and save it to the library
+    r2r batch <folder|.txt>   process many reels in a row
+    r2r list [--search ...]   list or search the library
+    r2r export <id|--all>     export to .melarecipe / .melarecipes, markdown or pdf
+    r2r delete <id>           remove a recipe from the recipe book
+    r2r serve                 start the web interface on http://localhost:8500
+    r2r check                 verify that every component is ready
 
-Tutto locale: nessuna chiave API, nessun servizio a pagamento.
+Every Italian option name is still accepted as an alias (`--cerca`, `--tutte`, `--porta`,
+`elimina`): the add-on's start-up line depends on it. See `_parser`.
+
+All local: no API key, no paid service.
 """
 
 from __future__ import annotations

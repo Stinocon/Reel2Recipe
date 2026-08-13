@@ -1,7 +1,7 @@
-"""Reel2Recipe — dai Reel di cucina a ricette strutturate, importabili in Mela.
+"""Reel2Recipe — from cooking reels to structured recipes, importable into Mela.
 
-Interamente locale: trascrizione con Whisper sulla macchina, strutturazione con un LLM
-via Ollama. Nessun servizio a pagamento, nessuna chiave API, nessun dato che esce dal PC.
+Entirely local: transcription with Whisper on the machine, structuring with an LLM through
+Ollama. No paid service, no API key, no data leaving the PC.
 """
 
 __version__ = "0.1.0"
