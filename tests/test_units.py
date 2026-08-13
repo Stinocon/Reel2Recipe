@@ -734,6 +734,17 @@ def test_un_nome_fatto_solo_del_parentetico_resta_intatto(t):
     assert normalizza_ingrediente("(un pizzico)", "", "", tabelle=t).riga_mela() == "(un pizzico)"
 
 
+@pytest.mark.parametrize("apostrofo", ["'", "’", "‘"])
+def test_l_apostrofo_tipografico_non_nasconde_una_misura_vaga(t, apostrofo):
+    """Le tastiere iOS e le didascalie di Instagram scrivono l'apostrofo curvo, e le voci di
+    `vaghe.yaml` sono scritte con quello ASCII. Senza normalizzarli, «bicchiere d'acqua»
+    usciva come «1 bicchiere d'acqua acqua» con provenienza `dichiarato`: una riga senza
+    senso presentata come dato certo, che è il guasto che questo progetto esiste per evitare."""
+    ingr = normalizza_ingrediente("acqua", "1", f"bicchiere d{apostrofo}acqua", tabelle=t)
+    assert ingr.quantita.provenienza is Provenienza.STIMATO_VAGHE
+    assert (ingr.quantita.valore, ingr.quantita.unita) == (200.0, "ml")
+
+
 @pytest.mark.parametrize("nota", ["q.b.", "(q.b.)", "un pizzico"])
 def test_una_misura_finita_nelle_note_resta_una_misura(t, nota):
     """Quarta variante dello stesso pattern, e l'unica trovata da un test invece che da un
