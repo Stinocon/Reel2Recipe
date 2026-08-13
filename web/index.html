@@ -1,6 +1,6 @@
 <!DOCTYPE html>
-<!-- L'attributo `lang` lo rimette `i18n.js` all'avvio e a ogni cambio: qui c'è solo un
-     valore di partenza, per non lasciare l'elemento senza lingua prima che il modulo giri. -->
+<!-- The `lang` attribute is reset by `i18n.js` on start-up and on every change: this is only
+     a starting value, so the element is not left without a language before the module runs. -->
 <html lang="it">
 <head>
   <meta charset="UTF-8" />
@@ -23,11 +23,11 @@
       </div>
     </div>
     <div class="strumenti-testata">
-      <!-- La lingua dell'interfaccia sta qui e non sepolta nelle Opzioni: è la prima cosa
-           che serve a chi apre la pagina e non legge l'italiano, e da lì in giù la catena
-           dei tre assi parte da sola (interfaccia → ricetta → misure). I nomi delle lingue
-           restano nella loro lingua, che è l'unico modo di renderli leggibili a chi cerca
-           la propria. -->
+      <!-- The interface language sits here and not buried in the Options: it is the first
+           thing somebody opening the page who does not read Italian needs, and from there the
+           three-axis chain starts by itself (interface → recipe → measures). The language
+           names stay in their own language, which is the only way to keep them readable to
+           whoever is looking for theirs. -->
       <select id="opt-lingua-ui" class="scelta-lingua" data-i18n-aria-label="lingua_interfaccia">
         <option value="it">Italiano</option>
         <option value="en">English</option>
@@ -58,8 +58,8 @@
       </div>
 
       <div class="cook-alternative">
-        <!-- Il testo sta in uno `span` e non nell'etichetta: l'etichetta contiene anche
-             l'input nascosto, e riscriverne il contenuto lo cancellerebbe. -->
+        <!-- The text sits in a `span` and not in the label: the label also contains the
+             hidden input, and rewriting its content would delete it. -->
         <label class="link-file" for="input-file">
           <input type="file" id="input-file" accept="video/*,audio/*" hidden />
           <span data-i18n-html="drop_hint">oppure trascina qui un video, o <span class="sottolineato">scegli un file</span></span>
