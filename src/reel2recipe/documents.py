@@ -269,9 +269,9 @@ def write_pdf(recipe: Recipe, folder: Path | str) -> Path:
         from reportlab.platypus import ListFlowable, ListItem, Paragraph, SimpleDocTemplate
     except ImportError as e:
         raise DocumentError(
-            "L'export in PDF richiede le dipendenze «doc». Installale con:\n"
+            "The PDF export needs the «doc» dependencies. Install them with:\n"
             "  uv sync --extra doc\n"
-            "Il Markdown invece non richiede nulla: usa --formato markdown."
+            "Markdown, on the other hand, needs nothing: use --format markdown."
         ) from e
 
     styles = {

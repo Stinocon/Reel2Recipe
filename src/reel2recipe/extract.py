@@ -77,13 +77,13 @@ def llm_timeout() -> float:
         seconds = float(raw)
     except ValueError:
         raise ExtractionError(
-            f"R2R_TIMEOUT_LLM vale «{raw}», che non è un numero di secondi. "
-            f"Scrivi solo la cifra, per esempio 1800 per mezz'ora."
+            f"R2R_TIMEOUT_LLM is «{raw}», which is not a number of seconds. "
+            f"Write just the figure, for example 1800 for half an hour."
         ) from None
     if seconds <= 0:
         raise ExtractionError(
-            f"R2R_TIMEOUT_LLM vale «{raw}»: con zero o meno nessuna estrazione "
-            f"potrebbe mai concludersi."
+            f"R2R_TIMEOUT_LLM is «{raw}»: with zero or less no extraction could ever "
+            f"finish."
         )
     return seconds
 
@@ -389,9 +389,9 @@ def choose_model(url: str = DEFAULT_OLLAMA_URL, requested: str | None = None) ->
     installed = available_models(url)
     if not installed:
         raise ExtractionError(
-            "Ollama non ha nessun modello installato.\n"
-            f"  Scarica quello consigliato:  ollama pull {PREFERRED_MODELS[0]}\n"
-            "Oppure esegui ./install.sh, che se ne occupa da sé."
+            "Ollama has no model installed.\n"
+            f"  Pull the recommended one:  ollama pull {PREFERRED_MODELS[0]}\n"
+            "Or run ./install.sh, which takes care of it."
         )
     if requested:
         # Accepts both "qwen2.5:14b" and "qwen2.5" when the tag is unambiguous.
@@ -399,8 +399,8 @@ def choose_model(url: str = DEFAULT_OLLAMA_URL, requested: str | None = None) ->
             if name == requested or name.split(":")[0] == requested:
                 return name
         raise ExtractionError(
-            f"Modello «{requested}» non installato. Disponibili: {', '.join(installed)}.\n"
-            f"  Per scaricarlo:  ollama pull {requested}"
+            f"Model «{requested}» not installed. Available: {', '.join(installed)}.\n"
+            f"  To pull it:  ollama pull {requested}"
         )
     for preferred in PREFERRED_MODELS:
         for name in installed:
@@ -472,15 +472,15 @@ def extract_draft(
     timeout = timeout if timeout is not None else llm_timeout()
     if not caption.strip() and not transcript.strip():
         raise ExtractionError(
-            "Non c'è materiale da analizzare: né didascalia né trascrizione. "
-            "Il reel potrebbe essere senza parlato e senza testo nel post."
+            "There is no material to analyse: neither caption nor transcript. "
+            "The reel may have no speech and no text in the post."
         )
 
     if not ollama_up(url):
         raise ExtractionError(
-            f"Ollama non risponde su {url}.\n"
-            "  Avvialo con:  ollama serve\n"
-            "  Se non è installato:  brew install ollama  (oppure ./install.sh)"
+            f"Ollama is not answering on {url}.\n"
+            "  Start it with:  ollama serve\n"
+            "  If it is not installed:  brew install ollama  (or ./install.sh)"
         )
 
     model_name = choose_model(url, model)
@@ -508,22 +508,22 @@ def extract_draft(
         response.raise_for_status()
     except httpx.TimeoutException as e:
         raise ExtractionError(
-            f"Il modello «{model_name}» ha superato i {int(timeout)} s. "
-            "Con un modello più piccolo è più rapido: ollama pull qwen2.5:7b-instruct"
+            f"Model «{model_name}» went over {int(timeout)} s. "
+            "A smaller model is faster: ollama pull qwen2.5:7b-instruct"
         ) from e
     except httpx.HTTPError as e:
-        raise ExtractionError(f"Errore nel dialogo con Ollama: {e}") from e
+        raise ExtractionError(f"Error talking to Ollama: {e}") from e
 
     content = (response.json().get("message") or {}).get("content", "")
     if not content.strip():
-        raise ExtractionError(f"Il modello «{model_name}» ha restituito una risposta vuota.")
+        raise ExtractionError(f"Model «{model_name}» returned an empty response.")
 
     try:
         draft = json.loads(content)
     except json.JSONDecodeError as e:
         raise ExtractionError(
-            f"Il modello «{model_name}» non ha rispettato lo schema JSON richiesto. "
-            "Con un modello più capace il problema di solito sparisce: ollama pull qwen2.5:14b"
+            f"Model «{model_name}» did not respect the requested JSON schema. "
+            "With a more capable model the problem usually goes away: ollama pull qwen2.5:14b"
         ) from e
 
     return ExtractionOutcome(

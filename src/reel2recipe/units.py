@@ -373,8 +373,8 @@ def load_tables(folder: str | None = None) -> Tables:
         path = base / name
         if not path.is_file():
             raise FileNotFoundError(
-                f"Tabella di conversione mancante: {path}. "
-                "Senza le tabelle non si converte nulla (e non si inventa nulla)."
+                f"Conversion table missing: {path}. "
+                "Without the tables nothing is converted (and nothing is invented)."
             )
         return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 

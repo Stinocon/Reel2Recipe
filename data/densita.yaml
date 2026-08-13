@@ -54,12 +54,12 @@ ingredients:
   # ---- flours and starches --------------------------------------------------
   "farina 00":
     g_per_ml: 0.5072
-    source: "King Arthur Baking, Ingredient Weight Chart — 120 g per cup (USDA FDC 168894 dà 125: divergenza nota)"
+    source: "King Arthur Baking, Ingredient Weight Chart — 120 g per cup (USDA FDC 168894 gives 125: known divergence)"
     alias: [farina, "farina 0", farina bianca, farina di grano tenero, farina manitoba,
             all-purpose flour, plain flour, flour, farina per dolci]
   "farina integrale":
     g_per_ml: 0.4776
-    source: "King Arthur Baking, Ingredient Weight Chart — 113 g per cup (USDA FDC 168893 dà 120)"
+    source: "King Arthur Baking, Ingredient Weight Chart — 113 g per cup (USDA FDC 168893 gives 120)"
     alias: [farina di grano integrale, whole wheat flour, wholemeal flour]
   "semola rimacinata":
     g_per_ml: 0.7059
@@ -67,7 +67,7 @@ ingredients:
     alias: [semola, semola di grano duro, farina di semola, semolina]
   "farina di mais":
     g_per_ml: 0.6636
-    source: "USDA FDC 168867 — 157 g per cup, farina di mais degerminata"
+    source: "USDA FDC 168867 — 157 g per cup, degerminated cornmeal"
     alias: [polenta, farina per polenta, cornmeal]
   "farina di mandorle":
     g_per_ml: 0.4058
@@ -75,7 +75,7 @@ ingredients:
     alias: [mandorle in polvere, almond flour, almond meal]
   "farina di riso":
     g_per_ml: 0.6002
-    source: "King Arthur Baking, Ingredient Weight Chart — 142 g per cup, riso bianco"
+    source: "King Arthur Baking, Ingredient Weight Chart — 142 g per cup, white rice"
     alias: [rice flour]
   "farina di ceci":
     g_per_ml: 0.3593
@@ -106,15 +106,15 @@ ingredients:
             caster sugar]
   "zucchero a velo":
     g_per_ml: 0.5072
-    source: "USDA FDC 169656 — 120 g per cup non setacciato (setacciato: 100 g)"
+    source: "USDA FDC 169656 — 120 g per cup unsifted (sifted: 100 g)"
     alias: [zucchero in polvere, powdered sugar, icing sugar, confectioners sugar]
   "zucchero di canna":
     g_per_ml: 0.9003
-    source: "King Arthur Baking, Ingredient Weight Chart — 213 g per cup pressato, come da convenzione anglosassone (USDA FDC 168833 dà 220)"
+    source: "King Arthur Baking, Ingredient Weight Chart — 213 g per cup packed, as per the Anglo-Saxon convention (USDA FDC 168833 gives 220)"
     alias: [zucchero grezzo, zucchero muscovado, brown sugar]
   "miele":
     g_per_ml: 1.4202
-    source: "USDA FDC 169640 — 21 g per cucchiaio"
+    source: "USDA FDC 169640 — 21 g per tablespoon"
     alias: [honey]
   "sciroppo d'acero":
     g_per_ml: 1.3314
@@ -126,7 +126,7 @@ ingredients:
     alias: [molassa, molasses]
   "latte condensato":
     g_per_ml: 1.2934
-    source: "USDA FDC 171275 — 306 g per cup, zuccherato"
+    source: "USDA FDC 171275 — 306 g per cup, sweetened"
     alias: [latte condensato zuccherato, condensed milk, sweetened condensed milk]
   "latte evaporato":
     g_per_ml: 1.0651
@@ -140,7 +140,7 @@ ingredients:
     alias: [butter, burro morbido, burro fuso]
   "margarina":
     g_per_ml: 0.9595
-    source: "USDA FDC 172346 — 227 g per cup, 80% di grassi"
+    source: "USDA FDC 172346 — 227 g per cup, 80% fat"
     alias: [margarine]
   "strutto":
     g_per_ml: 0.8665
@@ -163,7 +163,7 @@ ingredients:
     alias: [burro d'arachidi, peanut butter]
   "tahina":
     g_per_ml: 1.0820
-    source: "King Arthur Baking, Ingredient Weight Chart — 128 g per mezza cup"
+    source: "King Arthur Baking, Ingredient Weight Chart — 128 g per half a cup"
     alias: [tahin, tahini, crema di sesamo]
 
   # ---- liquids and dairy ----------------------------------------------------
@@ -175,12 +175,12 @@ ingredients:
   "latte":
     g_per_ml: 1.0313
     liquid: true
-    source: "USDA FDC 171265 — 244 g per cup, latte intero"
+    source: "USDA FDC 171265 — 244 g per cup, whole milk"
     alias: [milk, latte intero, latte parzialmente scremato, latte scremato]
   "latte di cocco":
     g_per_ml: 0.9552
     liquid: true
-    source: "USDA FDC 170173 — 226 g per cup, in lattina"
+    source: "USDA FDC 170173 — 226 g per cup, tinned"
     alias: [coconut milk]
   "latte di mandorla":
     g_per_ml: 1.0144
@@ -195,7 +195,7 @@ ingredients:
   "panna":
     g_per_ml: 1.0060
     liquid: true
-    source: "USDA FDC 170859 — 238 g per cup, porzione liquida (non montata)"
+    source: "USDA FDC 170859 — 238 g per cup, liquid portion (not whipped)"
     alias: [panna liquida, panna fresca, panna da montare, heavy cream, cream]
   "panna acida":
     g_per_ml: 0.9722
@@ -203,11 +203,11 @@ ingredients:
     alias: [sour cream, smetana]
   "yogurt":
     g_per_ml: 1.0355
-    source: "USDA FDC 171284 — 245 g per cup, yogurt intero naturale"
+    source: "USDA FDC 171284 — 245 g per cup, plain whole-milk yogurt"
     alias: [yogurt greco, yoghurt, yogurt bianco]
   "ricotta":
     g_per_ml: 1.0398
-    source: "USDA FDC 170851 — 246 g per cup, di latte intero"
+    source: "USDA FDC 170851 — 246 g per cup, of whole milk"
     alias: []
   "formaggio spalmabile":
     g_per_ml: 0.9806
@@ -215,7 +215,7 @@ ingredients:
     alias: [cream cheese, philadelphia, formaggio cremoso]
   "mozzarella grattugiata":
     g_per_ml: 0.4734
-    source: "USDA FDC 170845 — 112 g per cup, di latte intero"
+    source: "USDA FDC 170845 — 112 g per cup, of whole milk"
     alias: [mozzarella, shredded mozzarella]
   "cheddar grattugiato":
     g_per_ml: 0.4776
@@ -259,7 +259,7 @@ ingredients:
   "aceto":
     g_per_ml: 1.0102
     liquid: true
-    source: "USDA FDC 173469 — 239 g per cup, aceto di mele"
+    source: "USDA FDC 173469 — 239 g per cup, cider vinegar"
     alias: [aceto di vino, aceto di mele, vinegar]
   "aceto balsamico":
     g_per_ml: 1.0778
@@ -280,72 +280,72 @@ ingredients:
   # ---- grains, pulses, nuts -------------------------------------------------
   "riso":
     g_per_ml: 0.7819
-    source: "USDA FDC 168877 — 185 g per cup, crudo a chicco lungo"
+    source: "USDA FDC 168877 — 185 g per cup, raw, long grain"
     alias: [riso basmati, rice, long grain rice]
   "riso arborio":
     g_per_ml: 0.8454
-    source: "USDA FDC 168931 — 200 g per cup, crudo a chicco corto"
+    source: "USDA FDC 168931 — 200 g per cup, raw, short grain"
     alias: [riso carnaroli, riso vialone nano, riso per risotto, arborio rice]
   "lenticchie":
     g_per_ml: 0.8115
-    source: "USDA FDC 172420 — 192 g per cup, secche"
+    source: "USDA FDC 172420 — 192 g per cup, dried"
     alias: [lenticchie secche, lentils]
   "ceci secchi":
     g_per_ml: 0.8454
-    source: "USDA FDC 173756 — 200 g per cup, secchi"
+    source: "USDA FDC 173756 — 200 g per cup, dried"
     alias: [ceci, dried chickpeas]
   "fagioli secchi":
     g_per_ml: 0.7777
-    source: "USDA FDC 173744 — 184 g per cup, secchi"
+    source: "USDA FDC 173744 — 184 g per cup, dried"
     alias: [fagioli, fagioli borlotti, fagioli cannellini, dried beans]
   "piselli secchi":
     g_per_ml: 0.8284
-    source: "USDA FDC 172428 — 196 g per cup, secchi spezzati"
+    source: "USDA FDC 172428 — 196 g per cup, dried, split"
     alias: [split peas]
   "quinoa":
     g_per_ml: 0.7185
-    source: "USDA FDC 168874 — 170 g per cup, cruda"
+    source: "USDA FDC 168874 — 170 g per cup, raw"
     alias: []
   "couscous":
     g_per_ml: 0.7312
-    source: "USDA FDC 169699 — 173 g per cup, secco"
+    source: "USDA FDC 169699 — 173 g per cup, dry"
     alias: [cuscus]
   "bulgur":
     g_per_ml: 0.5917
-    source: "USDA FDC 170688 — 140 g per cup, secco"
+    source: "USDA FDC 170688 — 140 g per cup, dry"
     alias: []
   "orzo perlato":
     g_per_ml: 0.8454
-    source: "USDA FDC 170284 — 200 g per cup, crudo"
+    source: "USDA FDC 170284 — 200 g per cup, raw"
     alias: [orzo, pearl barley]
   "farro":
     g_per_ml: 0.7355
-    source: "USDA FDC 169745 — 174 g per cup, crudo"
+    source: "USDA FDC 169745 — 174 g per cup, raw"
     alias: [spelt]
   "avena":
     g_per_ml: 0.3424
-    source: "USDA FDC 173904 — 81 g per cup, fiocchi (King Arthur dà 113: divergenza nota)"
+    source: "USDA FDC 173904 — 81 g per cup, flakes (King Arthur gives 113: known divergence)"
     alias: [fiocchi di avena, avena in fiocchi, rolled oats, oats]
   "uvetta":
     g_per_ml: 0.6129
-    source: "USDA FDC 168165 — 145 g per cup, non pressata"
+    source: "USDA FDC 168165 — 145 g per cup, not packed"
     alias: [uva passa, uvetta sultanina, raisins]
   "noci":
     g_per_ml: 0.4227
-    source: "USDA FDC 170187 — 100 g per cup, gherigli a metà"
+    source: "USDA FDC 170187 — 100 g per cup, halved kernels"
     alias: [gherigli di noce, walnuts]
   "noci tritate":
     g_per_ml: 0.5072
-    source: "USDA FDC 170187 — 120 g per cup, in pezzi"
+    source: "USDA FDC 170187 — 120 g per cup, in pieces"
     alias: [nocciole tritate, mandorle tritate, frutta secca tritata, chopped nuts,
             chopped walnuts]
   "mandorle":
     g_per_ml: 0.6044
-    source: "USDA FDC 170567 — 143 g per cup, intere"
+    source: "USDA FDC 170567 — 143 g per cup, whole"
     alias: [almonds, whole almonds]
   "nocciole":
     g_per_ml: 0.5706
-    source: "USDA FDC 170581 — 135 g per cup, intere"
+    source: "USDA FDC 170581 — 135 g per cup, whole"
     alias: [hazelnuts]
   "pinoli":
     g_per_ml: 0.5706
@@ -353,61 +353,61 @@ ingredients:
     alias: [pine nuts]
   "pistacchi":
     g_per_ml: 0.5199
-    source: "USDA FDC 170184 — 123 g per cup, sgusciati"
+    source: "USDA FDC 170184 — 123 g per cup, shelled"
     alias: [pistachios]
   "cocco rapé":
     g_per_ml: 0.3931
-    source: "USDA FDC 168586 — 93 g per cup, essiccato in scaglie"
+    source: "USDA FDC 168586 — 93 g per cup, dried flakes"
     alias: [cocco rape, cocco grattugiato, farina di cocco rapé, shredded coconut,
             desiccated coconut]
 
   # ---- seeds -----------------------------------------------------------------
   "semi di sesamo":
     g_per_ml: 0.6087
-    source: "USDA FDC 170150 — 144 g per cup, interi essiccati"
+    source: "USDA FDC 170150 — 144 g per cup, whole, dried"
     alias: [sesamo, sesame seeds]
   "semi di chia":
     g_per_ml: 0.6256
-    source: "King Arthur Baking, Ingredient Weight Chart — 37 g per quarto di cup"
+    source: "King Arthur Baking, Ingredient Weight Chart — 37 g per quarter cup"
     alias: [chia, chia seeds]
   "semi di lino":
     g_per_ml: 0.6966
-    source: "USDA FDC 169414 — 10,3 g per cucchiaio, interi"
+    source: "USDA FDC 169414 — 10,3 g per tablespoon, whole"
     alias: [lino, flaxseed, flax seeds]
   "semi di girasole":
     g_per_ml: 0.5917
-    source: "USDA FDC 170562 — 140 g per cup, sgusciati"
+    source: "USDA FDC 170562 — 140 g per cup, shelled"
     alias: [sunflower seeds]
   "semi di zucca":
     g_per_ml: 0.5452
-    source: "USDA FDC 170556 — 129 g per cup, sgusciati"
+    source: "USDA FDC 170556 — 129 g per cup, shelled"
     alias: [pumpkin seeds, pepitas]
   "semi di papavero":
     g_per_ml: 0.5681
-    source: "USDA FDC 171330 — 2,8 g per cucchiaino"
+    source: "USDA FDC 171330 — 2,8 g per teaspoon"
     alias: [papavero, poppy seeds]
 
   # ---- other dry ingredients ------------------------------------------------
   "cacao amaro":
     g_per_ml: 0.3635
-    source: "USDA FDC 169593 — 86 g per cup, in polvere non zuccherato"
+    source: "USDA FDC 169593 — 86 g per cup, powdered unsweetened"
     alias: [cacao, cacao in polvere, cocoa powder, cacao amaro in polvere]
   "pangrattato":
     g_per_ml: 0.4565
-    source: "USDA FDC 174928 — 108 g per cup, secco"
+    source: "USDA FDC 174928 — 108 g per cup, dry"
     alias: [pane grattugiato, breadcrumbs]
   "cioccolato fondente":
     g_per_ml: 0.7186
-    source: "King Arthur Baking, Ingredient Weight Chart — 170 g per cup, a gocce o pezzi"
+    source: "King Arthur Baking, Ingredient Weight Chart — 170 g per cup, chips or chunks"
     alias: [cioccolato, gocce di cioccolato, cioccolato a pezzi, chocolate chips,
             dark chocolate]
   "gelatina in polvere":
     g_per_ml: 0.4734
-    source: "USDA FDC 169599 — 7 g per busta da un cucchiaio"
+    source: "USDA FDC 169599 — 7 g per one-tablespoon sachet"
     alias: [gelatina, gelatin]
   "caffè solubile":
     g_per_ml: 0.2029
-    source: "USDA FDC 171893 — 1 g per cucchiaino, in polvere"
+    source: "USDA FDC 171893 — 1 g per teaspoon, powdered"
     alias: [caffe solubile, caffè istantaneo, instant coffee]
 
   # ---- spices and powders ---------------------------------------------------
@@ -415,27 +415,27 @@ ingredients:
   # ("1 cucchiaino ≈ 2,6 g"), not to replace the teaspoon.
   "cannella":
     g_per_ml: 0.5275
-    source: "USDA FDC 171320 — 2,6 g per cucchiaino, macinata"
+    source: "USDA FDC 171320 — 2,6 g per teaspoon, ground"
     alias: [cannella in polvere, cinnamon]
   "curcuma":
     g_per_ml: 0.6087
-    source: "USDA FDC 172231 — 3 g per cucchiaino, macinata"
+    source: "USDA FDC 172231 — 3 g per teaspoon, ground"
     alias: [turmeric]
   "paprika":
     g_per_ml: 0.4666
-    source: "USDA FDC 171329 — 2,3 g per cucchiaino"
+    source: "USDA FDC 171329 — 2,3 g per teaspoon"
     alias: [paprica, paprika dolce, paprika affumicata]
   "pepe nero":
     g_per_ml: 0.4666
-    source: "USDA FDC 170931 — 2,3 g per cucchiaino, macinato"
+    source: "USDA FDC 170931 — 2,3 g per teaspoon, ground"
     alias: [pepe, pepe macinato, black pepper]
   "origano secco":
     g_per_ml: 0.2029
-    source: "USDA FDC 171328 — 1 g per cucchiaino, in foglie"
+    source: "USDA FDC 171328 — 1 g per teaspoon, leaf form"
     alias: [origano, dried oregano]
   "aglio in polvere":
     g_per_ml: 0.6289
-    source: "USDA FDC 171325 — 3,1 g per cucchiaino"
+    source: "USDA FDC 171325 — 3,1 g per teaspoon"
     alias: [garlic powder]
 
   # ---- salt and raising agents ----------------------------------------------
@@ -444,25 +444,25 @@ ingredients:
   # as a comment.
   "sale fino":
     g_per_ml: 1.2173
-    source: "USDA FDC 173468 — 6 g per cucchiaino, sale da tavola"
+    source: "USDA FDC 173468 — 6 g per teaspoon, table salt"
     alias: [sale, salt, sale da cucina]
   "sale grosso":
     g_per_ml: 1.2173
-    source: "USDA FDC 173468 — 6 g per cucchiaino; il dato è quello del sale fino perché nessuna fonte copre il sale grosso, la cui densità apparente varia del doppio con la pezzatura del cristallo. Voce necessaria comunque: senza, «sale grosso» ricadrebbe in silenzio su «sale»"
+    source: "USDA FDC 173468 — 6 g per teaspoon; the figure is fine salt's, because no source covers coarse salt, whose bulk density varies twofold with the crystal size. The entry is needed anyway: without it, «sale grosso» would silently fall back on «sale»"
     alias: [sale marino grosso, coarse salt, kosher salt]
   "lievito per dolci":
     g_per_ml: 0.8115
-    source: "King Arthur Baking, Ingredient Weight Chart — 4 g per cucchiaino (USDA FDC 172803 dà 4,6)"
+    source: "King Arthur Baking, Ingredient Weight Chart — 4 g per teaspoon (USDA FDC 172803 gives 4,6)"
     alias: [lievito in polvere, baking powder, lievito vanigliato]
   "bicarbonato":
     g_per_ml: 0.9333
-    source: "USDA FDC 175040 — 4,6 g per cucchiaino"
+    source: "USDA FDC 175040 — 4,6 g per teaspoon"
     alias: [bicarbonato di sodio, baking soda]
   "cremor tartaro":
     g_per_ml: 0.6087
-    source: "USDA FDC 175041 — 3 g per cucchiaino"
+    source: "USDA FDC 175041 — 3 g per teaspoon"
     alias: [cremortartaro, cream of tartar]
   "lievito di birra secco":
     g_per_ml: 0.6087
-    source: "King Arthur Baking, Ingredient Weight Chart — 3 g per cucchiaino (USDA FDC 175043 dà 4)"
+    source: "King Arthur Baking, Ingredient Weight Chart — 3 g per teaspoon (USDA FDC 175043 gives 4)"
     alias: [lievito secco, lievito disidratato, active dry yeast, instant yeast]
