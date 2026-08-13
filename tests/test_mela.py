@@ -1,8 +1,8 @@
-"""Test dell'export verso Mela e del passaggio bozza → ricetta.
+"""Tests for the export to Mela and for the draft → recipe step.
 
-Il collaudo vero resta aprire un `.melarecipe` in Mela su iOS (v. README). Questi test
-proteggono le due cose che si rompono in silenzio: i separatori `\\n` fra le righe di
-ingredienti e procedimento, e il formato dei titoli di gruppo `#`.
+The real proof is still opening a `.melarecipe` in Mela on iOS (see the README). These tests
+protect the two things that break silently: the `\\n` separators between the ingredient and
+method lines, and the `#` format of the group headings.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from reel2recipe.mela import (
 from reel2recipe.recipe import Source, Recipe, from_draft
 
 
-BOZZA = {
+DRAFT = {
     "titolo": "Tiramisù al pistacchio",
     "porzioni": "6 persone",
     "tempo_preparazione_min": 25,
@@ -46,9 +46,9 @@ BOZZA = {
 
 
 @pytest.fixture
-def ricetta() -> Recipe:
+def recipe() -> Recipe:
     return from_draft(
-        BOZZA,
+        DRAFT,
         source=Source.now(
             url="https://www.instagram.com/reel/ABC123/",
             author="cucina_test",
@@ -58,144 +58,147 @@ def ricetta() -> Recipe:
 
 
 # ----------------------------------------------------------------------------------
-# Bozza → ricetta
+# Draft → recipe
 # ----------------------------------------------------------------------------------
 
 
-def test_bozza_normalizza_le_quantita(ricetta):
-    """La cup di zucchero deve essere diventata 200 g passando per units.py."""
-    zucchero = next(i for i in ricetta.ingredients if i.name == "zucchero semolato")
+def test_the_draft_normalises_the_quantities(recipe):
+    """The cup of sugar must have become 200 g by going through units.py."""
+    zucchero = next(i for i in recipe.ingredients if i.name == "zucchero semolato")
     assert (zucchero.quantity.value, zucchero.quantity.unit) == (200.0, "g")
 
 
-def test_bozza_converte_le_temperature(ricetta):
-    """350°F nel procedimento deve diventare 175 °C, e la sostituzione va tracciata.
+def test_the_draft_converts_the_temperatures(recipe):
+    """350°F in the method has to become 175 °C, and the substitution has to be tracked.
 
-    La traccia si controlla sulla sostituzione ("350°F → 175 °C") e non su una parola
-    della frase che la introduce: quella dipende da lingua e sistema, il fatto che la
-    modifica al testo dell'autore sia dichiarata no.
+    The trace is checked on the substitution itself ("350°F → 175 °C") and not on a word of
+    the sentence introducing it: that one depends on language and system, whereas the fact
+    that a change to the author's text is declared does not.
     """
-    assert any("175 °C" in p for p in ricetta.method)
-    assert not any("350" in p and "F" in p for p in ricetta.method)
-    assert any("350°F" in n and "175 °C" in n for n in ricetta.notes)
+    assert any("175 °C" in p for p in recipe.method)
+    assert not any("350" in p and "F" in p for p in recipe.method)
+    assert any("350°F" in n and "175 °C" in n for n in recipe.notes)
 
 
-def test_bozza_raccoglie_le_lacune(ricetta):
-    """Il "q.b." del cacao non è una lacuna, ma la ricetta deve saper dire se ha incertezze."""
-    assert ricetta.has_uncertainties
+def test_the_draft_gathers_the_gaps(recipe):
+    """The cocoa's "q.b." is not a gap, but the recipe has to be able to say it has
+    uncertainties."""
+    assert recipe.has_uncertainties
 
 
-def test_tempo_totale(ricetta):
-    assert ricetta.total_time_min() == 25
+def test_total_time(recipe):
+    assert recipe.total_time_min() == 25
 
 
-def test_round_trip_del_modello(ricetta):
-    """Recipe → dict → Recipe senza perdere quantità né provenienze."""
-    ricostruita = Recipe.from_dict(json.loads(ricetta.to_json()))
-    assert ricostruita.title == ricetta.title
-    assert len(ricostruita.ingredients) == len(ricetta.ingredients)
-    for a, b in zip(ricetta.ingredients, ricostruita.ingredients):
+def test_the_model_round_trips(recipe):
+    """Recipe → dict → Recipe without losing quantities or provenances."""
+    rebuilt = Recipe.from_dict(json.loads(recipe.to_json()))
+    assert rebuilt.title == recipe.title
+    assert len(rebuilt.ingredients) == len(recipe.ingredients)
+    for a, b in zip(recipe.ingredients, rebuilt.ingredients):
         assert a.mela_line() == b.mela_line()
         assert a.quantity.provenance is b.quantity.provenance
 
 
 # ----------------------------------------------------------------------------------
-# Formato Mela
+# The Mela format
 # ----------------------------------------------------------------------------------
 
 
-def test_ingredienti_sono_una_stringa_separata_da_newline(ricetta):
-    """È l'errore più facile da fare: Mela vuole una stringa, non un array."""
-    d = to_melarecipe(ricetta)
+def test_the_ingredients_are_a_newline_separated_string(recipe):
+    """The easiest mistake to make: Mela wants a string, not an array."""
+    d = to_melarecipe(recipe)
     assert isinstance(d["ingredients"], str)
     assert "\n" in d["ingredients"]
     assert isinstance(d["instructions"], str)
 
 
-def test_gruppi_come_intestazioni_con_cancelletto(ricetta):
-    righe = ingredient_lines(ricetta)
-    assert "# Per la crema" in righe
-    assert "# Per la base" in righe
-    # L'intestazione deve precedere i suoi ingredienti.
-    assert righe.index("# Per la crema") < righe.index("250 g mascarpone")
+def test_groups_become_hash_headings(recipe):
+    lines = ingredient_lines(recipe)
+    assert "# Per la crema" in lines
+    assert "# Per la base" in lines
+    # The heading has to come before its ingredients.
+    assert lines.index("# Per la crema") < lines.index("250 g mascarpone")
 
 
-def test_gruppo_unico_non_produce_intestazione():
-    """Se c'è un solo gruppo (o nessuno), l'intestazione è rumore."""
+def test_a_single_group_produces_no_heading():
+    """With only one group (or none), the heading is noise."""
     r = from_draft({
         "titolo": "Pasta al burro",
         "ingredienti": [{"quantita_raw": "100", "unita_raw": "g", "nome": "burro"}],
         "procedimento": ["Sciogli il burro."],
     })
-    assert not any(riga.startswith("#") for riga in ingredient_lines(r))
+    assert not any(line.startswith("#") for line in ingredient_lines(r))
 
 
-def test_qb_reso_alla_italiana(ricetta):
-    d = to_melarecipe(ricetta)
+def test_qb_rendered_the_italian_way(recipe):
+    d = to_melarecipe(recipe)
     assert "cacao amaro q.b." in d["ingredients"]
 
 
-def test_procedimento_non_numerato(ricetta):
-    """La numerazione la mette Mela: aggiungerla qui produceva "1 1. Monta i tuorli…".
+def test_the_method_is_not_numbered(recipe):
+    """Mela adds the numbering: adding it here produced "1 1. Monta i tuorli…".
 
-    Visto sulla prima ricetta aperta davvero nell'app, non deducibile dal formato.
+    Seen on the first recipe actually opened in the app; not deducible from the format.
     """
-    d = to_melarecipe(ricetta)
+    d = to_melarecipe(recipe)
     assert d["instructions"].startswith("Monta i tuorli")
     assert "1. " not in d["instructions"]
 
 
-def test_numerazione_gia_presente_viene_tolta(ricetta):
-    """Stesso doppione per l'altra strada: un passo che arriva già numerato dal modello."""
-    ricetta.method = ["1. Monta i tuorli.", "2) Inforna.", "3 - Sforna."]
-    righe = to_melarecipe(ricetta)["instructions"].split("\n")
-    assert righe == ["Monta i tuorli.", "Inforna.", "Sforna."]
+def test_numbering_already_present_is_stripped(recipe):
+    """The same duplication by the other road: a step arriving already numbered from the
+    model."""
+    recipe.method = ["1. Monta i tuorli.", "2) Inforna.", "3 - Sforna."]
+    lines = to_melarecipe(recipe)["instructions"].split("\n")
+    assert lines == ["Monta i tuorli.", "Inforna.", "Sforna."]
 
 
-def test_passo_che_inizia_per_cifra_resta_intero(ricetta):
-    """Una cifra iniziale non è sempre un'etichetta di elenco: qui è la quantità.
+def test_a_step_starting_with_a_digit_stays_whole(recipe):
+    """A leading digit is not always a list label: here it is the quantity.
 
-    Il terzo caso è quello che costringe il criterio a essere stretto: "5 - 6 minuti" ha la
-    forma di una numerazione, ma togliere "5 - " cambierebbe un tempo di cottura in silenzio.
+    The third case is the one that forces the criterion to be strict: "5 - 6 minuti" has the
+    shape of a numbering, but removing "5 - " would silently change a cooking time.
     """
-    ricetta.method = [
+    recipe.method = [
         "200 g di farina in una ciotola.",
         "180 °C per 20 minuti.",
         "5 - 6 minuti di cottura, finché non è dorato.",
     ]
-    righe = to_melarecipe(ricetta)["instructions"].split("\n")
-    assert righe == [
+    lines = to_melarecipe(recipe)["instructions"].split("\n")
+    assert lines == [
         "200 g di farina in una ciotola.",
         "180 °C per 20 minuti.",
         "5 - 6 minuti di cottura, finché non è dorato.",
     ]
 
 
-def test_campi_obbligatori_e_tipi(ricetta):
-    d = to_melarecipe(ricetta)
-    for chiave in ("id", "title", "text", "images", "categories", "yield", "prepTime",
-                   "cookTime", "totalTime", "ingredients", "instructions", "notes",
-                   "nutrition", "link", "favorite", "wantToCook", "date"):
-        assert chiave in d, f"campo mancante nel .melarecipe: {chiave}"
+def test_required_fields_and_types(recipe):
+    d = to_melarecipe(recipe)
+    for key in ("id", "title", "text", "images", "categories", "yield", "prepTime",
+                "cookTime", "totalTime", "ingredients", "instructions", "notes",
+                "nutrition", "link", "favorite", "wantToCook", "date"):
+        assert key in d, f"field missing from the .melarecipe: {key}"
     assert isinstance(d["images"], list)
     assert isinstance(d["categories"], list)
     assert isinstance(d["favorite"], bool)
     assert isinstance(d["date"], float)
 
 
-def test_identificativo_dallurl(ricetta):
-    """Con un URL, l'id è l'URL senza schema: dà a Mela una chiave stabile per gli aggiornamenti."""
-    assert to_melarecipe(ricetta)["id"] == "www.instagram.com/reel/ABC123"
+def test_the_identifier_comes_from_the_url(recipe):
+    """With a URL, the id is the URL without its scheme: it gives Mela a stable key for
+    updates."""
+    assert to_melarecipe(recipe)["id"] == "www.instagram.com/reel/ABC123"
 
 
-def test_link_valorizzato_per_attribuzione(ricetta):
-    """L'attribuzione all'autore originale non è opzionale."""
-    d = to_melarecipe(ricetta)
+def test_the_link_is_filled_in_for_attribution(recipe):
+    """Crediting the original author is not optional."""
+    d = to_melarecipe(recipe)
     assert d["link"] == "https://www.instagram.com/reel/ABC123/"
     assert "cucina_test" in d["notes"]
 
 
-def test_durate_leggibili():
+def test_readable_durations():
     r = from_draft({"titolo": "X", "tempo_preparazione_min": 90, "tempo_cottura_min": 45})
     d = to_melarecipe(r)
     assert d["prepTime"] == "1 h 30 min"
@@ -203,48 +206,48 @@ def test_durate_leggibili():
     assert d["totalTime"] == "2 h 15 min"
 
 
-def test_categorie_senza_virgole():
-    """Mela non ammette virgole nei nomi di categoria: verrebbero spezzate all'import."""
+def test_categories_without_commas():
+    """Mela does not allow commas in category names: they would be split on import."""
     r = from_draft({"titolo": "X", "categorie": ["Dolci, freddi"]})
     assert "," not in to_melarecipe(r)["categories"][0]
 
 
-def test_lacune_finiscono_nelle_note():
-    """Una stima non deve mai passare per un dato certo: va scritta nella ricetta."""
+def test_the_gaps_end_up_in_the_notes():
+    """An estimate must never pass for certain data: it goes into the recipe."""
     r = from_draft({
         "titolo": "Test",
         "ingredienti": [{"quantita_raw": "1", "unita_raw": "cup", "nome": "gorgonzola"}],
     })
-    note = to_melarecipe(r)["notes"]
-    assert "Da verificare" in note
-    assert "densità sconosciuta" in note
+    notes = to_melarecipe(r)["notes"]
+    assert "Da verificare" in notes
+    assert "densità sconosciuta" in notes
 
 
 # ----------------------------------------------------------------------------------
-# Scrittura su disco
+# Writing to disk
 # ----------------------------------------------------------------------------------
 
 
-def test_scrittura_e_rilettura(ricetta, tmp_path):
-    percorso = write_melarecipe(ricetta, tmp_path)
-    assert percorso.suffix == ".melarecipe"
-    riletta = read_melarecipe(percorso)
-    assert riletta["title"] == "Tiramisù al pistacchio"
-    assert "250 g mascarpone" in riletta["ingredients"]
+def test_writing_and_reading_back(recipe, tmp_path):
+    path = write_melarecipe(recipe, tmp_path)
+    assert path.suffix == ".melarecipe"
+    reread = read_melarecipe(path)
+    assert reread["title"] == "Tiramisù al pistacchio"
+    assert "250 g mascarpone" in reread["ingredients"]
 
 
-def test_non_sovrascrive_export_precedenti(ricetta, tmp_path):
-    primo = write_melarecipe(ricetta, tmp_path)
-    secondo = write_melarecipe(ricetta, tmp_path)
-    assert primo != secondo
-    assert primo.exists() and secondo.exists()
+def test_it_does_not_overwrite_earlier_exports(recipe, tmp_path):
+    first = write_melarecipe(recipe, tmp_path)
+    second = write_melarecipe(recipe, tmp_path)
+    assert first != second
+    assert first.exists() and second.exists()
 
 
-def test_export_multiplo_e_uno_zip(ricetta, tmp_path):
-    percorso = write_melarecipes([ricetta, ricetta], tmp_path / "arretrato")
-    assert percorso.suffix == ".melarecipes"
-    with zipfile.ZipFile(percorso) as z:
-        nomi = z.namelist()
-        assert len(nomi) == 2, "i nomi duplicati devono essere disambiguati, non sovrascritti"
-        assert all(n.endswith(".melarecipe") for n in nomi)
-        assert json.loads(z.read(nomi[0]))["title"] == "Tiramisù al pistacchio"
+def test_the_multiple_export_is_a_zip(recipe, tmp_path):
+    path = write_melarecipes([recipe, recipe], tmp_path / "arretrato")
+    assert path.suffix == ".melarecipes"
+    with zipfile.ZipFile(path) as z:
+        names = z.namelist()
+        assert len(names) == 2, "duplicate names must be disambiguated, not overwritten"
+        assert all(n.endswith(".melarecipe") for n in names)
+        assert json.loads(z.read(names[0]))["title"] == "Tiramisù al pistacchio"
