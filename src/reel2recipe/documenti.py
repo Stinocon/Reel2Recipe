@@ -25,7 +25,7 @@ from pathlib import Path
 
 from .mela import righe_ingredienti
 from .recipe import Ricetta, percorso_libero
-from .units import PROVENIENZE_INCERTE, sigla, testo_da
+from .units import UNCERTAIN_PROVENANCES, text_from
 
 # Le stringhe dei documenti, per lingua. Come in `mela.py`: poche e stabili, un dizionario
 # basta e si legge meglio di un meccanismo di traduzione.
@@ -71,7 +71,7 @@ TESTI = {
 
 def testo(lingua: str, chiave: str, **dati) -> str:
     """Una stringa del documento nella lingua della ricetta, con ripiego sull'italiano."""
-    return testo_da(TESTI, lingua, chiave, **dati)
+    return text_from(TESTI, lingua, chiave, **dati)
 
 ESTENSIONE_MARKDOWN = ".md"
 ESTENSIONE_PDF = ".pdf"
@@ -156,9 +156,9 @@ def _avvertenze(ricetta: Ricetta) -> list[str]:
     """
     righe = list(ricetta.lacune)
     stimate = [
-        testo(ricetta.lingua, "stima", nome=i.nome, quantita=i.quantita.testo())
+        testo(ricetta.lingua, "stima", nome=i.name, quantita=i.quantity.text())
         for i in ricetta.ingredienti
-        if i.quantita.provenienza in PROVENIENZE_INCERTE and i.quantita.valore is not None
+        if i.quantity.provenance in UNCERTAIN_PROVENANCES and i.quantity.value is not None
     ]
     # Le lacune di `recipe.py` già nominano gli ingredienti senza quantità: si tengono solo
     # le stime che non sono già state dichiarate, per non ripetere la stessa cosa due volte.

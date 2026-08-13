@@ -204,7 +204,7 @@ def ricetta_ambigua():
 
 def _ingrediente(ricetta, parola):
     for i in ricetta.ingredienti:
-        if parola in i.nome.lower():
+        if parola in i.name.lower():
             return i
     return None
 
@@ -216,9 +216,9 @@ def test_una_dose_scritta_due_volte_non_diventa_un_millilitro(ricetta_ambigua):
     _, ricetta = ricetta_ambigua
     latte = _ingrediente(ricetta, "latte")
     assert latte, "il latte è sparito dall'estrazione"
-    assert latte.quantita.unita == "ml", f"il latte non è un volume: {latte.riga_mela()!r}"
-    assert 250 <= latte.quantita.valore <= 350, (
-        f"il latte doveva restare intorno ai 300 ml, è uscito {latte.riga_mela()!r}"
+    assert latte.quantity.unit == "ml", f"il latte non è un volume: {latte.mela_line()!r}"
+    assert 250 <= latte.quantity.value <= 350, (
+        f"il latte doveva restare intorno ai 300 ml, è uscito {latte.mela_line()!r}"
     )
 
 
@@ -258,7 +258,7 @@ def test_una_misura_vaga_ricevuta_non_diventa_una_lacuna_falsa(ricetta_ambigua, 
     recuperare e asserirlo renderebbe questo gate ballerino invece che informativo. In quel
     caso il test si salta dicendo perché, così l'informazione non va persa.
     """
-    from reel2recipe.units import Provenienza
+    from reel2recipe.units import Provenance
 
     bozza, ricetta = ricetta_ambigua
     grezzo = _grezzo(bozza, parola)
@@ -274,11 +274,11 @@ def test_una_misura_vaga_ricevuta_non_diventa_una_lacuna_falsa(ricetta_ambigua, 
         )
 
     ingr = _ingrediente(ricetta, parola)
-    assert ingr and ingr.quantita.provenienza in {
-        Provenienza.INDETERMINATO, Provenienza.STIMATO_VAGHE
+    assert ingr and ingr.quantity.provenance in {
+        Provenance.INDETERMINATE, Provenance.ESTIMATED_VAGUE
     }, (
         f"«{parola}»: il modello aveva riportato l'indicazione ({campi!r}) ma è uscita come "
-        f"{ingr.quantita.provenienza.value} ({ingr.riga_mela()!r})"
+        f"{ingr.quantity.provenance.value} ({ingr.mela_line()!r})"
     )
 
 
@@ -287,6 +287,6 @@ def test_una_parola_fra_parentesi_non_diventa_un_unita(ricetta_ambigua):
     _, ricetta = ricetta_ambigua
     mela = _ingrediente(ricetta, "mela")
     assert mela, "la mela è sparita dall'estrazione"
-    assert not (mela.quantita.unita or "").startswith("("), (
-        f"una parentesi è stata scambiata per un'unità: {mela.riga_mela()!r}"
+    assert not (mela.quantity.unit or "").startswith("("), (
+        f"una parentesi è stata scambiata per un'unità: {mela.mela_line()!r}"
     )

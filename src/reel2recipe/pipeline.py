@@ -23,7 +23,7 @@ from pathlib import Path
 from . import acquire, asr, audio, extract
 from .paths import media_folder
 from .recipe import Fonte, Ricetta, da_bozza
-from .units import Catalogo, Lingua, Sistema, Tabelle, carica_tabelle, sigla, testo_da
+from .units import Catalogue, Language, System, Tables, code_of, load_tables, text_from
 
 Avanzamento = Callable[[str, str], None]   # (fase, messaggio)
 
@@ -35,7 +35,7 @@ Avanzamento = Callable[[str, str], None]   # (fase, messaggio)
 # lingua della ricetta ci stanno già perché vengono salvate con lei: farle divergere
 # produrrebbe una scheda mezza in una lingua e mezza nell'altra. Nell'uso normale i due
 # valori coincidono comunque, perché la lingua della ricetta segue quella dell'interfaccia.
-TESTI: Catalogo = {
+TESTI: Catalogue = {
     "it": {
         "scaricamento": "Scaricamento del reel…",
         "scaricato": "Scaricato: {etichetta}",
@@ -88,7 +88,7 @@ TESTI: Catalogo = {
 
 def testo(lingua: str, chiave: str, **dati) -> str:
     """Una frase di avanzamento o un'avvertenza, nella lingua della ricetta."""
-    return testo_da(TESTI, lingua, chiave, **dati)
+    return text_from(TESTI, lingua, chiave, **dati)
 
 
 def _silenzio(fase: str, messaggio: str) -> None:
@@ -188,22 +188,22 @@ def lavora(
     modello_llm: str | None = None,
     url_ollama: str = extract.URL_OLLAMA_PREDEFINITO,
     salta_audio: bool = False,
-    tabelle: Tabelle | None = None,
+    tabelle: Tables | None = None,
     # I due assi di uscita. `lingua_audio` sopra è un'altra cosa: è la lingua PARLATA nel
     # reel, che serve a Whisper. Un reel giapponese può benissimo produrre una ricetta in
     # italiano — tenerli separati evita di confondere l'ingresso con l'uscita.
-    lingua: str = Lingua.IT,
-    sistema: str = Sistema.METRICO,
+    lingua: str = Language.IT,
+    sistema: str = System.METRIC,
 ) -> Esito:
     """Porta un `Media` già acquisito fino alla `Ricetta` normalizzata."""
     avvertenze: list[str] = []
-    t = tabelle or carica_tabelle()
+    t = tabelle or load_tables()
 
     trascrizione = None
     if not salta_audio:
         trascrizione = _trascrivi_se_possibile(
             media, backend_asr, modello_asr, lingua_audio, su_avanzamento, avvertenze,
-            sigla(lingua),
+            code_of(lingua),
         )
 
     testo_trascrizione = trascrizione.text if trascrizione else ""
@@ -226,7 +226,7 @@ def lavora(
         modello=modello_llm,
         url=url_ollama,
         commenti_autore=media.author_comments,
-        lingua=sigla(lingua),
+        lingua=code_of(lingua),
     )
 
     if not esito_estrazione.e_una_ricetta:
@@ -266,7 +266,7 @@ def lavora(
 def da_url(url: str, su_avanzamento: Avanzamento = _silenzio,
            cookies_da_browser: str | None = None, **kwargs) -> Esito:
     """La strada principale: si incolla un link e si preme Cook."""
-    lingua = kwargs.get("lingua", Lingua.IT)
+    lingua = kwargs.get("lingua", Language.IT)
     su_avanzamento("acquisizione", testo(lingua, "scaricamento"))
     media = acquire.from_url(url, media_folder(), cookies_from_browser=cookies_da_browser)
     su_avanzamento("acquisizione", testo(lingua, "scaricato", etichetta=media.label()))
@@ -276,7 +276,7 @@ def da_url(url: str, su_avanzamento: Avanzamento = _silenzio,
 def da_file(percorso: Path | str, didascalia: str = "",
             su_avanzamento: Avanzamento = _silenzio, **kwargs) -> Esito:
     """Per i reel già salvati sul disco, o quando lo scaricamento non è possibile."""
-    su_avanzamento("acquisizione", testo(kwargs.get("lingua", Lingua.IT), "lettura_file"))
+    su_avanzamento("acquisizione", testo(kwargs.get("lingua", Language.IT), "lettura_file"))
     media = acquire.from_file(percorso, caption=didascalia)
     return lavora(media, su_avanzamento, **kwargs)
 

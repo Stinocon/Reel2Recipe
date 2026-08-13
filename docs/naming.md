@@ -42,11 +42,11 @@ delicate code in the project (`AGENTS.md §3`) — and it is 1270 lines. It want
 that starts on it, not the tail of one that has been doing something else all day.
 
 1. **Done:** `asr.py` (the reference for how prose is handled), `percorsi.py` → `paths.py`,
-   `audio.py`, `acquire.py` — all leaves — and `store.py`, whose SQL schema and listing keys
-   stay Italian as *format* (the reason is in its docstring).
-2. **Next, on a fresh session:** `units.py`, then `recipe.py`. Highest risk, and everything
-   downstream depends on the names they settle. `recipe.py` is where the compatibility net
-   for `from_dict` goes in, in the same commit as the field renames.
+   `audio.py`, `acquire.py` — all leaves — `store.py`, whose SQL schema and listing keys
+   stay Italian as *format* (the reason is in its docstring), and `units.py`, the engine.
+2. **Next, on a fresh session:** `recipe.py`. Everything downstream depends on the names it
+   settles, and it is where the compatibility net for `from_dict` goes in, in the same commit
+   as the field renames.
 3. **Then, once each:** `mela.py`, `documenti.py` → `documents.py`, `extract.py`,
    `pipeline.py`, `api.py`, `cli.py` (internals only — its public surface is already
    English). Every one of these reads `Recipe`'s fields, which is why they come after it and
@@ -54,35 +54,27 @@ that starts on it, not the tail of one that has been doing something else all da
 4. **Last:** `web/app.js` in the same commit as the `Recipe` field renames it reads, then
    the `data/*.yaml` keys with their loader, then `docs/`.
 
-### What an aborted attempt at `units.py` taught
+### What `units.py` confirmed, and what `recipe.py` still owes
 
-It was tried at the end of a long session and reverted at roughly 60%. Three findings, so
-the next attempt does not pay for them again.
+The aborted attempt predicted three things. Two are spent — the `MESSAGES` keys and the three
+colliding `note`s were both mapped up front and cost nothing. The third is the one that
+matters for the module that comes next, and it is now **verified rather than inferred**:
 
-**1. The JSON keys and the Python attributes are decoupled in one half and welded in the
-other.** `Recipe.to_dict()` builds the ingredient and quantity dictionaries with **string
-literals** (`"nome"`, `"quantita"`, `"valore"`), so `Quantity` and `Ingredient` can be
-renamed freely without touching a single stored recipe. But the top level starts from
+**The JSON keys and the Python attributes are decoupled in one half and welded in the other.**
+`Recipe.to_dict()` builds the ingredient and quantity dictionaries with **string literals**
+(`"nome"`, `"quantita"`, `"valore"`), so `Quantity` and `Ingredient` were renamed in full
+without touching a single stored recipe — a round-trip over `to_dict`/`from_dict` after the
+rename still produces the Italian keys, byte for byte. But the top level starts from
 `asdict(self)`, so **`Recipe`'s own fields map straight onto JSON keys** — renaming `titolo`
 really does rename it on disk. The compatibility net in `from_dict` is needed for the top
-level only; the nested objects need nothing.
+level only; the nested objects needed nothing, and got nothing.
 
-**2. Renaming the `MESSAGES` keys breaks every call site inside `units.py` at once**, and
-the failures surface one test at a time rather than all together, which makes it look like
-progress when it is a queue. Rename the catalogue keys and their `message(...)` call sites in
-the same pass, or leave the keys alone.
-
-**3. `note` is three different things** and they collide: `Quantity.note` (singular, the
-conversion note), `Ingredient.notes` (the ingredient's own notes) and the `note` parameter
-threaded through `normalise_ingredient` into `_normalise_ingredient`. A blanket rename gets
-two of the three and leaves an `UnboundLocalError` in the middle of the engine. Map the three
-explicitly before starting.
-
-And the practical lesson, which was predicted and then confirmed: **`units.py` needs a
-session that starts on it.** Not because it is hard in itself, but because the cascade
-through its consumers is long, and a session with little budget left ends with a broken tree
-and nothing to show. Reverting cost nothing because everything else was committed — keep
-that property.
+One thing the migration of `units.py` added to the method: **rewriting a module is also the
+closest reading it will ever get.** The pass turned up a line in `_key` that claimed to
+normalise apostrophes and replaced the ASCII one with itself — with a real consequence on the
+output, since the curly apostrophe is what iOS keyboards and Instagram captions write. It went
+into its own commit *before* the rename, so that the translation commit changed no behaviour.
+Keep that split: a rename that also fixes something is a rename nobody can review.
 
 `extract.py` carries an obligation the others do not: it holds the system prompts and the
 JSON schema, so after touching it the model gate has to run —
@@ -132,6 +124,7 @@ Decided once, used everywhere. Add a row rather than inventing a synonym.
 | `Lingua` | `Language` |
 | `Sistema` | `System` |
 | `Tabelle` | `Tables` |
+| `Catalogo` | `Catalogue` |
 | `Libreria` | `Library` |
 | `Trascrizione` | `Transcript` |
 | `Media` | `Media` (unchanged) |
@@ -207,9 +200,27 @@ Decided once, used everywhere. Add a row rather than inventing a synonym.
 | `disponibili` | `available` |
 | `sigla` | `code_of` |
 | `testo_da` | `text_from` |
+| `conteggio` | `count` |
+| `destinazione` | `target` |
+| `misure_a_cucchiaio` | `spoon_measures` |
+| `scorpora_` | `split_off_` |
+| `prova_` | `try_` |
+| `confeziona` | `finalise` |
+| `e_…` (predicato) | `is_…` (`e_liquido` → `is_liquid`) |
+| `come_…` (ramo di esito) | `as_…` (`_come_conteggio` → `_as_count`) |
+| `riga_mela` | `mela_line` |
 
 ### Prose
 
 Comments and docstrings in **English**, keeping the register they have in Italian: they
 explain the *why*, in plain words, and they name the real incident when there was one. British
 spelling, to match the interface catalogue and the READMEs.
+
+**The test modules are a separate step, declared here so it is not forgotten.** When a module
+is migrated, its tests are updated as *callers* — the names they import, the attributes they
+read, the keyword arguments they pass — and nothing more. Their own function names and
+docstrings stay Italian for now. That is deliberate, not an oversight: those docstrings carry
+the incident behind each regression ("visto su un reel vero"), which is exactly the reasoning
+this migration must not lose, and translating them is careful prose work rather than a rename.
+Doing it inside the module's own commit would mix a mechanical change with a judgement-heavy
+one in the same diff. The tests get one pass of their own, at the end, together with `docs/`.

@@ -104,7 +104,7 @@ def comando_cook(args) -> int:
 
 
 def _stampa_ricetta(ricetta) -> None:
-    from .units import PROVENIENZE_INCERTE
+    from .units import UNCERTAIN_PROVENANCES
 
     if ricetta.porzioni or ricetta.tempo_totale_min():
         dettagli = [d for d in (ricetta.porzioni,
@@ -116,9 +116,9 @@ def _stampa_ricetta(ricetta) -> None:
         if gruppo and len([g for g in ricetta.gruppi if g]) > 0 and len(ricetta.gruppi) > 1:
             print(spento(f"    — {gruppo} —"))
         for i in ricetta.ingredienti:
-            if i.gruppo == gruppo:
-                riga = f"    {i.riga_mela()}"
-                print(avviso(riga) if i.quantita.provenienza in PROVENIENZE_INCERTE else riga)
+            if i.group == gruppo:
+                riga = f"    {i.mela_line()}"
+                print(avviso(riga) if i.quantity.provenance in UNCERTAIN_PROVENANCES else riga)
 
     print("\n  " + _c("Method", "1"))
     for n, passo in enumerate(ricetta.procedimento, 1):

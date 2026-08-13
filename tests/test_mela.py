@@ -64,8 +64,8 @@ def ricetta() -> Ricetta:
 
 def test_bozza_normalizza_le_quantita(ricetta):
     """La cup di zucchero deve essere diventata 200 g passando per units.py."""
-    zucchero = next(i for i in ricetta.ingredienti if i.nome == "zucchero semolato")
-    assert (zucchero.quantita.valore, zucchero.quantita.unita) == (200.0, "g")
+    zucchero = next(i for i in ricetta.ingredienti if i.name == "zucchero semolato")
+    assert (zucchero.quantity.value, zucchero.quantity.unit) == (200.0, "g")
 
 
 def test_bozza_converte_le_temperature(ricetta):
@@ -95,8 +95,8 @@ def test_round_trip_del_modello(ricetta):
     assert ricostruita.titolo == ricetta.titolo
     assert len(ricostruita.ingredienti) == len(ricetta.ingredienti)
     for a, b in zip(ricetta.ingredienti, ricostruita.ingredienti):
-        assert a.riga_mela() == b.riga_mela()
-        assert a.quantita.provenienza is b.quantita.provenienza
+        assert a.mela_line() == b.mela_line()
+        assert a.quantity.provenance is b.quantity.provenance
 
 
 # ----------------------------------------------------------------------------------

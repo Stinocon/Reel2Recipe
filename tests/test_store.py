@@ -164,15 +164,15 @@ def test_la_migrazione_conserva_le_ricette_e_la_ricerca(tmp_path):
 def test_gli_assi_sopravvivono_al_salvataggio(lib):
     """Lingua e sistema di una ricetta devono tornare identici dopo un giro nel database:
     servono all'export, che avviene dopo il salvataggio."""
-    from reel2recipe.units import Lingua, Sistema
+    from reel2recipe.units import Language, System
     r = da_bozza(
         {"titolo": "Pancakes", "ingredienti": [{"quantita_raw": "1", "unita_raw": "cup", "nome": "flour"}],
          "procedimento": ["Mix."], "confidenza": {}, "lacune": []},
-        lingua=Lingua.EN, sistema=Sistema.IMPERIALE,
+        lingua=Language.EN, sistema=System.IMPERIAL,
     )
     id = lib.save(r)
     riletta = lib.read(id)
     assert riletta.lingua == "en"
     assert riletta.sistema == "imperiale"
     # E la quantità è ancora in cup, non riconvertita in grammi.
-    assert riletta.ingredienti[0].quantita.unita == "cup"
+    assert riletta.ingredienti[0].quantity.unit == "cup"

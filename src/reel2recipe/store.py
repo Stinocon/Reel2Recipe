@@ -196,7 +196,7 @@ class Library:
             (
                 identifier,
                 recipe.titolo,
-                " ".join(i.nome for i in recipe.ingredienti),
+                " ".join(i.name for i in recipe.ingredienti),
                 " ".join(recipe.procedimento),
                 " ".join(recipe.categorie),
             ),

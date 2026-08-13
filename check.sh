@@ -40,7 +40,7 @@ fi
 
 # ------------------------------------------------------------ 2. tabelle di conversione
 sezione "Tabelle di conversione (data/)"
-if uv run python -c "from reel2recipe.units import carica_tabelle; t=carica_tabelle(); assert t.densita and t.volume and t.vaghe" 2>/dev/null; then
+if uv run python -c "from reel2recipe.units import load_tables; t=load_tables(); assert t.density and t.volume and t.vague" 2>/dev/null; then
   ok "unita.yaml, densita.yaml, vaghe.yaml caricano e sono coerenti"
 else
   ko "le tabelle in data/ non caricano o sono incomplete"

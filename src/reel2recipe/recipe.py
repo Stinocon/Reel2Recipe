@@ -21,18 +21,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .units import (
-    PROVENIENZE_INCERTE,
-    Lingua,
-    Sistema,
-    Ingrediente,
-    Provenienza,
-    Quantita,
-    Tabelle,
-    carica_tabelle,
-    converti_temperature_nel_testo,
-    normalizza_ingrediente,
-    sigla,
-    testo_da,
+    UNCERTAIN_PROVENANCES,
+    Ingredient,
+    Language,
+    Provenance,
+    Quantity,
+    System,
+    Tables,
+    code_of,
+    convert_temperatures_in_text,
+    load_tables,
+    normalise_ingredient,
+    text_from,
 )
 
 
@@ -71,7 +71,7 @@ class Fonte:
 @dataclass
 class Ricetta:
     titolo: str
-    ingredienti: list[Ingrediente] = field(default_factory=list)
+    ingredienti: list[Ingredient] = field(default_factory=list)
     procedimento: list[str] = field(default_factory=list)
     descrizione: str | None = None
     porzioni: str | None = None
@@ -87,15 +87,15 @@ class Ricetta:
     # I due assi con cui la ricetta è stata prodotta. Il sistema è quello in cui le quantità
     # sono espresse e non si può cambiare senza riconvertire; la lingua è quella in cui il
     # modello ha scritto nomi e procedimento, e cambiarla richiede una nuova estrazione.
-    lingua: str = Lingua.IT.value
-    sistema: str = Sistema.METRICO.value
+    lingua: str = Language.IT.value
+    sistema: str = System.METRIC.value
 
     # ---- proprietà utili all'interfaccia -----------------------------------------
 
     @property
     def ha_incertezze(self) -> bool:
         return bool(self.lacune) or any(
-            i.quantita.provenienza in PROVENIENZE_INCERTE for i in self.ingredienti
+            i.quantity.provenance in UNCERTAIN_PROVENANCES for i in self.ingredienti
         )
 
     @property
@@ -103,8 +103,8 @@ class Ricetta:
         """Gruppi di ingredienti nell'ordine in cui compaiono ("Per la base", "Per la crema")."""
         visti: list[str | None] = []
         for i in self.ingredienti:
-            if i.gruppo not in visti:
-                visti.append(i.gruppo)
+            if i.group not in visti:
+                visti.append(i.group)
         return visti
 
     def tempo_totale_min(self) -> int | None:
@@ -130,20 +130,20 @@ class Ricetta:
         d = asdict(self)
         d["ingredienti"] = [
             {
-                "nome": i.nome,
-                "note": i.note,
-                "gruppo": i.gruppo,
-                "lacuna": i.lacuna,
-                "riga": i.riga_mela(),
+                "nome": i.name,
+                "note": i.notes,
+                "gruppo": i.group,
+                "lacuna": i.gap,
+                "riga": i.mela_line(),
                 "quantita": {
-                    "valore": i.quantita.valore,
-                    "valore_max": i.quantita.valore_max,
-                    "unita": i.quantita.unita,
-                    "provenienza": i.quantita.provenienza.value,
-                    "testo_originale": i.quantita.testo_originale,
-                    "nota": i.quantita.nota,
-                    "sistema": i.quantita.sistema,
-                    "incerta": i.quantita.provenienza in PROVENIENZE_INCERTE,
+                    "valore": i.quantity.value,
+                    "valore_max": i.quantity.value_max,
+                    "unita": i.quantity.unit,
+                    "provenienza": i.quantity.provenance.value,
+                    "testo_originale": i.quantity.original_text,
+                    "nota": i.quantity.note,
+                    "sistema": i.quantity.system,
+                    "incerta": i.quantity.provenance in UNCERTAIN_PROVENANCES,
                 },
             }
             for i in self.ingredienti
@@ -161,19 +161,19 @@ class Ricetta:
         for i in d.get("ingredienti", []):
             q = i.get("quantita") or {}
             ingredienti.append(
-                Ingrediente(
-                    nome=i.get("nome", ""),
-                    note=i.get("note"),
-                    gruppo=i.get("gruppo"),
-                    lacuna=i.get("lacuna"),
-                    quantita=Quantita(
-                        valore=q.get("valore"),
-                        unita=q.get("unita"),
-                        provenienza=Provenienza(q.get("provenienza", "assente")),
-                        testo_originale=q.get("testo_originale", ""),
-                        valore_max=q.get("valore_max"),
-                        nota=q.get("nota"),
-                        sistema=q.get("sistema", Sistema.METRICO.value),
+                Ingredient(
+                    name=i.get("nome", ""),
+                    notes=i.get("note"),
+                    group=i.get("gruppo"),
+                    gap=i.get("lacuna"),
+                    quantity=Quantity(
+                        value=q.get("valore"),
+                        unit=q.get("unita"),
+                        provenance=Provenance(q.get("provenienza", "assente")),
+                        original_text=q.get("testo_originale", ""),
+                        value_max=q.get("valore_max"),
+                        note=q.get("nota"),
+                        system=q.get("sistema", System.METRIC.value),
                     ),
                 )
             )
@@ -193,8 +193,8 @@ class Ricetta:
             confidenza=dict(d.get("confidenza") or {}),
             immagini=list(d.get("immagini") or []),
             trascrizione=d.get("trascrizione"),
-            lingua=d.get("lingua", Lingua.IT.value),
-            sistema=d.get("sistema", Sistema.METRICO.value),
+            lingua=d.get("lingua", Language.IT.value),
+            sistema=d.get("sistema", System.METRIC.value),
         )
 
 
@@ -216,9 +216,9 @@ def da_bozza(
     fonte: Fonte | None = None,
     immagini: list[str] | None = None,
     trascrizione: str | None = None,
-    tabelle: Tabelle | None = None,
-    lingua: str = Lingua.IT,
-    sistema: str = Sistema.METRICO,
+    tabelle: Tables | None = None,
+    lingua: str = Language.IT,
+    sistema: str = System.METRIC,
 ) -> Ricetta:
     """Trasforma la bozza JSON prodotta da `extract.py` in una `Ricetta` normalizzata.
 
@@ -226,28 +226,28 @@ def da_bozza(
     ("1", "cup") e ne esce con quelli metrici e la loro provenienza. Le lacune emerse
     durante la conversione si sommano a quelle già dichiarate dall'LLM.
     """
-    t = tabelle or carica_tabelle()
+    t = tabelle or load_tables()
 
-    ingredienti: list[Ingrediente] = []
+    ingredienti: list[Ingredient] = []
     lacune: list[str] = list(bozza.get("lacune") or [])
 
     for grezzo in bozza.get("ingredienti") or []:
         nome = (grezzo.get("nome") or "").strip()
         if not nome:
             continue
-        ingrediente = normalizza_ingrediente(
-            nome=nome,
-            quantita_raw=grezzo.get("quantita_raw"),
-            unita_raw=grezzo.get("unita_raw"),
-            note=(grezzo.get("note") or None),
-            gruppo=(grezzo.get("gruppo") or None),
-            tabelle=t,
-            sistema=sistema,
-            lingua=lingua,
+        ingrediente = normalise_ingredient(
+            name=nome,
+            quantity_raw=grezzo.get("quantita_raw"),
+            unit_raw=grezzo.get("unita_raw"),
+            notes=(grezzo.get("note") or None),
+            group=(grezzo.get("gruppo") or None),
+            tables=t,
+            system=sistema,
+            language=lingua,
         )
         ingredienti.append(ingrediente)
-        if ingrediente.lacuna:
-            lacune.append(ingrediente.lacuna)
+        if ingrediente.gap:
+            lacune.append(ingrediente.gap)
 
     # Le temperature in Fahrenheit nel procedimento vanno portate a Celsius: un forno
     # italiano non ha quella scala. Ogni sostituzione viene tracciata fra le note.
@@ -257,7 +257,7 @@ def da_bozza(
         testo = str(passo).strip()
         if not testo:
             continue
-        convertito, sostituzioni = converti_temperature_nel_testo(testo, t, sistema)
+        convertito, sostituzioni = convert_temperatures_in_text(testo, t, sistema)
         procedimento.append(convertito)
         note_temperature.extend(sostituzioni)
 
@@ -271,12 +271,12 @@ def da_bozza(
             "en": {"metrico": "Temperatures converted to Celsius: ",
                    "imperiale": "Temperatures converted to Fahrenheit: "},
         }
-        note.append(testo_da(intestazioni, lingua, sigla(sistema))
+        note.append(text_from(intestazioni, lingua, code_of(sistema))
                     + ", ".join(dict.fromkeys(note_temperature)))
 
     return Ricetta(
-        lingua=sigla(lingua),
-        sistema=sigla(sistema),
+        lingua=code_of(lingua),
+        sistema=code_of(sistema),
         titolo=(bozza.get("titolo") or "Ricetta senza titolo").strip(),
         ingredienti=ingredienti,
         procedimento=procedimento,
