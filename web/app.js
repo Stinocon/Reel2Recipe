@@ -13,12 +13,12 @@ const $$ = (sel) => document.querySelectorAll(sel);
 // Ogni fase con la sua icona: il nome dice cosa sta succedendo, l'icona lo rende
 // riconoscibile a colpo d'occhio mentre la barra avanza.
 const FASI = {
-  acquisizione: { icona: 'scarica', chiave: 'fase_acquisizione' },
+  acquisition: { icona: 'scarica', chiave: 'fase_acquisizione' },
   audio: { icona: 'video', chiave: 'fase_audio' },
-  trascrizione: { icona: 'microfono', chiave: 'fase_trascrizione' },
-  estrazione: { icona: 'modello', chiave: 'fase_estrazione' },
-  conversione: { icona: 'bilancia', chiave: 'fase_conversione' },
-  fatto: { icona: 'fatto', chiave: 'fase_fatto' },
+  transcription: { icona: 'microfono', chiave: 'fase_trascrizione' },
+  extraction: { icona: 'modello', chiave: 'fase_estrazione' },
+  conversion: { icona: 'bilancia', chiave: 'fase_conversione' },
+  done: { icona: 'fatto', chiave: 'fase_fatto' },
 };
 
 const PROVENIENZE_STIMA = new Set(['stimato:vaghe', 'indeterminato', 'assente']);
@@ -91,22 +91,22 @@ async function aggiornaStato() {
 
     // Popola i modelli disponibili nell'opzione dedicata.
     const select = $('#opt-modello');
-    if (s.modelli_llm?.length && select.options.length <= 1) {
-      s.modelli_llm.forEach((m) => select.add(new Option(m, m)));
+    if (s.llm_models?.length && select.options.length <= 1) {
+      s.llm_models.forEach((m) => select.add(new Option(m, m)));
     }
 
-    if (!s.pronto) {
+    if (!s.ready) {
       pallino.className = 'pallino ko';
-      testo.textContent = t(s.ollama_attivo ? 'stato_nessun_modello' : 'stato_ollama_spento');
+      testo.textContent = t(s.ollama_up ? 'stato_nessun_modello' : 'stato_ollama_spento');
       // Il messaggio non dà per scontato di girare su una macchina di sviluppo: dentro
       // l'add-on Home Assistant non c'è una shell dove digitare `ollama pull`, e il modello
       // se lo scarica l'add-on da solo — dire «esegui» lì è un consiglio che non si può
       // seguire. Prima si dichiara lo stato, poi il comando, per chi ha dove darlo.
-      $('#cook-nota').textContent = s.ollama_attivo
-        ? t('nota_nessun_modello', { modello: s.modello_consigliato })
+      $('#cook-nota').textContent = s.ollama_up
+        ? t('nota_nessun_modello', { modello: s.recommended_model })
         : t('nota_ollama_spento');
       $('#cook-nota').classList.add('errore');
-    } else if (!s.asr_pronto) {
+    } else if (!s.asr_ready) {
       pallino.className = 'pallino parziale';
       testo.textContent = t('stato_pronto_didascalie');
     } else {
@@ -131,18 +131,18 @@ async function aggiornaStato() {
 // comando che non fa niente è peggio di un comando assente, perché insegna a non fidarsi.
 function opzioniScelte() {
   return {
-    backend_asr: $('#opt-asr').value,
+    asr_backend: $('#opt-asr').value,
     // Vuoto = la riconosce Whisper. È un fatto dell'ingresso e non segue la lingua della
     // ricetta: un reel inglese che diventa una ricetta italiana è il caso più comune.
-    lingua_audio: $('#opt-lingua-parlato').value || null,
-    modello_llm: $('#opt-modello').value || null,
-    salta_audio: $('#opt-no-audio').checked,
+    audio_language: $('#opt-lingua-parlato').value || null,
+    llm_model: $('#opt-modello').value || null,
+    skip_audio: $('#opt-no-audio').checked,
     // Vuoto = «come l'interfaccia». È il primo anello della catena dei tre assi:
     // interfaccia → ricetta → misure, ciascuno con il precedente come ripiego.
-    lingua: $('#opt-lingua').value || lingua(),
+    language: $('#opt-lingua').value || lingua(),
     // Vuoto significa «come la lingua», e a decidere è il server: la regola sta in un
-    // punto solo (`RichiestaCook.assi()`), non anche qui.
-    sistema: $('#opt-sistema').value || null,
+    // punto solo (`CookRequest.axes()`), non anche qui.
+    system: $('#opt-sistema').value || null,
   };
 }
 
@@ -193,17 +193,17 @@ function seguiLavoro(job) {
   const sorgente = new EventSource(conLinguaUI(`/api/cook/${job}/eventi`));
   sorgente.onmessage = (ev) => {
     const dato = JSON.parse(ev.data);
-    if (dato.tipo === 'avanzamento') {
-      segnaFase(dato.fase, dato.messaggio);
-    } else if (dato.tipo === 'fine') {
+    if (dato.kind === "progress") {
+      segnaFase(dato.stage, dato.message);
+    } else if (dato.kind === "end") {
       sorgente.close();
       fineUI();
       if (dato.ok) {
-        mostraRicetta(dato.ricetta, dato.avvertenze, dato.modello);
+        mostraRicetta(dato.recipe, dato.warnings, dato.model);
         caricaLibreria();
       } else {
-        toast(dato.errore || t('toast_estrazione_fallita'), true);
-        $('#cook-nota').textContent = dato.errore || '';
+        toast(dato.error || t('toast_estrazione_fallita'), true);
+        $('#cook-nota').textContent = dato.error || '';
         $('#cook-nota').classList.add('errore');
       }
     }

@@ -24,7 +24,7 @@ TestClient = pytest.importorskip("fastapi.testclient").TestClient
 
 @pytest.fixture
 def spia(monkeypatch):
-    """Sostituisce `pipeline.da_url` e `pipeline.da_file` con una spia sugli argomenti.
+    """Sostituisce `pipeline.from_url` e `pipeline.from_file` con una spia sugli argomenti.
 
     La lavorazione gira in un thread, quindi la chiamata HTTP torna prima che la spia sia
     stata invocata: l'evento è ciò che permette di aspettarla senza una pausa a caso.
@@ -36,10 +36,10 @@ def spia(monkeypatch):
         ricevuti.update(kwargs)
         ricevuti["posizionali"] = args
         chiamata.set()
-        return pipeline.Esito(errore="spia: nessuna lavorazione vera")
+        return pipeline.Outcome(error="spia: nessuna lavorazione vera")
 
-    monkeypatch.setattr(pipeline, "da_url", falsa)
-    monkeypatch.setattr(pipeline, "da_file", falsa)
+    monkeypatch.setattr(pipeline, "from_url", falsa)
+    monkeypatch.setattr(pipeline, "from_file", falsa)
 
     def attendi() -> dict:
         assert chiamata.wait(timeout=5), "la pipeline non è mai stata chiamata"
@@ -50,8 +50,20 @@ def spia(monkeypatch):
 
 @pytest.fixture
 def client(tmp_path):
-    with TestClient(api.crea_app(db=str(tmp_path / "prova.db"))) as c:
+    with TestClient(api.create_app(db=str(tmp_path / "prova.db"))) as c:
         yield c
+
+
+def _ricetta_minima() -> dict:
+    """Una ricetta valida e piccola, nella forma che `to_dict()` produce."""
+    from reel2recipe.recipe import Source, from_draft
+
+    return from_draft(
+        {"titolo": "Pane", "porzioni": "2 persone",
+         "ingredienti": [{"nome": "farina 00", "quantita_raw": "250", "unita_raw": "g"}],
+         "procedimento": ["Impasta."], "lacune": []},
+        source=Source.now(url="https://x/y", author="tester"),
+    ).to_dict()
 
 
 # --------------------------------------------------------------------------------------
@@ -63,28 +75,28 @@ def client(tmp_path):
     "richiesta, lingua_attesa, sistema_atteso",
     [
         ({}, "it", "metrico"),                                    # predefiniti
-        ({"lingua": "en"}, "en", "imperiale"),                    # il sistema segue la lingua
-        ({"lingua": "en", "sistema": "metrico"}, "en", "metrico"),  # inglese coi grammi
-        ({"lingua": "it", "sistema": "imperiale"}, "it", "imperiale"),
+        ({"language": "en"}, "en", "imperiale"),                    # il sistema segue la lingua
+        ({"language": "en", "system": "metrico"}, "en", "metrico"),  # inglese coi grammi
+        ({"language": "it", "system": "imperiale"}, "it", "imperiale"),
     ],
 )
 def test_cook_inoltra_lingua_e_sistema(client, spia, richiesta, lingua_attesa, sistema_atteso):
     risposta = client.post("/api/cook", json={"url": "https://esempio.test/reel/1", **richiesta})
     assert risposta.status_code == 200
     ricevuti = spia()
-    assert ricevuti["lingua"] == lingua_attesa
-    assert ricevuti["sistema"] == sistema_atteso
+    assert ricevuti["language"] == lingua_attesa
+    assert ricevuti["system"] == sistema_atteso
 
 
 def test_cook_inoltra_le_opzioni_di_lavorazione(client, spia):
     client.post("/api/cook", json={
         "url": "https://esempio.test/reel/1",
-        "backend_asr": "mlx", "modello_llm": "qwen2.5:14b", "salta_audio": True,
+        "asr_backend": "mlx", "llm_model": "qwen2.5:14b", "skip_audio": True,
     })
     ricevuti = spia()
-    assert ricevuti["backend_asr"] == "mlx"
-    assert ricevuti["modello_llm"] == "qwen2.5:14b"
-    assert ricevuti["salta_audio"] is True
+    assert ricevuti["asr_backend"] == "mlx"
+    assert ricevuti["llm_model"] == "qwen2.5:14b"
+    assert ricevuti["skip_audio"] is True
 
 
 def test_cook_non_dichiara_una_lingua_del_parlato_che_non_sa(client, spia):
@@ -93,13 +105,13 @@ def test_cook_non_dichiara_una_lingua_del_parlato_che_non_sa(client, spia):
     Non basta che `asr.DEFAULT_LANGUAGE` sia `None` — l'API deve anche non inventarsi
     un valore per conto suo, per esempio deducendolo dalla lingua richiesta in uscita.
     """
-    client.post("/api/cook", json={"url": "https://esempio.test/reel/1", "lingua": "en"})
-    assert spia()["lingua_audio"] is None
+    client.post("/api/cook", json={"url": "https://esempio.test/reel/1", "language": "en"})
+    assert spia()["audio_language"] is None
 
 
 def test_cook_inoltra_la_lingua_del_parlato_forzata(client, spia):
-    client.post("/api/cook", json={"url": "https://esempio.test/reel/1", "lingua_audio": "en"})
-    assert spia()["lingua_audio"] == "en"
+    client.post("/api/cook", json={"url": "https://esempio.test/reel/1", "audio_language": "en"})
+    assert spia()["audio_language"] == "en"
 
 
 def test_cook_senza_url_e_rifiutato(client):
@@ -117,21 +129,21 @@ def test_cook_file_inoltra_tutte_le_opzioni(client, spia):
     un link."""
     risposta = client.post(
         "/api/cook-file",
-        params={"backend_asr": "faster-whisper", "modello_llm": "qwen2.5:14b",
-                "salta_audio": "true", "lingua": "en", "lingua_audio": "it",
-                "didascalia": "una prova"},
+        params={"asr_backend": "faster-whisper", "llm_model": "qwen2.5:14b",
+                "skip_audio": "true", "language": "en", "audio_language": "it",
+                "caption": "una prova"},
         files={"file": ("reel.mp4", b"non un video vero", "video/mp4")},
     )
     assert risposta.status_code == 200
 
     ricevuti = spia()
-    assert ricevuti["backend_asr"] == "faster-whisper"
-    assert ricevuti["modello_llm"] == "qwen2.5:14b"
-    assert ricevuti["salta_audio"] is True
-    assert ricevuti["didascalia"] == "una prova"
-    assert ricevuti["lingua"] == "en"
-    assert ricevuti["sistema"] == "imperiale"
-    assert ricevuti["lingua_audio"] == "it"
+    assert ricevuti["asr_backend"] == "faster-whisper"
+    assert ricevuti["llm_model"] == "qwen2.5:14b"
+    assert ricevuti["skip_audio"] is True
+    assert ricevuti["caption"] == "una prova"
+    assert ricevuti["language"] == "en"
+    assert ricevuti["system"] == "imperiale"
+    assert ricevuti["audio_language"] == "it"
 
 
 def test_cook_file_ripulisce_il_temporaneo(client, spia):
@@ -155,12 +167,12 @@ def test_cook_file_ripulisce_il_temporaneo(client, spia):
 
 @pytest.mark.parametrize("lingua, atteso", [("it", "metrico"), ("en", "imperiale")])
 def test_il_sistema_segue_la_lingua(lingua, atteso):
-    assert api.RichiestaCook(lingua=lingua).assi()["sistema"] == atteso
+    assert api.CookRequest(language=lingua).axes()["system"] == atteso
 
 
 def test_il_sistema_chiesto_esplicitamente_vince():
-    assi = api.RichiestaCook(lingua="en", sistema="metrico").assi()
-    assert assi == {"lingua": "en", "sistema": "metrico"}
+    assi = api.CookRequest(language="en", system="metrico").axes()
+    assert assi == {"language": "en", "system": "metrico"}
 
 
 # --------------------------------------------------------------------------------------
@@ -173,17 +185,56 @@ def test_errori_tradotti(client):
     un'altra cosa — in che lingua produrre la ricetta. Chiamarli uguale avrebbe legato la
     lingua dei bottoni a quella del contenuto senza che nessuno lo avesse deciso."""
     assert client.get("/api/export?lingua_ui=en").json()["detail"] == "The library is empty."
-    assert client.get("/api/export?lingua_ui=it").json()["detail"] == "Library vuota."
+    assert client.get("/api/export?lingua_ui=it").json()["detail"] == "Libreria vuota."
     assert client.get("/api/ricette/999?lingua_ui=en").json()["detail"] == "Recipe not found."
 
 
 def test_errori_in_italiano_senza_indicazione(client):
     """Senza `lingua_ui` si ripiega sull'italiano, che è la lingua in cui il progetto è
     scritto: un ripiego deve essere una lingua vera, non una chiave grezza."""
-    assert client.get("/api/export").json()["detail"] == "Library vuota."
+    assert client.get("/api/export").json()["detail"] == "Libreria vuota."
 
 
 def test_una_lingua_ignota_non_fa_sparire_il_messaggio(client):
     """Il ripiego serve proprio a questo: meglio una frase italiana dentro un'uscita in
     un'altra lingua che un `KeyError` davanti all'utente."""
-    assert client.get("/api/export?lingua_ui=de").json()["detail"] == "Library vuota."
+    assert client.get("/api/export?lingua_ui=de").json()["detail"] == "Libreria vuota."
+
+
+# --------------------------------------------------------------------------------------
+# L'export: il formato chiesto deve essere quello prodotto
+# --------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("formato, tipo, estensione", [
+    ("mela", "application/json", ".melarecipe"),
+    ("markdown", "text/markdown", ".md"),
+    ("pdf", "application/pdf", ".pdf"),
+])
+def test_l_export_rispetta_il_formato_chiesto(client, formato, tipo, estensione):
+    """Il parametro di query deve arrivare davvero al codice che sceglie il formato.
+
+    Nessun test lo copriva, e durante la migrazione il parametro è stato rinominato da
+    `formato` a `format_` nella firma Python — che in FastAPI *è* il nome del parametro di
+    query. La pagina continuava a mandare `?formato=`, che a quel punto non corrispondeva a
+    nulla: ogni export cadeva sul valore predefinito e restituiva un `.melarecipe` con
+    l'etichetta del formato chiesto. Nessun errore, un file sbagliato, e lo si vede solo
+    aprendolo. Trovato eseguendo il prodotto, non la suite.
+    """
+    if formato == "pdf":
+        pytest.importorskip("reportlab")
+
+    id = client.post("/api/ricette", json=_ricetta_minima()).json()["id"]
+    risposta = client.get(f"/api/ricette/{id}/export?formato={formato}")
+
+    assert risposta.status_code == 200
+    assert risposta.headers["content-type"].startswith(tipo)
+    assert estensione in risposta.headers.get("content-disposition", "")
+
+
+def test_un_formato_sconosciuto_non_diventa_un_mela(client):
+    """Il verso opposto: un formato che non esiste deve dirlo, non ripiegare in silenzio."""
+    id = client.post("/api/ricette", json=_ricetta_minima()).json()["id"]
+    risposta = client.get(f"/api/ricette/{id}/export?formato=sbagliato")
+    assert risposta.status_code == 400
+    assert "sbagliato" in risposta.json()["detail"]

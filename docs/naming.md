@@ -46,20 +46,21 @@ field names are also the JSON keys on disk and the *format boundary* runs throug
 of it. **Size predicts effort; contact with stored data predicts risk.** They are not the same
 axis, and the second one is what to plan around.
 
-1. **Done:** `asr.py` (the reference for how prose is handled), `percorsi.py` → `paths.py`,
-   `audio.py`, `acquire.py` — all leaves — `store.py`, whose SQL schema stays Italian as
-   *format* (the reason is in its docstring), `units.py`, the engine, and `recipe.py`, the
-   model — the last together with `web/app.js` and `Library.list_`'s output keys, which read
-   its fields and could not be left a commit behind.
-2. **Next, once each:** `extract.py`, `pipeline.py`, `api.py`, `cli.py` (internals only —
-   its public surface is already English). All of these were updated as *callers* when
-   `units.py` and `recipe.py` moved; what is left is their own identifiers and prose.
-   Done so far in this pass: `mela.py`, and `documenti.py` → `documents.py` (the only
-   module whose file name moved as well, with `tests/test_documenti.py` alongside it).
-3. **Last:** the `data/*.yaml` keys with their loader, then the test modules' own prose (see
-   below), then `docs/`.
+1. **Done — every module in `src/reel2recipe/`.** In order: `asr.py`, `percorsi.py` →
+   `paths.py`, `audio.py`, `acquire.py`, `store.py`, `units.py`, `recipe.py`, `mela.py`,
+   `documenti.py` → `documents.py`, `extract.py`, `pipeline.py`, `api.py`, `cli.py`. The
+   protocol surfaces moved with the only thing that reads them, `web/app.js`: `Recipe`'s JSON
+   keys, `Library.list_`'s output keys, the pipeline's stage names, the SSE payload and
+   `CookRequest`'s fields.
+2. **Left in Italian on purpose**, each with its reason in the module that holds it:
+   `extract.py`'s prompts, schema and delimiters (the model contract); the URL paths and the
+   export's `?formato=` (external surface — the rule is *add a synonym*, as the CLI does with
+   `--porta`); the SQL columns, the nested ingredient keys, the draft's keys and the file
+   names (format); every user-facing Italian string.
+3. **Still to do:** the `data/*.yaml` keys with their loader, the test modules' own prose
+   (see below), `web/app.js`'s and `web/i18n.js`'s own identifiers, then `docs/`.
 
-### What the two hard modules taught
+### What the hard modules taught
 
 The aborted attempt at `units.py` predicted three things. Two were spent immediately — the
 `MESSAGES` keys and the three colliding `note`s were mapped up front and cost nothing. The
@@ -97,11 +98,43 @@ apostrophes and replaced the ASCII one with itself, with a real consequence on t
 went into its own commit *before* the rename, so the translation commit changed no behaviour.
 Keep that split: a rename that also fixes something is a rename nobody can review.
 
-`extract.py` carries an obligation the others do not: it holds the system prompts and the
-JSON schema, so after touching it the model gate has to run —
+### The three ways a rename hides
+
+By the end, the migration had produced four real defects and every one of them was invisible
+to `./check.sh`. They fall into three kinds, and the countermeasure for each is now in the
+repo rather than in someone's memory.
+
+**1. Tests that do not run.** `extract.py` carries an obligation the others do not: it holds
+the system prompts and the JSON schema, so after touching it the model gate has to run —
 `R2R_TEST_MODELLO=1 uv run pytest tests/test_modello.py`, roughly two minutes, and it needs
-Ollama up. Renaming identifiers around the prompts does not change them, but the gate is
-cheap next to the risk of finding out later.
+Ollama up. That gate is opt-in, and a mechanical kwarg rename during the `recipe.py` step
+had made `tests/test_modello.py` call `estrai_bozza(transcript=…)` — a parameter that did not
+exist. The test that protects the project's central promise sat uncallable for two commits.
+**An opt-in test is not covered by the net; run it in the same session you touch it, even
+by accident.**
+
+**2. Code no test reaches.** `text(lingua, "pronta", titolo=…)` became `title=…` while the
+sentence still said `{titolo}`. `str.format` raises `KeyError`, so every successful job would
+have died on its last progress message — and reaching that line needs Ollama and a real file.
+`tests/test_web.py` now compares, by AST, the keyword arguments of every `text(...)` call
+against the placeholders its sentence declares. The neighbouring guard compared placeholders
+*between languages*; this one compares them with *whoever fills them*, which is a different
+question.
+
+**3. Wiring only the running product exercises.** `serve_command` imports `create_app` inside
+the function, so the stale name survived every test and died on the first real start. And the
+export's `?formato=` query parameter, renamed to `format_` in the Python signature — which in
+FastAPI *is* the query name — made all three formats silently return a `.melarecipe`. No
+error, a wrong file, visible only on opening it. Both were found by restarting the server and
+running a real reel end to end. `tests/test_api.py` now covers the export formats; for the
+rest, **restart the thing and use it** is the only guard there is.
+
+And the one that was not this migration's fault but was found by it: `"Libreria vuota."` had
+been `"Library vuota."` since the `store.py` step, and `tests/test_api.py` asserted the broken
+string — a test locking a defect in place. Which is the argument for the string-literal diff:
+extracting every literal from `src/` before and after, and reading the difference. It caught
+four Italian sentences a regex had walked into, a non-breaking space lost by a hand-rewrite,
+and a help line that had started advertising a database file that does not exist.
 
 ## What must NOT be renamed
 
