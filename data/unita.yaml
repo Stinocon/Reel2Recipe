@@ -56,17 +56,6 @@ volume_imperiale:
   - quart
   - gallon
 
-# Unità di destinazione per ciascun sistema, in ordine di grandezza decrescente. `units.py`
-# sceglie la più grande che dia un numero ancora comodo da leggere: 5 ml restano cucchiaini,
-# non "0,02 cup".
-destinazione:
-  metrico:
-    peso: [g]
-    volume: [ml]
-  imperiale:
-    peso: [lb, oz]
-    volume: [cup, tbsp, tsp]
-
 # Etichette d'uscita per lingua: sostituiscono il nome tecnico dell'unità quando esiste una
 # forma corrente. In italiano "tbsp" si dice cucchiaio; in inglese "cucchiaio" si dice tbsp.
 # La tabella è simmetrica di proposito — è il cuore della bidirezionalità.
