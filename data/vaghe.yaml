@@ -1,38 +1,40 @@
-# vaghe.yaml — le misure "a occhio" della cucina, in italiano e in inglese.
+# vaghe.yaml — the kitchen's "by eye" measures, in Italian and in English.
 #
-# "q.b.", "un pizzico", "un filo d'olio", "una noce di burro" non sono unità di misura:
-# sono convenzioni linguistiche. Non hanno un valore esatto, ma hanno un valore *tipico*,
-# e ignorarle significherebbe buttare via metà degli ingredienti di un reel.
+# "q.b.", "un pizzico", "un filo d'olio", "una noce di burro" are not units of measurement:
+# they are conventions of language. They have no exact value, but they do have a *typical*
+# one, and ignoring them would mean throwing away half a reel's ingredients.
 #
-# Ogni voce qui dentro produce una quantità con provenienza `stimato:vaghe`, che
-# l'interfaccia e l'export segnalano come stima. Non vengono mai presentate come dati
-# certi: sono un aiuto, non una misurazione.
+# Every entry in here produces a quantity with provenance `stimato:vaghe`, which the interface
+# and the exports flag as an estimate. They are never presented as certain data: they are a
+# help, not a measurement.
 #
-# `without_quantity: true` significa che l'espressione non esprime affatto una quantità
-# ("q.b."): in quel caso non si stima nulla, si conserva la dicitura.
+# The **keys** are English; the expressions and their aliases are not, and cannot be: they are
+# the words the captions are written in, and they are what the lookup matches against.
+#
+# `without_quantity: true` means the expression does not express a quantity at all ("q.b."):
+# in that case nothing is estimated, the wording is kept.
 #
 # ---------------------------------------------------------------------------------
-# PERCHÉ LA NOTA NON STA IN TABELLA
+# WHY THE NOTE IS NOT IN THE TABLE
 #
-# La nota che spiega la stima ("un pizzico ≈ 0,5 g") non si scrive qui: si compone dal
-# valore effettivo. Scritta a mano dipenderebbe dalla lingua, mentre il numero dipende dal
-# sistema — e le due cose divergono: in metrico/inglese si otteneva "0,5 g (a pinch is about
-# 1/8 tsp)", una nota che contraddice il numero che accompagna. Qui resta solo il nome
-# dell'espressione per lingua, che è l'unica parte non deducibile.
+# The note explaining the estimate ("un pizzico ≈ 0,5 g") is not written here: it is composed
+# from the actual value. Written by hand it would depend on the language, while the number
+# depends on the system — and the two diverge: in metric/English you got "0,5 g (a pinch is
+# about 1/8 tsp)", a note contradicting the number it accompanies. What stays here is only the
+# expression's name per language, which is the only part that cannot be deduced.
 #
-# PERCHÉ IL VALORE È DICHIARATO PER SISTEMA
+# WHY THE VALUE IS DECLARED PER SYSTEM
 #
-# Un pizzico in grammi è 0,5; convertirlo meccanicamente in once darebbe 0,018 oz, che non
-# è una misura che qualcuno esegua. In inglese un pizzico si scrive "1/8 tsp", e quello è il
-# dato giusto — non il risultato di una divisione. Quindi il valore tipico si dichiara per
-# ciascun sistema, come si fa per le densità: il numero sta in tabella, non in un calcolo
-# che lo rovina.
+# A pinch in grams is 0.5; converting it mechanically into ounces would give 0.018 oz, which is
+# not a measure anybody carries out. In English a pinch is written "1/8 tsp", and that is the
+# right datum — not the result of a division. So the typical value is declared for each system,
+# as is done for the densities: the number is in the table, not in a calculation that ruins it.
 #
-# aggiornato: 2026-07-24
+# updated: 2026-07-24
 
 expressions:
 
-  # ---- non esprimono una quantità -------------------------------------------
+  # ---- these express no quantity at all -------------------------------------
   "q.b.":
     without_quantity: true
     rendering:
@@ -46,7 +48,7 @@ expressions:
       en: "as needed"
     alias: [al bisogno, se necessario, as required]
 
-  # ---- piccole quantità di condimento ---------------------------------------
+  # ---- small amounts of seasoning -------------------------------------------
   "un pizzico":
     name:
       it: "un pizzico"
@@ -72,7 +74,7 @@ expressions:
       imperiale: {quantity: 0.125, unit: tsp}
     alias: [punta di coltello, una punta di, knife tip]
 
-  # ---- grassi e liquidi versati a occhio ------------------------------------
+  # ---- fats and liquids poured by eye ---------------------------------------
   "un filo":
     name:
       it: "un filo"
@@ -114,7 +116,7 @@ expressions:
       imperiale: {quantity: 1.0, unit: cup}
     alias: [tazza, una tazza di, tazzina, a mug, mug]
 
-  # ---- quantità a manciate ---------------------------------------------------
+  # ---- quantities by the handful ---------------------------------------------
   "una manciata":
     name:
       it: "una manciata"
@@ -132,7 +134,7 @@ expressions:
       imperiale: {quantity: 0.75, unit: oz}
     alias: [mazzetto, un mazzetto di, un ciuffo, ciuffo, un mazzo, a bunch, bunch]
 
-  # ---- pezzi contati ---------------------------------------------------------
+  # ---- counted pieces --------------------------------------------------------
   "uno spicchio":
     name:
       it: "uno spicchio"
@@ -150,8 +152,8 @@ expressions:
       imperiale: {quantity: 1.0, unit: oz}
     alias: [fetta, una fetta di, slice, a slice]
 
-  # ---- moltiplicatori di conteggio (non producono peso) ----------------------
-  # Diventano un numero puro applicato all'unità che segue, o al conteggio dei pezzi.
+  # ---- counting multipliers (they produce no weight) -------------------------
+  # They become a pure number applied to the unit that follows, or to the count of pieces.
   "un paio":
     multiplier: 2
     alias: [paio, un paio di, a couple, a couple of]
@@ -159,8 +161,8 @@ expressions:
     multiplier: 12
     alias: [dozzina, una dozzina di, dozen, a dozen]
 
-# Espressioni che indicano quantità genuinamente indeterminata: non si stima,
-# si dichiara la lacuna e si conserva il testo.
+# Expressions denoting a genuinely open-ended quantity: nothing is estimated, the gap is
+# declared and the text is kept.
 indeterminate:
   - qualche
   - alcuni

@@ -1,55 +1,57 @@
-# densita.yaml — densità per ingrediente, per convertire un VOLUME in un PESO.
+# densita.yaml — density per ingredient, for converting a VOLUME into a WEIGHT.
 #
-# Perché questo file esiste. "1 cup di farina" e "1 cup di zucchero" occupano lo stesso
-# volume ma pesano 120 g e 200 g: una differenza del 67%. Nessuna conversione volume→peso
-# è possibile senza sapere *cosa* si sta misurando. Un LLM a cui si chiede di convertire
-# produce un numero plausibile e spesso sbagliato; qui il numero viene da una tabella.
+# Why this file exists. "1 cup di farina" and "1 cup di zucchero" occupy the same volume but
+# weigh 120 g and 200 g: a difference of 67%. No volume→weight conversion is possible without
+# knowing *what* is being measured. An LLM asked to convert produces a plausible and often
+# wrong number; here the number comes from a table.
 #
-# REGOLA NON NEGOZIABILE: se un ingrediente non è in questa tabella, la conversione
-# volume→peso NON si fa. Si conserva l'unità originale e si dichiara la lacuna.
-# Non esiste una "densità media" da usare come ripiego — sarebbe un'invenzione.
+# NON-NEGOTIABLE RULE: if an ingredient is not in this table, the volume→weight conversion is
+# NOT done. The original unit is kept and the gap is declared. There is no "average density" to
+# fall back on — that would be an invention.
 #
-# `g_per_ml` è l'unico valore operativo. Il peso per cup citato in `source` è la
-# documentazione da cui deriva: g_per_ml = g_per_cup / 236,5882365 (la cup US, in
-# unita.yaml). Non viene letto dal codice: un solo dato, un solo posto.
+# The **keys are English, the ingredient names are not**: they are what the model writes and
+# what the cook reads, and the lookup matches against them. `g_per_ml` is the only operative
+# value. The weight per cup quoted in `source` is the documentation it derives from:
+# g_per_ml = g_per_cup / 236.5882365 (the US cup, in unita.yaml). It is not read by the code:
+# one datum, one place.
 #
-# I valori dei secchi sono per ingrediente versato e livellato, non pressato, salvo nota.
-# Sono grandezze intrinsecamente variabili (±5-10% a seconda di umidità e compattazione):
-# vanno bene per cucinare, non per la chimica analitica.
+# The values for dry ingredients are for the ingredient poured and levelled, not packed, unless
+# noted. They are intrinsically variable quantities (±5–10% depending on humidity and
+# compaction): fine for cooking, not for analytical chemistry.
 #
 # ---------------------------------------------------------------------------------
-# LE FONTI
+# THE SOURCES
 #
-# Ogni densità deve citare un riferimento che chi legge possa andare a controllare: un
-# numero senza provenienza è un numero di cui non ci si può fidare. Il test
-# `test_ogni_densita_cita_una_fonte_nominata` lo verifica, e non accetta una fonte che si
-# limiti a ripetere il numero.
+# Every density has to cite a reference the reader can go and check: a number without a
+# provenance is a number you cannot trust. The test `test_every_density_cites_a_named_source`
+# verifies it, and does not accept a source that merely repeats the number.
 #
-#   USDA FDC <id>   FoodData Central, dataset SR Legacy. L'ID identifica l'alimento:
+#   USDA FDC <id>   FoodData Central, SR Legacy dataset. The ID identifies the food:
 #                   https://fdc.nal.usda.gov/food-details/<id>
-#   King Arthur     Ingredient Weight Chart, riferimento standard della panificazione:
+#   King Arthur     Ingredient Weight Chart, the standard baking reference:
 #                   https://www.kingarthurbaking.com/learn/ingredient-weight-chart
-#   definizione:    solo per l'acqua: 1 ml = 1 g non è una misura, è la definizione.
+#   definizione:    for water only: 1 ml = 1 g is not a measurement, it is the definition.
+#                   (The marker stays Italian: it is matched literally by the test.)
 #
-# Le due fonti non sempre concordano, e dove diverge la scelta è dichiarata nella voce.
-# I casi noti: farina 00 (King Arthur 120 g/cup, USDA 125), farina integrale (113 contro
-# 120), zucchero di canna (213 contro 220), avena (King Arthur 113, USDA 81). Dove il
-# valore in uso coincide con una delle due, si cita quella — è la sua provenienza reale.
+# The two sources do not always agree, and where they diverge the choice is declared in the
+# entry. The known cases: farina 00 (King Arthur 120 g/cup, USDA 125), farina integrale (113
+# against 120), zucchero di canna (213 against 220), avena (King Arthur 113, USDA 81). Where
+# the value in use matches one of the two, that is the one cited — it is its real provenance.
 #
 # ---------------------------------------------------------------------------------
-# COME SI AGGIUNGE UNA VOCE
+# HOW TO ADD AN ENTRY
 #
-# `units.py` risolve un nome cercando la voce più lunga contenuta nel nome, e a parità di
-# lunghezza la scelta è arbitraria. Quindi ogni composto formabile va scritto per esteso:
-# senza una voce `latte di cocco`, quel nome pescherebbe a caso fra `latte` e `cocco`.
-# Vale anche per gli alias inglesi (`coconut milk` accanto a `milk`). Il test
-# `test_ogni_voce_risolve_a_se_stessa` non lascia passare una voce irraggiungibile.
+# `units.py` resolves a name by looking for the longest entry contained in it, and at equal
+# length the choice is arbitrary. So every compound that can be formed has to be written out in
+# full: without a `latte di cocco` entry, that name would pick at random between `latte` and
+# `cocco`. The same holds for the English aliases (`coconut milk` next to `milk`). The test
+# `test_every_entry_resolves_to_itself` does not let an unreachable entry through.
 #
-# aggiornato: 2026-07-24
+# updated: 2026-07-24
 
 ingredients:
 
-  # ---- farine e amidi -------------------------------------------------------
+  # ---- flours and starches --------------------------------------------------
   "farina 00":
     g_per_ml: 0.5072
     source: "King Arthur Baking, Ingredient Weight Chart — 120 g per cup (USDA FDC 168894 dà 125: divergenza nota)"
@@ -96,7 +98,7 @@ ingredients:
     source: "King Arthur Baking, Ingredient Weight Chart — 152 g per cup"
     alias: [fecola, potato starch]
 
-  # ---- zuccheri e dolcificanti ---------------------------------------------
+  # ---- sugars and sweeteners ------------------------------------------------
   "zucchero semolato":
     g_per_ml: 0.8454
     source: "USDA FDC 169655 — 200 g per cup"
@@ -131,7 +133,7 @@ ingredients:
     source: "USDA FDC 172194 — 252 g per cup"
     alias: [evaporated milk]
 
-  # ---- grassi ---------------------------------------------------------------
+  # ---- fats -----------------------------------------------------------------
   "burro":
     g_per_ml: 0.9595
     source: "USDA FDC 173430 — 227 g per cup"
@@ -164,7 +166,7 @@ ingredients:
     source: "King Arthur Baking, Ingredient Weight Chart — 128 g per mezza cup"
     alias: [tahin, tahini, crema di sesamo]
 
-  # ---- liquidi e latticini --------------------------------------------------
+  # ---- liquids and dairy ----------------------------------------------------
   "acqua":
     g_per_ml: 1.0
     liquid: true
@@ -275,7 +277,7 @@ ingredients:
     source: "USDA FDC 174863 — 237 g per cup"
     alias: [beer]
 
-  # ---- cereali, legumi, frutta secca ---------------------------------------
+  # ---- grains, pulses, nuts -------------------------------------------------
   "riso":
     g_per_ml: 0.7819
     source: "USDA FDC 168877 — 185 g per cup, crudo a chicco lungo"
@@ -359,7 +361,7 @@ ingredients:
     alias: [cocco rape, cocco grattugiato, farina di cocco rapé, shredded coconut,
             desiccated coconut]
 
-  # ---- semi ------------------------------------------------------------------
+  # ---- seeds -----------------------------------------------------------------
   "semi di sesamo":
     g_per_ml: 0.6087
     source: "USDA FDC 170150 — 144 g per cup, interi essiccati"
@@ -385,7 +387,7 @@ ingredients:
     source: "USDA FDC 171330 — 2,8 g per cucchiaino"
     alias: [papavero, poppy seeds]
 
-  # ---- altri secchi ---------------------------------------------------------
+  # ---- other dry ingredients ------------------------------------------------
   "cacao amaro":
     g_per_ml: 0.3635
     source: "USDA FDC 169593 — 86 g per cup, in polvere non zuccherato"
@@ -408,9 +410,9 @@ ingredients:
     source: "USDA FDC 171893 — 1 g per cucchiaino, in polvere"
     alias: [caffe solubile, caffè istantaneo, instant coffee]
 
-  # ---- spezie e polveri -----------------------------------------------------
-  # Si usano quasi solo a cucchiaino: la densità serve per la nota fra parentesi
-  # ("1 cucchiaino ≈ 2,6 g"), non per sostituire il cucchiaino.
+  # ---- spices and powders ---------------------------------------------------
+  # They are used almost only by the teaspoon: the density serves the note in brackets
+  # ("1 cucchiaino ≈ 2,6 g"), not to replace the teaspoon.
   "cannella":
     g_per_ml: 0.5275
     source: "USDA FDC 171320 — 2,6 g per cucchiaino, macinata"
@@ -436,10 +438,10 @@ ingredients:
     source: "USDA FDC 171325 — 3,1 g per cucchiaino"
     alias: [garlic powder]
 
-  # ---- sale e agenti lievitanti --------------------------------------------
-  # Attenzione: sono gli ingredienti dove l'errore di conversione pesa di più in
-  # proporzione. Per questi, units.py preferisce conservare l'unità originale
-  # (cucchiaino) e riportare i grammi come commento.
+  # ---- salt and raising agents ----------------------------------------------
+  # Careful: these are the ingredients where a conversion error weighs most in proportion.
+  # For them, units.py prefers to keep the original unit (cucchiaino) and report the grams
+  # as a comment.
   "sale fino":
     g_per_ml: 1.2173
     source: "USDA FDC 173468 — 6 g per cucchiaino, sale da tavola"
