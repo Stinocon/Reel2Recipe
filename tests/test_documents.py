@@ -1,9 +1,9 @@
-"""Test dell'export in Markdown e PDF.
+"""Tests for the Markdown and PDF export.
 
-Questi formati esistono per chi non ha Mela, quindi devono bastare da soli: la ricetta
-completa, i gruppi, la fonte, e soprattutto **le incertezze**. Il test che conta più di
-tutti è `test_le_lacune_finiscono_nell_export`: un PDF pulito che nasconde le stime sarebbe
-più bello e più pericoloso di uno che le dichiara.
+These formats exist for anyone without Mela, so they have to stand on their own: the complete
+recipe, the groups, the source, and above all **the uncertainties**. The test that matters
+more than all the others is `test_the_gaps_end_up_in_the_export`: a clean PDF that hides the
+estimates would be prettier and more dangerous than one that declares them.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from reel2recipe.documents import (
 )
 from reel2recipe.recipe import Source, Recipe, from_draft, free_path
 
-BOZZA = {
+DRAFT = {
     "titolo": "Tiramisù al pistacchio",
     "porzioni": "6 persone",
     "tempo_preparazione_min": 25,
@@ -38,14 +38,14 @@ BOZZA = {
 
 
 @pytest.fixture
-def ricetta() -> Recipe:
-    return from_draft(BOZZA, source=Source.now(
+def recipe() -> Recipe:
+    return from_draft(DRAFT, source=Source.now(
         url="https://www.instagram.com/reel/ABC123/", author="cucina_test",
     ))
 
 
 @pytest.fixture
-def semplice() -> Recipe:
+def simple() -> Recipe:
     return from_draft(
         {"titolo": "Pasta al burro",
          "ingredienti": [{"quantita_raw": "100", "unita_raw": "g", "nome": "burro"}],
@@ -58,8 +58,8 @@ def semplice() -> Recipe:
 # ----------------------------------------------------------------------------------
 
 
-def test_markdown_ha_la_ricetta_completa(ricetta):
-    md = to_markdown(ricetta)
+def test_markdown_has_the_complete_recipe(recipe):
+    md = to_markdown(recipe)
     assert md.startswith("# Tiramisù al pistacchio")
     assert "## Ingredienti" in md and "## Procedimento" in md
     assert "- 250 g ricotta" in md
@@ -67,50 +67,50 @@ def test_markdown_ha_la_ricetta_completa(ricetta):
     assert "2. Componi a strati." in md
 
 
-def test_markdown_annida_i_gruppi_sotto_gli_ingredienti(ricetta):
-    """I gruppi sono una parte degli ingredienti, non una sezione pari al procedimento:
-    devono stare a un livello di intestazione più basso."""
-    md = to_markdown(ricetta)
+def test_markdown_nests_the_groups_under_the_ingredients(recipe):
+    """The groups are a part of the ingredients, not a section on a par with the method: they
+    belong at a lower heading level."""
+    md = to_markdown(recipe)
     assert "### Per la crema" in md
     assert "### Per la base" in md
     assert "## Per la crema" not in md.replace("### Per la crema", "")
 
 
-def test_markdown_senza_gruppi_non_inventa_intestazioni(semplice):
-    md = to_markdown(semplice)
+def test_markdown_without_groups_invents_no_headings(simple):
+    md = to_markdown(simple)
     assert "###" not in md
     assert "- 100 g burro" in md
 
 
-def test_markdown_cita_la_fonte(ricetta):
-    """Il procedimento è riformulato con parole nostre: senza il rimando all'originale
-    l'attribuzione all'autore si perderebbe (docs/legale.md)."""
-    md = to_markdown(ricetta)
+def test_markdown_cites_the_source(recipe):
+    """The method is reworded in our own words: without the pointer back to the original the
+    attribution to the author would be lost (docs/legale.md)."""
+    md = to_markdown(recipe)
     assert "## Fonte" in md
     assert "cucina_test" in md
     assert "https://www.instagram.com/reel/ABC123/" in md
 
 
-def test_il_sommario_riporta_porzioni_e_tempi(ricetta):
-    assert "6 persone" in to_markdown(ricetta)
-    assert "preparazione 25 min" in to_markdown(ricetta)
+def test_the_summary_carries_servings_and_times(recipe):
+    assert "6 persone" in to_markdown(recipe)
+    assert "preparazione 25 min" in to_markdown(recipe)
 
 
-def test_le_lacune_finiscono_nell_export(ricetta):
-    """Il test che conta. Chi stampa la ricetta e la porta in cucina deve vedere sia ciò
-    che il reel non diceva, sia quali numeri sono stime nostre e non dati."""
-    md = to_markdown(ricetta)
+def test_the_gaps_end_up_in_the_export(recipe):
+    """The test that matters. Whoever prints the recipe and takes it into the kitchen has to
+    see both what the reel did not say and which numbers are estimates of ours, not data."""
+    md = to_markdown(recipe)
     assert "## Da verificare" in md
     assert "Il reel non diceva quante uova." in md
-    # "un pizzico" è diventato 0,5 g: un numero prodotto da noi, e va detto.
+    # "un pizzico" became 0.5 g: a number produced by us, and it has to be said.
     assert "stima" in md and "sale" in md
 
 
-def test_scrivi_markdown_non_sovrascrive(ricetta, tmp_path):
-    primo = write_markdown(ricetta, tmp_path)
-    secondo = write_markdown(ricetta, tmp_path)
-    assert primo != secondo and primo.exists() and secondo.exists()
-    assert primo.read_text(encoding="utf-8").startswith("# Tiramisù")
+def test_write_markdown_does_not_overwrite(recipe, tmp_path):
+    first = write_markdown(recipe, tmp_path)
+    second = write_markdown(recipe, tmp_path)
+    assert first != second and first.exists() and second.exists()
+    assert first.read_text(encoding="utf-8").startswith("# Tiramisù")
 
 
 # ----------------------------------------------------------------------------------
@@ -118,83 +118,83 @@ def test_scrivi_markdown_non_sovrascrive(ricetta, tmp_path):
 # ----------------------------------------------------------------------------------
 
 
-def test_pdf_e_un_pdf_valido(ricetta, tmp_path):
-    pytest.importorskip("reportlab", reason="l'export PDF richiede l'extra «doc»")
-    percorso = write_pdf(ricetta, tmp_path)
-    assert percorso.suffix == ".pdf"
-    assert percorso.read_bytes().startswith(b"%PDF")
+def test_the_pdf_is_a_valid_pdf(recipe, tmp_path):
+    pytest.importorskip("reportlab", reason="the PDF export needs the «doc» extra")
+    path = write_pdf(recipe, tmp_path)
+    assert path.suffix == ".pdf"
+    assert path.read_bytes().startswith(b"%PDF")
 
 
-def test_pdf_e_markdown_hanno_lo_stesso_nome_di_base(ricetta, tmp_path):
-    """Tre vestiti della stessa ricetta devono chiamarsi allo stesso modo, o ritrovarli
-    nella cartella di export diventa un indovinello."""
-    pytest.importorskip("reportlab", reason="l'export PDF richiede l'extra «doc»")
-    assert write_pdf(ricetta, tmp_path).stem == write_markdown(ricetta, tmp_path).stem
+def test_pdf_and_markdown_share_the_same_base_name(recipe, tmp_path):
+    """Three outfits of the same recipe have to be called the same thing, or finding them
+    again in the export folder becomes a riddle."""
+    pytest.importorskip("reportlab", reason="the PDF export needs the «doc» extra")
+    assert write_pdf(recipe, tmp_path).stem == write_markdown(recipe, tmp_path).stem
 
 
-def test_senza_reportlab_l_errore_dice_cosa_fare(ricetta, tmp_path, monkeypatch):
-    """Se manca l'extra, il messaggio deve indicare il comando e l'alternativa, non
-    limitarsi a un ImportError."""
+def test_without_reportlab_the_error_says_what_to_do(recipe, tmp_path, monkeypatch):
+    """If the extra is missing, the message has to name the command and the alternative, not
+    stop at an ImportError."""
     import builtins
 
-    vero_import = builtins.__import__
+    real_import = builtins.__import__
 
-    def import_che_nega_reportlab(nome, *args, **kwargs):
-        if nome.startswith("reportlab"):
-            raise ImportError("simulazione: reportlab non installato")
-        return vero_import(nome, *args, **kwargs)
+    def import_refusing_reportlab(name, *args, **kwargs):
+        if name.startswith("reportlab"):
+            raise ImportError("simulation: reportlab not installed")
+        return real_import(name, *args, **kwargs)
 
-    monkeypatch.setattr(builtins, "__import__", import_che_nega_reportlab)
+    monkeypatch.setattr(builtins, "__import__", import_refusing_reportlab)
     with pytest.raises(DocumentError) as e:
-        write_pdf(ricetta, tmp_path)
+        write_pdf(recipe, tmp_path)
     assert "uv sync --extra doc" in str(e.value)
     assert "markdown" in str(e.value).lower()
 
 
 @pytest.mark.parametrize(
-    "prima, dopo",
+    "before, after",
     [
-        ("≈ 4 g", "~ 4 g"),          # il simbolo che produciamo di più
-        ("perché", "perché"),         # gli accenti stanno in Latin-1 e restano
-        ("buono 🇯🇵📍 davvero", "buono davvero"),   # le emoji spariscono senza lasciare spazi doppi
+        ("≈ 4 g", "~ 4 g"),          # the symbol we produce most often
+        ("perché", "perché"),         # accents are in Latin-1 and stay
+        ("buono 🇯🇵📍 davvero", "buono davvero"),   # emoji vanish without leaving double spaces
         ("2–3 cucchiai", "2-3 cucchiai"),
     ],
 )
-def test_testo_pdf_riduce_solo_cio_che_non_si_puo_disegnare(prima, dopo):
-    assert _pdf_text(prima) == dopo
+def test_pdf_text_reduces_only_what_cannot_be_drawn(before, after):
+    assert _pdf_text(before) == after
 
 
-def test_xml_sicuro_protegge_i_paragrafi():
-    """reportlab legge i paragrafi come mini-XML: un ingrediente con "&" farebbe esplodere
-    l'export invece di stampare una e commerciale."""
+def test_xml_safe_protects_the_paragraphs():
+    """reportlab reads paragraphs as mini-XML: an ingredient containing "&" would blow up the
+    export instead of printing an ampersand."""
     assert _xml_safe("sale & pepe <tutto>") == "sale &amp; pepe &lt;tutto&gt;"
 
 
 # ----------------------------------------------------------------------------------
-# Helper condivisi
+# Shared helpers
 # ----------------------------------------------------------------------------------
 
 
-def test_percorso_libero_non_calpesta_un_export_precedente(tmp_path):
-    primo = free_path(tmp_path, "ricetta", ".md")
-    primo.write_text("primo", encoding="utf-8")
-    secondo = free_path(tmp_path, "ricetta", ".md")
-    assert secondo.name == "ricetta-2.md"
-    assert primo.read_text(encoding="utf-8") == "primo"
+def test_free_path_does_not_tread_on_an_earlier_export(tmp_path):
+    first = free_path(tmp_path, "ricetta", ".md")
+    first.write_text("first", encoding="utf-8")
+    second = free_path(tmp_path, "ricetta", ".md")
+    assert second.name == "ricetta-2.md"
+    assert first.read_text(encoding="utf-8") == "first"
 
 
-def test_nome_file_e_leggibile_e_sicuro():
+def test_the_file_name_is_readable_and_safe():
     assert from_draft({"titolo": "Tiramisù al pistacchio!", "ingredienti": [],
                      "procedimento": [], "confidenza": {}, "lacune": []}).file_name() \
         == "tiramisu-al-pistacchio"
 
 
-def test_export_in_inglese_traduce_l_involucro(tmp_path):
-    """L'involucro — sezioni, attribuzione, piede — segue la lingua della ricetta.
+def test_the_english_export_translates_the_wrapper(tmp_path):
+    """The wrapper — sections, attribution, footer — follows the recipe's language.
 
-    I nomi degli ingredienti no: quelli vengono dall'estrazione, non si ritraducono a valle
-    (per quello serve una nuova estrazione). Qui si verifica ciò che il CODICE controlla:
-    le intestazioni.
+    The ingredient names do not: those come from the extraction and are not re-translated
+    downstream (that would take a fresh extraction). What is checked here is what the CODE
+    controls: the headings.
     """
     from reel2recipe.units import Language, System
     r = from_draft(
@@ -209,15 +209,15 @@ def test_export_in_inglese_traduce_l_involucro(tmp_path):
     assert "## Ingredients" in md and "## Method" in md
     assert "## To check" in md and "## Source" in md
     assert "Recipe by baker" in md
-    # E il sistema imperiale: 1 cup di farina resta 1 cup, non 120 g.
+    # And the imperial system: 1 cup of flour stays 1 cup, not 120 g.
     assert "1 cup flour" in md
-    # Nessuna intestazione italiana sopravvissuta.
+    # No Italian heading has survived.
     assert "Ingredienti" not in md and "Procedimento" not in md
 
 
-def test_export_in_italiano_resta_italiano(ricetta):
-    """Il default non deve essere toccato dal multilingua: senza chiedere nulla, tutto in
-    italiano."""
-    md = to_markdown(ricetta)
+def test_the_italian_export_stays_italian(recipe):
+    """The default must not be disturbed by the multilingual work: ask for nothing, get
+    everything in Italian."""
+    md = to_markdown(recipe)
     assert "## Ingredienti" in md and "## Procedimento" in md
     assert "Ingredients" not in md
