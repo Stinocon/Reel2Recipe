@@ -326,7 +326,7 @@ src/reel2recipe/     il codice
   units.py           conversione deterministica delle quantità — il cuore del progetto
   recipe.py          il modello di una ricetta
   mela.py            export nel formato Mela
-  documenti.py       export in Markdown e PDF, per chi non usa Mela
+  documents.py       export in Markdown e PDF, per chi non usa Mela
   store.py           il ricettario (SQLite + ricerca full-text)
   paths.py           dove vivono i dati (una sola decisione, spostabile con R2R_WORKSPACE)
   pipeline.py        la catena completa

@@ -51,10 +51,11 @@ axis, and the second one is what to plan around.
    *format* (the reason is in its docstring), `units.py`, the engine, and `recipe.py`, the
    model — the last together with `web/app.js` and `Library.list_`'s output keys, which read
    its fields and could not be left a commit behind.
-2. **Next, once each:** `mela.py`, `documenti.py` → `documents.py`, `extract.py`,
-   `pipeline.py`, `api.py`, `cli.py` (internals only — its public surface is already
-   English). All of these were updated as *callers* when `units.py` and `recipe.py` moved;
-   what is left is their own identifiers and prose.
+2. **Next, once each:** `extract.py`, `pipeline.py`, `api.py`, `cli.py` (internals only —
+   its public surface is already English). All of these were updated as *callers* when
+   `units.py` and `recipe.py` moved; what is left is their own identifiers and prose.
+   Done so far in this pass: `mela.py`, and `documenti.py` → `documents.py` (the only
+   module whose file name moved as well, with `tests/test_documenti.py` alongside it).
 3. **Last:** the `data/*.yaml` keys with their loader, then the test modules' own prose (see
    below), then `docs/`.
 

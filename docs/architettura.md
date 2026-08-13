@@ -24,7 +24,7 @@ c'è [`legale.md`](legale.md).
                      ▼   Recipe — quantità metriche + provenienza + gaps
               ┌──────┴──────┬─────────────┐
               ▼             ▼             ▼
-            store         mela        documenti
+            store         mela        documents
           (SQLite)  (.melarecipe)   (.md / .pdf)
 ```
 
@@ -281,7 +281,7 @@ sapute, perché sbagliarle non dà errore ma un import sbagliato:
 Entrambi sono protetti da test in `tests/test_mela.py`, ma il collaudo vero resta **aprire un
 `.melarecipe` in Mela su iOS** e controllare che tutto arrivi pulito.
 
-### Markdown e PDF (`documenti.py`)
+### Markdown e PDF (`documents.py`)
 
 Mela è il formato migliore *se* ce l'hai. Chi non ce l'ha resterebbe senza niente da tenere,
 e una ricetta che non puoi conservare non ha risolto il problema di partenza: ritrovarla. Da

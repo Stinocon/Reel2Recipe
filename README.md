@@ -331,7 +331,7 @@ src/reel2recipe/     the code
   units.py           deterministic conversion of amounts — the heart of the project
   recipe.py          the model of a recipe
   mela.py            export in Mela's format
-  documenti.py       export to Markdown and PDF, for those without Mela
+  documents.py       export to Markdown and PDF, for those without Mela
   store.py           the recipe book (SQLite + full-text search)
   paths.py           where the data lives (one decision, movable with R2R_WORKSPACE)
   pipeline.py        the whole chain

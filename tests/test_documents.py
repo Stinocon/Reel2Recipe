@@ -10,13 +10,13 @@ from __future__ import annotations
 
 import pytest
 
-from reel2recipe.documenti import (
-    ErroreDocumento,
-    _testo_pdf,
-    _xml_sicuro,
-    scrivi_markdown,
-    scrivi_pdf,
-    verso_markdown,
+from reel2recipe.documents import (
+    DocumentError,
+    _pdf_text,
+    _xml_safe,
+    write_markdown,
+    write_pdf,
+    to_markdown,
 )
 from reel2recipe.recipe import Source, Recipe, from_draft, free_path
 
@@ -59,7 +59,7 @@ def semplice() -> Recipe:
 
 
 def test_markdown_ha_la_ricetta_completa(ricetta):
-    md = verso_markdown(ricetta)
+    md = to_markdown(ricetta)
     assert md.startswith("# Tiramisù al pistacchio")
     assert "## Ingredienti" in md and "## Procedimento" in md
     assert "- 250 g ricotta" in md
@@ -70,14 +70,14 @@ def test_markdown_ha_la_ricetta_completa(ricetta):
 def test_markdown_annida_i_gruppi_sotto_gli_ingredienti(ricetta):
     """I gruppi sono una parte degli ingredienti, non una sezione pari al procedimento:
     devono stare a un livello di intestazione più basso."""
-    md = verso_markdown(ricetta)
+    md = to_markdown(ricetta)
     assert "### Per la crema" in md
     assert "### Per la base" in md
     assert "## Per la crema" not in md.replace("### Per la crema", "")
 
 
 def test_markdown_senza_gruppi_non_inventa_intestazioni(semplice):
-    md = verso_markdown(semplice)
+    md = to_markdown(semplice)
     assert "###" not in md
     assert "- 100 g burro" in md
 
@@ -85,21 +85,21 @@ def test_markdown_senza_gruppi_non_inventa_intestazioni(semplice):
 def test_markdown_cita_la_fonte(ricetta):
     """Il procedimento è riformulato con parole nostre: senza il rimando all'originale
     l'attribuzione all'autore si perderebbe (docs/legale.md)."""
-    md = verso_markdown(ricetta)
+    md = to_markdown(ricetta)
     assert "## Fonte" in md
     assert "cucina_test" in md
     assert "https://www.instagram.com/reel/ABC123/" in md
 
 
 def test_il_sommario_riporta_porzioni_e_tempi(ricetta):
-    assert "6 persone" in verso_markdown(ricetta)
-    assert "preparazione 25 min" in verso_markdown(ricetta)
+    assert "6 persone" in to_markdown(ricetta)
+    assert "preparazione 25 min" in to_markdown(ricetta)
 
 
 def test_le_lacune_finiscono_nell_export(ricetta):
     """Il test che conta. Chi stampa la ricetta e la porta in cucina deve vedere sia ciò
     che il reel non diceva, sia quali numeri sono stime nostre e non dati."""
-    md = verso_markdown(ricetta)
+    md = to_markdown(ricetta)
     assert "## Da verificare" in md
     assert "Il reel non diceva quante uova." in md
     # "un pizzico" è diventato 0,5 g: un numero prodotto da noi, e va detto.
@@ -107,8 +107,8 @@ def test_le_lacune_finiscono_nell_export(ricetta):
 
 
 def test_scrivi_markdown_non_sovrascrive(ricetta, tmp_path):
-    primo = scrivi_markdown(ricetta, tmp_path)
-    secondo = scrivi_markdown(ricetta, tmp_path)
+    primo = write_markdown(ricetta, tmp_path)
+    secondo = write_markdown(ricetta, tmp_path)
     assert primo != secondo and primo.exists() and secondo.exists()
     assert primo.read_text(encoding="utf-8").startswith("# Tiramisù")
 
@@ -120,7 +120,7 @@ def test_scrivi_markdown_non_sovrascrive(ricetta, tmp_path):
 
 def test_pdf_e_un_pdf_valido(ricetta, tmp_path):
     pytest.importorskip("reportlab", reason="l'export PDF richiede l'extra «doc»")
-    percorso = scrivi_pdf(ricetta, tmp_path)
+    percorso = write_pdf(ricetta, tmp_path)
     assert percorso.suffix == ".pdf"
     assert percorso.read_bytes().startswith(b"%PDF")
 
@@ -129,7 +129,7 @@ def test_pdf_e_markdown_hanno_lo_stesso_nome_di_base(ricetta, tmp_path):
     """Tre vestiti della stessa ricetta devono chiamarsi allo stesso modo, o ritrovarli
     nella cartella di export diventa un indovinello."""
     pytest.importorskip("reportlab", reason="l'export PDF richiede l'extra «doc»")
-    assert scrivi_pdf(ricetta, tmp_path).stem == scrivi_markdown(ricetta, tmp_path).stem
+    assert write_pdf(ricetta, tmp_path).stem == write_markdown(ricetta, tmp_path).stem
 
 
 def test_senza_reportlab_l_errore_dice_cosa_fare(ricetta, tmp_path, monkeypatch):
@@ -145,8 +145,8 @@ def test_senza_reportlab_l_errore_dice_cosa_fare(ricetta, tmp_path, monkeypatch)
         return vero_import(nome, *args, **kwargs)
 
     monkeypatch.setattr(builtins, "__import__", import_che_nega_reportlab)
-    with pytest.raises(ErroreDocumento) as e:
-        scrivi_pdf(ricetta, tmp_path)
+    with pytest.raises(DocumentError) as e:
+        write_pdf(ricetta, tmp_path)
     assert "uv sync --extra doc" in str(e.value)
     assert "markdown" in str(e.value).lower()
 
@@ -161,13 +161,13 @@ def test_senza_reportlab_l_errore_dice_cosa_fare(ricetta, tmp_path, monkeypatch)
     ],
 )
 def test_testo_pdf_riduce_solo_cio_che_non_si_puo_disegnare(prima, dopo):
-    assert _testo_pdf(prima) == dopo
+    assert _pdf_text(prima) == dopo
 
 
 def test_xml_sicuro_protegge_i_paragrafi():
     """reportlab legge i paragrafi come mini-XML: un ingrediente con "&" farebbe esplodere
     l'export invece di stampare una e commerciale."""
-    assert _xml_sicuro("sale & pepe <tutto>") == "sale &amp; pepe &lt;tutto&gt;"
+    assert _xml_safe("sale & pepe <tutto>") == "sale &amp; pepe &lt;tutto&gt;"
 
 
 # ----------------------------------------------------------------------------------
@@ -205,7 +205,7 @@ def test_export_in_inglese_traduce_l_involucro(tmp_path):
         source=Source.now(url="https://x/y", author="baker"),
         language=Language.EN, system=System.IMPERIAL,
     )
-    md = verso_markdown(r)
+    md = to_markdown(r)
     assert "## Ingredients" in md and "## Method" in md
     assert "## To check" in md and "## Source" in md
     assert "Recipe by baker" in md
@@ -218,6 +218,6 @@ def test_export_in_inglese_traduce_l_involucro(tmp_path):
 def test_export_in_italiano_resta_italiano(ricetta):
     """Il default non deve essere toccato dal multilingua: senza chiedere nulla, tutto in
     italiano."""
-    md = verso_markdown(ricetta)
+    md = to_markdown(ricetta)
     assert "## Ingredienti" in md and "## Procedimento" in md
     assert "Ingredients" not in md
