@@ -1,14 +1,19 @@
-"""test_web.py — guard strutturali sul frontend.
+"""test_web.py — structural guards on the frontend.
 
-Non eseguono JavaScript: la suite è pytest e il frontend non ha (né vuole) una toolchain.
-Controllano invece le sole cose che si possono verificare leggendo i file, ed è esattamente
-la classe di difetto che è passata inosservata: **un comando disegnato che nessuno legge**,
-e **una parola che esiste in una lingua sola**.
+They do not execute JavaScript: the suite is pytest and the frontend has no toolchain (and
+does not want one). What they check instead is the only thing verifiable by reading the files,
+and that is exactly the class of defect that went unnoticed: **a control that is drawn and
+nobody reads**, and **a word that exists in one language only**.
 
-`index.html` dichiarava `#opt-lingua` e `#opt-sistema`, l'utente li vedeva e li usava, e
-`app.js` non li interrogava mai — quindi ogni lavorazione usciva in italiano metrico. Un
-controllo che non fa niente è peggio di un controllo assente: il primo insegna a non
-fidarsi dell'interfaccia, il secondo almeno è onesto.
+`index.html` declared `#opt-lingua` and `#opt-sistema`, the user saw them and used them, and
+`app.js` never queried them — so every job came out in Italian metric. A control that does
+nothing is worse than a missing one: the first teaches you not to trust the interface, the
+second is at least honest.
+
+The guards have grown since, and each new one was added the day something got past the suite:
+the placeholders against the calls that fill them, the JSON keys against what the server
+actually produces, the CSS classes against the stylesheet. Every one of them was verified by
+breaking it on purpose.
 """
 
 from __future__ import annotations
@@ -23,132 +28,142 @@ from pathlib import Path
 from reel2recipe import api, documents, mela, pipeline, units
 from reel2recipe.paths import REPO_ROOT
 
-CARTELLA_WEB = REPO_ROOT / "web"
-INDEX = (CARTELLA_WEB / "index.html").read_text(encoding="utf-8")
-I18N = (CARTELLA_WEB / "i18n.js").read_text(encoding="utf-8")
+WEB_FOLDER = REPO_ROOT / "web"
+INDEX = (WEB_FOLDER / "index.html").read_text(encoding="utf-8")
+I18N = (WEB_FOLDER / "i18n.js").read_text(encoding="utf-8")
 
-# Tutti i moduli della pagina, non solo `app.js`: il selettore della lingua è collegato in
-# `i18n.js`, e un guard che guardasse un file solo lo dichiarerebbe morto per sbaglio.
-MODULI = {p.name: p.read_text(encoding="utf-8") for p in sorted(CARTELLA_WEB.glob("*.js"))}
-JS = "\n".join(MODULI.values())
+# Every module of the page, not just `app.js`: the language selector is wired up in
+# `i18n.js`, and a guard looking at one file only would declare it dead by mistake.
+MODULES = {p.name: p.read_text(encoding="utf-8") for p in sorted(WEB_FOLDER.glob("*.js"))}
+JS = "\n".join(MODULES.values())
 
-ID_DEFINITI = set(re.findall(r'id="([\w-]+)"', INDEX)) | set(re.findall(r'id="([\w-]+)"', JS))
-ID_USATI = set(re.findall(r"""\$\$?\('#([\w-]+)'\)""", JS))
+DEFINED_IDS = set(re.findall(r'id="([\w-]+)"', INDEX)) | set(re.findall(r'id="([\w-]+)"', JS))
+USED_IDS = set(re.findall(r"""\$\$?\('#([\w-]+)'\)""", JS))
 
 
 # --------------------------------------------------------------------------------------
-# Comandi disegnati e comandi letti
+# Controls drawn and controls read
 # --------------------------------------------------------------------------------------
 
 
-def test_ogni_controllo_delle_opzioni_viene_letto():
-    """Ogni `#opt-…` disegnato deve essere interrogato da qualche modulo.
+def test_every_option_control_is_read():
+    """Every `#opt-…` that is drawn has to be queried by some module.
 
-    È il guard che avrebbe fatto scattare il difetto della lingua: il menu esisteva da
-    subito, la lettura no.
+    It is the guard that would have caught the language defect: the menu existed from the
+    start, the reading did not.
     """
-    disegnati = {i for i in set(re.findall(r'id="([\w-]+)"', INDEX)) if i.startswith("opt-")}
-    assert disegnati, "nessun controllo delle opzioni trovato: il guard si è scollegato"
-    non_letti = sorted(disegnati - ID_USATI)
-    assert not non_letti, (
-        f"controlli disegnati in index.html ma mai letti dal JavaScript: {non_letti}. "
-        "Un comando che non fa niente va collegato o tolto."
+    drawn = {i for i in set(re.findall(r'id="([\w-]+)"', INDEX)) if i.startswith("opt-")}
+    assert drawn, "no option control found: the guard has come unplugged"
+    unread = sorted(drawn - USED_IDS)
+    assert not unread, (
+        f"controls drawn in index.html but never read by the JavaScript: {unread}. "
+        "A control that does nothing is to be wired up or removed."
     )
 
 
-def test_nessun_selettore_punta_nel_vuoto():
-    """Il verso opposto: un `$('#tipo-sbagliato')` non fallisce, restituisce `null` — e il
-    difetto si manifesta molto più tardi, come una riga che non reagisce."""
-    inesistenti = sorted(ID_USATI - ID_DEFINITI)
-    assert not inesistenti, f"il JavaScript interroga id che nessuno definisce: {inesistenti}"
+def test_no_selector_points_at_nothing():
+    """The other way round: a `$('#wrong-id')` does not fail, it returns `null` — and the
+    defect shows up much later, as a row that does not react."""
+    undefined = sorted(USED_IDS - DEFINED_IDS)
+    assert not undefined, f"the JavaScript queries ids nobody defines: {undefined}"
 
 
 # --------------------------------------------------------------------------------------
-# I cataloghi: nessuna lingua a metà
+# The catalogues: no half-translated language
 # --------------------------------------------------------------------------------------
 
 
-def _chiavi_i18n() -> dict[str, set[str]]:
-    """Le chiavi dichiarate da ciascuna lingua in `i18n.js`.
+def _i18n_keys() -> dict[str, set[str]]:
+    """The keys declared by each language in `i18n.js`.
 
-    Si legge il file invece di eseguirlo: le due lingue sono due blocchi `it: { … }` e
-    `en: { … }` dentro un oggetto letterale, e le chiavi stanno a inizio riga con due
-    livelli di rientro. Basta a rispondere alla domanda che conta — *c'è una chiave che
-    esiste di qua e non di là?* — senza tirarsi dentro un interprete JavaScript.
+    The file is read rather than executed: the two languages are two `it: { … }` and
+    `en: { … }` blocks inside an object literal, and the keys sit at the start of a line with
+    two levels of indentation. That is enough to answer the question that matters — *is there a
+    key that exists on one side and not on the other?* — without dragging in a JavaScript
+    interpreter.
+
+    The cut is made at `export const LANGUAGES`, which is the first thing after the catalogue.
+    During the migration that marker was renamed and the split silently stopped cutting
+    anything: the guard kept passing on the whole file. Hence the assertion below that the
+    marker was actually found.
     """
-    catalogo = I18N.split("export const LINGUE")[0]
-    per_lingua: dict[str, set[str]] = {}
-    lingua_corrente = None
-    for riga in catalogo.splitlines():
-        if intestazione := re.match(r"^  (\w+): \{$", riga):
-            lingua_corrente = intestazione.group(1)
-            per_lingua[lingua_corrente] = set()
-        elif lingua_corrente and (chiave := re.match(r"^    (\w+):", riga)):
-            per_lingua[lingua_corrente].add(chiave.group(1))
-    return per_lingua
-
-
-def test_i18n_dichiara_le_lingue_attese():
-    chiavi = _chiavi_i18n()
-    assert set(chiavi) == {"it", "en"}, f"lingue trovate in i18n.js: {sorted(chiavi)}"
-    assert len(chiavi["it"]) > 50, "il catalogo sembra vuoto: il guard non sta leggendo nulla"
-
-
-def test_i18n_non_ha_lingue_a_meta():
-    """Una chiave presente in una lingua sola non è un errore visibile: il ripiego
-    sull'italiano la copre, e chi legge in inglese trova una frase italiana in mezzo alla
-    pagina senza che niente lo segnali."""
-    chiavi = _chiavi_i18n()
-    assert not (chiavi["it"] - chiavi["en"]), (
-        f"chiavi senza traduzione inglese: {sorted(chiavi['it'] - chiavi['en'])}"
+    assert "export const LANGUAGES" in I18N, (
+        "the marker that closes the catalogue has changed name: the split is not cutting and "
+        "the guard is reading more than it should"
     )
-    assert not (chiavi["en"] - chiavi["it"]), (
-        f"chiavi inglesi senza corrispettivo italiano: {sorted(chiavi['en'] - chiavi['it'])}"
+    catalogue = I18N.split("export const LANGUAGES")[0]
+    per_language: dict[str, set[str]] = {}
+    current_language = None
+    for line in catalogue.splitlines():
+        if heading := re.match(r"^  (\w+): \{$", line):
+            current_language = heading.group(1)
+            per_language[current_language] = set()
+        elif current_language and (key := re.match(r"^    (\w+):", line)):
+            per_language[current_language].add(key.group(1))
+    return per_language
+
+
+def test_i18n_declares_the_expected_languages():
+    keys = _i18n_keys()
+    assert set(keys) == {"it", "en"}, f"languages found in i18n.js: {sorted(keys)}"
+    assert len(keys["it"]) > 50, "the catalogue looks empty: the guard is reading nothing"
+
+
+def test_i18n_has_no_half_translated_language():
+    """A key present in one language only is not a visible error: the fallback to Italian
+    covers it, and whoever is reading in English finds an Italian sentence in the middle of the
+    page with nothing flagging it."""
+    keys = _i18n_keys()
+    assert not (keys["it"] - keys["en"]), (
+        f"keys with no English translation: {sorted(keys['it'] - keys['en'])}"
+    )
+    assert not (keys["en"] - keys["it"]), (
+        f"English keys with no Italian counterpart: {sorted(keys['en'] - keys['it'])}"
     )
 
 
-def test_ogni_chiave_del_markup_esiste_nel_catalogo():
-    """Un `data-i18n` che non trova la sua chiave non solleva niente: `t()` ripiega sulla
-    chiave stessa, e a schermo compare `lbl_misure` al posto di «Misure»."""
-    chiavi = _chiavi_i18n()["it"]
-    usate = set(re.findall(r'data-i18n(?:-\w+)?="([\w-]+)"', INDEX))
-    assert usate, "nessun attributo data-i18n nel markup: il guard si è scollegato"
-    assert not (usate - chiavi), f"chiavi usate nel markup e assenti dal catalogo: {sorted(usate - chiavi)}"
+def test_every_markup_key_exists_in_the_catalogue():
+    """A `data-i18n` that does not find its key raises nothing: `t()` falls back to the key
+    itself, and `lbl_measures` appears on screen where "Misure" should be."""
+    keys = _i18n_keys()["it"]
+    used = set(re.findall(r'data-i18n(?:-\w+)?="([\w-]+)"', INDEX))
+    assert used, "no data-i18n attribute in the markup: the guard has come unplugged"
+    assert not (used - keys), f"keys used in the markup and absent from the catalogue: {sorted(used - keys)}"
 
 
-@pytest.mark.parametrize("modulo, catalogo", [("pipeline", pipeline.TEXTS), ("api", api.TEXTS)])
-def test_i_cataloghi_python_sono_completi(modulo, catalogo):
-    """Stessa regola per le stringhe che nascono nel server: avanzamento, avvertenze ed
-    errori dell'API. Il ripiego sull'italiano c'è, ma serve a non rompere nulla — non a
-    rendere accettabile una traduzione mancante."""
-    assert set(catalogo) == {"it", "en"}, f"{modulo}.TESTI: lingue {sorted(catalogo)}"
-    mancanti = set(catalogo["it"]) - set(catalogo["en"])
-    assert not mancanti, f"{modulo}.TESTI, chiavi senza traduzione inglese: {sorted(mancanti)}"
-    in_piu = set(catalogo["en"]) - set(catalogo["it"])
-    assert not in_piu, f"{modulo}.TESTI, chiavi inglesi orfane: {sorted(in_piu)}"
+@pytest.mark.parametrize("module, catalogue", [("pipeline", pipeline.TEXTS), ("api", api.TEXTS)])
+def test_the_python_catalogues_are_complete(module, catalogue):
+    """The same rule for the strings born in the server: progress, warnings and API errors.
+    The fallback to Italian is there, but it exists to break nothing — not to make a missing
+    translation acceptable."""
+    assert set(catalogue) == {"it", "en"}, f"{module}.TEXTS: languages {sorted(catalogue)}"
+    missing = set(catalogue["it"]) - set(catalogue["en"])
+    assert not missing, f"{module}.TEXTS, keys with no English translation: {sorted(missing)}"
+    extra = set(catalogue["en"]) - set(catalogue["it"])
+    assert not extra, f"{module}.TEXTS, orphan English keys: {sorted(extra)}"
 
 
-@pytest.mark.parametrize("modulo, catalogo", [("pipeline", pipeline.TEXTS), ("api", api.TEXTS)])
-def test_i_segnaposto_coincidono_fra_le_lingue(modulo, catalogo):
-    """Un `{titolo}` che sparisce nella traduzione inglese non dà errore: dà una frase a cui
-    manca il pezzo che la rendeva utile. Un segnaposto *inventato* invece esplode, e lo fa
-    davanti all'utente, a metà lavorazione."""
-    for chiave, testo_it in catalogo["it"].items():
-        attesi = set(re.findall(r"\{(\w+)\}", testo_it))
-        trovati = set(re.findall(r"\{(\w+)\}", catalogo["en"][chiave]))
-        assert attesi == trovati, (
-            f"{modulo}.TESTI['{chiave}']: segnaposto it={sorted(attesi)} en={sorted(trovati)}"
+@pytest.mark.parametrize("module, catalogue", [("pipeline", pipeline.TEXTS), ("api", api.TEXTS)])
+def test_the_placeholders_match_between_languages(module, catalogue):
+    """A `{title}` that vanishes in the English translation gives no error: it gives a
+    sentence missing the piece that made it useful. An *invented* placeholder, on the other
+    hand, explodes — and it does so in front of the user, halfway through a job."""
+    for key, italian_text in catalogue["it"].items():
+        expected = set(re.findall(r"\{(\w+)\}", italian_text))
+        found = set(re.findall(r"\{(\w+)\}", catalogue["en"][key]))
+        assert expected == found, (
+            f"{module}.TEXTS['{key}']: placeholders it={sorted(expected)} en={sorted(found)}"
         )
 
 
 # --------------------------------------------------------------------------------------
-# Il contratto fra il JSON del server e le chiavi che la pagina legge
+# The contract between the server JSON and the keys the page reads
 # --------------------------------------------------------------------------------------
 
 
-def _ricetta_di_prova():
-    """Una ricetta vera, costruita dalla pipeline invece che scritta a mano: le chiavi
-    devono essere quelle che il server produce davvero, non quelle che ricordiamo."""
+def _sample_recipe():
+    """A real recipe, built by the pipeline rather than written by hand: the keys have to be
+    the ones the server actually produces, not the ones we remember."""
     from reel2recipe.recipe import Source, from_draft
 
     return from_draft(
@@ -162,175 +177,175 @@ def _ricetta_di_prova():
     )
 
 
-def test_ogni_chiave_letta_dalla_pagina_esiste_nel_json_del_server():
-    """Il guard che avrebbe intercettato in un colpo solo la rinomina dei campi di `Recipe`.
+def test_every_key_the_page_reads_exists_in_the_server_json():
+    """The guard that would have caught the rename of `Recipe`'s fields in one go.
 
-    `app.js` legge il JSON per attributo: `ricetta.titolo` su un oggetto che non ha più quel
-    campo non solleva niente, restituisce `undefined`, e la scheda si disegna lo stesso — con
-    il titolo vuoto. È la stessa famiglia di difetto muto dei guard qui sopra, e su un
-    frontend senza toolchain non c'è nient'altro che possa accorgersene.
+    `app.js` reads the JSON by attribute: `recipe.titolo` on an object that no longer has that
+    field raises nothing, returns `undefined`, and the card draws itself anyway — with an empty
+    title. It is the same family of mute defect as the guards above, and on a frontend with no
+    toolchain there is nothing else that could notice.
 
-    Il confronto è deliberatamente **strutturale e non esaustivo**: si guardano solo gli
-    accessi `ricetta.X`, che sono quelli sul primo livello del JSON. Gli accessi annidati
-    (`ing.riga`, `i.gruppo`) restano fuori perché le loro chiavi sono italiane per scelta e
-    non seguono i nomi Python.
+    The comparison is deliberately **structural and not exhaustive**: only `recipe.X` accesses
+    are looked at, which are the ones on the JSON's first level. The nested accesses
+    (`ing.riga`, `i.gruppo`) stay out because their keys are Italian by choice and do not
+    follow the Python names.
     """
-    ricetta = _ricetta_di_prova().to_dict()
-    # `id` lo aggiunge l'API dopo il salvataggio, non `to_dict()`.
-    disponibili = set(ricetta) | {"id"}
+    recipe = _sample_recipe().to_dict()
+    # `id` is added by the API after the save, not by `to_dict()`.
+    available = set(recipe) | {"id"}
 
-    lette = set(re.findall(r"\b(?:current)?[Rr]ecipe\.(\w+)", MODULI["app.js"]))
-    assert lette, "nessun accesso a `recipe.` in app.js: il guard si è scollegato"
+    read_keys = set(re.findall(r"\b(?:current)?[Rr]ecipe\.(\w+)", MODULES["app.js"]))
+    assert read_keys, "no `recipe.` access in app.js: the guard has come unplugged"
 
-    mancanti = sorted(lette - disponibili)
-    assert not mancanti, (
-        f"app.js legge chiavi che il server non produce: {mancanti}. "
-        f"Il server ne produce: {sorted(disponibili)}"
+    missing = sorted(read_keys - available)
+    assert not missing, (
+        f"app.js reads keys the server does not produce: {missing}. "
+        f"The server produces: {sorted(available)}"
     )
 
 
-def test_ogni_chiave_della_scheda_libreria_esiste_nell_elenco(tmp_path):
-    """Lo stesso per le carte della libreria, che vengono da `Library.list_` e non da
-    `to_dict()`: è una seconda forma, con chiavi sue, e quindi una seconda strada per
-    divergere in silenzio dal frontend."""
+def test_every_library_card_key_exists_in_the_listing(tmp_path):
+    """The same for the library cards, which come from `Library.list_` and not from
+    `to_dict()`: a second shape, with keys of its own, and therefore a second way of drifting
+    away from the frontend in silence."""
     from reel2recipe.store import Library
 
-    with Library(tmp_path / "guard.db") as libreria:
-        libreria.save(_ricetta_di_prova())
-        disponibili = set(libreria.list_()[0])
+    with Library(tmp_path / "guard.db") as library:
+        library.save(_sample_recipe())
+        available = set(library.list_()[0])
 
-    # Le carte si disegnano dentro `voci.map((v) => …)`: gli accessi sono tutti su `v`.
-    lette = set(re.findall(r"\bv\.(\w+)", MODULI["app.js"]))
-    assert lette, "nessun accesso a `v.` in app.js: il guard si è scollegato"
+    # The cards are drawn inside `entries.map((v) => …)`: every access is on `v`.
+    read_keys = set(re.findall(r"\bv\.(\w+)", MODULES["app.js"]))
+    assert read_keys, "no `v.` access in app.js: the guard has come unplugged"
 
-    mancanti = sorted(lette - disponibili)
-    assert not mancanti, (
-        f"app.js legge dalle carte chiavi che `Library.list_` non produce: {mancanti}. "
-        f"L'elenco ne produce: {sorted(disponibili)}"
+    missing = sorted(read_keys - available)
+    assert not missing, (
+        f"app.js reads card keys that `Library.list_` does not produce: {missing}. "
+        f"The listing produces: {sorted(available)}"
     )
 
 
-@pytest.mark.parametrize("modulo, catalogo, sorgente", [
+@pytest.mark.parametrize("module, catalogue, source", [
     ("pipeline", pipeline.TEXTS, pipeline.__file__),
     ("api", api.TEXTS, api.__file__),
     ("mela", mela.TEXTS, mela.__file__),
     ("documents", documents.TEXTS, documents.__file__),
     ("units", units.MESSAGES, units.__file__),
 ])
-def test_ogni_chiamata_passa_i_segnaposto_che_la_frase_chiede(modulo, catalogo, sorgente):
-    """I nomi passati a `text(...)` devono essere quelli che la frase aspetta.
+def test_every_call_passes_the_placeholders_the_sentence_asks_for(module, catalogue, source):
+    """The names passed to `text(...)` have to be the ones the sentence expects.
 
-    Il guard qui sopra confronta i segnaposto **fra le due lingue**; questo confronta i
-    segnaposto con **chi li riempie**, che è un'altra cosa e ha lasciato passare un difetto
-    vero: durante la migrazione una rinomina meccanica ha trasformato
-    `text(lingua, "pronta", titolo=…)` in `title=…` mentre la frase diceva ancora `{titolo}`.
-    `str.format` solleva `KeyError`, quindi ogni lavorazione riuscita sarebbe esplosa
-    all'ultimo messaggio — ma nessun test lo vedeva, perché per arrivare lì servono Ollama e
-    un file vero. Il difetto è rimasto per due commit.
+    The guard above compares the placeholders **between the two languages**; this one compares
+    the placeholders with **whoever fills them**, which is a different question and which let a
+    real defect through: during the migration a mechanical rename turned
+    `text(language, "ready_recipe", titolo=…)` into `title=…` while the sentence still said
+    `{titolo}`. `str.format` raises `KeyError`, so every successful job would have exploded on
+    its last message — but no test saw it, because reaching that line needs Ollama and a real
+    file. The defect survived two commits.
 
-    Si legge il sorgente invece di eseguirlo: interessa la chiamata scritta, non quella
-    percorsa da un test.
+    The source is read rather than executed: what matters is the call as written, not the one a
+    test happens to walk through.
     """
-    albero = ast.parse(Path(sorgente).read_text(encoding="utf-8"))
-    per_chiave: dict[str, set[str]] = {
-        chiave: set(re.findall(r"\{(\w+)\}", frase))
-        for chiave, frase in catalogo["it"].items()
+    tree = ast.parse(Path(source).read_text(encoding="utf-8"))
+    per_key: dict[str, set[str]] = {
+        key: set(re.findall(r"\{(\w+)\}", frase))
+        for key, frase in catalogue["it"].items()
     }
 
-    controllate = 0
-    for nodo in ast.walk(albero):
-        if not isinstance(nodo, ast.Call) or len(nodo.args) < 2:
+    checked = 0
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or len(node.args) < 2:
             continue
-        nome = getattr(nodo.func, "id", None) or getattr(nodo.func, "attr", None)
+        nome = getattr(node.func, "id", None) or getattr(node.func, "attr", None)
         if nome not in ("text", "message"):
             continue
-        chiave_nodo = nodo.args[1]
-        if not (isinstance(chiave_nodo, ast.Constant) and isinstance(chiave_nodo.value, str)):
-            continue                      # chiave calcolata: non verificabile da qui
-        chiave = chiave_nodo.value
-        assert chiave in per_chiave, f"{modulo}: `{chiave}` non esiste nel catalogo"
-        passati = {kw.arg for kw in nodo.keywords if kw.arg}
-        attesi = per_chiave[chiave]
-        assert passati == attesi, (
-            f"{modulo}, chiave `{chiave}` (riga {nodo.lineno}): la frase chiede "
-            f"{sorted(attesi)}, la chiamata passa {sorted(passati)}"
+        key_node = node.args[1]
+        if not (isinstance(key_node, ast.Constant) and isinstance(key_node.value, str)):
+            continue                      # computed key: not checkable from here
+        key = key_node.value
+        assert key in per_key, f"{module}: `{key}` does not exist in the catalogue"
+        passed = {kw.arg for kw in node.keywords if kw.arg}
+        expected = per_key[key]
+        assert passed == expected, (
+            f"{module}, key `{key}` (line {node.lineno}): the sentence asks for "
+            f"{sorted(expected)}, the call passes {sorted(passed)}"
         )
-        controllate += 1
+        checked += 1
 
-    assert controllate, f"{modulo}: nessuna chiamata trovata, il guard si è scollegato"
+    assert checked, f"{module}: no call found, the guard has come unplugged"
 
 
-def test_ogni_chiamata_a_t_passa_i_segnaposto_che_la_frase_chiede():
-    """Lo stesso guard del lato Python, per il lato senza toolchain.
+def test_every_t_call_passes_the_placeholders_the_sentence_asks_for():
+    """The same guard as the Python side, for the side without a toolchain.
 
-    `t('minuti', { quanti: … })` contro una frase che dice `{how_many}` non solleva niente:
-    `t()` sostituisce ciò che trova e lascia il resto letterale, quindi a schermo compare
-    «{how_many} min». È successo davvero durante la migrazione, quando le chiavi e i
-    segnaposto del catalogo sono passati all'inglese e i punti di chiamata no.
+    `t('minutes', { quanti: … })` against a sentence saying `{how_many}` raises nothing: `t()`
+    substitutes what it finds and leaves the rest literal, so "{how_many} min" appears on
+    screen. It really happened during the migration, when the catalogue's keys and placeholders
+    moved to English and the call sites did not.
 
-    Si legge il sorgente, come gli altri guard qui: nessun interprete JavaScript, solo la
-    forma `t('chiave', { a: …, b: … })` che è l'unica usata in `app.js`.
+    The source is read, as in the other guards here: no JavaScript interpreter, only the
+    `t('key', { a: …, b: … })` shape, which is the only one used in `app.js`.
     """
-    catalogo = _chiavi_i18n()
-    testi = MODULI["i18n.js"]
+    catalogue = _i18n_keys()
+    texts = MODULES["i18n.js"]
 
-    # I segnaposto dichiarati da ciascuna chiave, letti dal blocco italiano.
-    per_chiave: dict[str, set[str]] = {}
-    chiave_corrente = None
-    for riga in testi.split("export const LINGUE")[0].splitlines():
-        if intestazione := re.match(r"^    (\w+):", riga):
-            chiave_corrente = intestazione.group(1)
-            per_chiave.setdefault(chiave_corrente, set())
-        if chiave_corrente:
-            per_chiave[chiave_corrente].update(re.findall(r"\{(\w+)\}", riga))
+    # The placeholders each key declares, read from the Italian block.
+    per_key: dict[str, set[str]] = {}
+    current_key = None
+    for line in texts.split("export const LANGUAGES")[0].splitlines():
+        if heading := re.match(r"^    (\w+):", line):
+            current_key = heading.group(1)
+            per_key.setdefault(current_key, set())
+        if current_key:
+            per_key[current_key].update(re.findall(r"\{(\w+)\}", line))
 
-    controllate = 0
-    for chiave, corpo in re.findall(r"t\('(\w+)',\s*\{([^}]*)\}", MODULI["app.js"]):
-        assert chiave in catalogo["it"], f"`{chiave}` non esiste nel catalogo"
-        passati = set(re.findall(r"(\w+)\s*:", corpo)) | {
-            n for n in re.findall(r"^\s*(\w+)\s*$", corpo)   # forma abbreviata { cerca }
+    checked = 0
+    for key, body in re.findall(r"t\('(\w+)',\s*\{([^}]*)\}", MODULES["app.js"]):
+        assert key in catalogue["it"], f"`{key}` does not exist in the catalogue"
+        passed = set(re.findall(r"(\w+)\s*:", body)) | {
+            n for n in re.findall(r"^\s*(\w+)\s*$", body)   # shorthand form { search }
         }
-        attesi = per_chiave.get(chiave, set())
-        assert passati == attesi, (
-            f"t('{chiave}'): la frase chiede {sorted(attesi)}, la chiamata passa {sorted(passati)}"
+        expected = per_key.get(key, set())
+        assert passed == expected, (
+            f"t('{key}'): the sentence asks for {sorted(expected)}, the call passes {sorted(passed)}"
         )
-        controllate += 1
+        checked += 1
 
-    assert controllate, "nessuna chiamata `t(chiave, {…})` trovata: il guard si è scollegato"
-
-
-# Classi presenti nel markup ma senza una regola in `style.css`. Non sono un danno — un
-# gancio inutilizzato non rompe niente — ma esistevano già prima della migrazione, e
-# metterle qui per nome è più onesto che allentare il guard fino a non farlo scattare più.
-CLASSI_SENZA_STILE = {"btn-cook-testo", "fase-testo", "libreria"}
+    assert checked, "no `t(key, {…})` call found: the guard has come unplugged"
 
 
-def test_ogni_classe_usata_ha_una_regola_nel_foglio_di_stile():
-    """Una classe scritta male non solleva niente: l'elemento si disegna senza stile.
+# Classes present in the markup but with no rule in `style.css`. They do no damage — an unused
+# hook breaks nothing — but they already existed before the migration, and naming them here is
+# more honest than loosening the guard until it stops firing at all.
+CLASSES_WITHOUT_STYLE = {"btn-cook-testo", "fase-testo", "libreria"}
 
-    È il difetto che il frontend rende invisibile — nessuna toolchain, nessun compilatore —
-    e la rinomina degli identificatori di `app.js` ci è caduta dentro: `'fase'` era diventato
-    `'stage'`, `scheda-copertina` era diventato `card-cover`, e `style.css` continuava a
-    definire i nomi di prima. La pagina avrebbe funzionato e sarebbe stata illeggibile.
 
-    I nomi delle classi restano in italiano di proposito: vivono in tre file — `index.html`,
-    `app.js` e `style.css` — e spostarli è un passo suo, che non fa parte di questa
-    migrazione (v. docs/naming.md).
+def test_every_used_class_has_a_rule_in_the_stylesheet():
+    """A misspelt class raises nothing: the element draws itself unstyled.
+
+    It is the defect the frontend makes invisible — no toolchain, no compiler — and the rename
+    of `app.js`'s identifiers fell straight into it: `'fase'` had become `'stage'`,
+    `scheda-copertina` had become `card-cover`, and `style.css` went on defining the earlier
+    names. The page would have worked and been unreadable.
+
+    The class names stay Italian on purpose: they live in three files — `index.html`, `app.js`
+    and `style.css` — and moving them is a step of its own, outside this migration (see
+    docs/naming.md).
     """
-    stile = (CARTELLA_WEB / "style.css").read_text(encoding="utf-8")
-    definite = set(re.findall(r"\.([a-z][\w-]*)", stile))
+    stylesheet = (WEB_FOLDER / "style.css").read_text(encoding="utf-8")
+    defined = set(re.findall(r"\.([a-z][\w-]*)", stylesheet))
 
-    usate: set[str] = set()
-    for sorgente in (MODULI["app.js"], INDEX):
-        for m in re.finditer(r"""class="([a-z][\w -]*)\"""", sorgente):
-            usate |= set(m.group(1).split())
-        for m in re.finditer(r"""className\s*=\s*'([a-z][\w -]*)'""", sorgente):
-            usate |= set(m.group(1).split())
-        for m in re.finditer(r"""classList\.(?:add|remove|toggle)\('([\w-]+)'\)""", sorgente):
-            usate.add(m.group(1))
-        for m in re.finditer(r"""querySelector(?:All)?\('\.([\w-]+)""", sorgente):
-            usate.add(m.group(1))
+    used: set[str] = set()
+    for source in (MODULES["app.js"], INDEX):
+        for m in re.finditer(r"""class="([a-z][\w -]*)\"""", source):
+            used |= set(m.group(1).split())
+        for m in re.finditer(r"""className\s*=\s*'([a-z][\w -]*)'""", source):
+            used |= set(m.group(1).split())
+        for m in re.finditer(r"""classList\.(?:add|remove|toggle)\('([\w-]+)'\)""", source):
+            used.add(m.group(1))
+        for m in re.finditer(r"""querySelector(?:All)?\('\.([\w-]+)""", source):
+            used.add(m.group(1))
 
-    assert usate, "nessuna classe trovata: il guard si è scollegato"
-    orfane = sorted(usate - definite - CLASSI_SENZA_STILE)
-    assert not orfane, f"classi usate ma senza regola in style.css: {orfane}"
+    assert used, "no class found: the guard has come unplugged"
+    orphans = sorted(used - defined - CLASSES_WITHOUT_STYLE)
+    assert not orphans, f"classes used with no rule in style.css: {orphans}"
