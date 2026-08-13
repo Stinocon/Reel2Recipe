@@ -1,9 +1,10 @@
 # Naming — the Italian → English migration
 
-> **Transitional document.** It exists while the codebase is being moved from Italian to
-> English, and it gets deleted when the move is finished. Until then it is the single place
-> that decides what a thing is called, so that a rename spread over several sessions does not
-> produce three names for the same concept.
+> **Transitional document, now mostly a record.** It existed while the codebase was moved from
+> Italian to English. The move is done: `src/`, `tests/`, `web/`, the `data/` keys and
+> `docs/architecture.md` are all English. What survives here is worth keeping until it is no
+> longer true — the table of what must *not* be renamed, which is a live constraint on future
+> work, and the account of how a rename hides, which cost four real defects to learn.
 
 ## Why there is no script for this
 
@@ -66,7 +67,12 @@ axis, and the second one is what to plan around.
    its own with no readability gain for the JavaScript, and a missed class breaks the styling
    silently. `tests/test_web.py` now guards ids in both directions and classes against
    `style.css`, so the step is safe to take later if it is ever worth taking.
-5. **Still to do:** the test modules' own prose (see below), then `docs/`.
+5. **Done last:** the test modules' own prose — all ten of them, with the model gate re-run
+   for `test_modello.py` — and `docs/architettura.md` → `docs/architecture.md`.
+6. **Deliberately left in Italian:** `docs/legale.md` and `docs/condizioni-uso.md`. They are
+   authoritative in Italian and carry a non-binding English summary; translating them in full
+   would put two published legal versions in circulation, which is a real problem rather than
+   a stylistic one (the rule predates this migration).
 
 ### What the hard modules taught
 

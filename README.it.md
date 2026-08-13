@@ -47,10 +47,12 @@ la catena — vedi [la nota sui limiti](#onest%C3%A0-sui-limiti). I numeri resta
 le parole a scivolare.
 
 > **Una nota su questa documentazione.** Questo README e quello dell'add-on esistono in
-> inglese e in italiano. I documenti tecnici in [`docs/`](docs/) sono **solo in italiano**:
-> spiegano il *perché* di un codice i cui commenti sono in italiano, e tenerne allineate due
-> copie garantirebbe soltanto che prima o poi una delle due mente. I documenti legali fanno
-> fede in italiano, con un riassunto inglese non vincolante in testa.
+> inglese e in italiano, due copie che si muovono insieme. Tutto il resto sta in una lingua
+> sola, decisa dal suo pubblico: [`docs/architecture.md`](docs/architecture.md) è in inglese,
+> perché spiega un codice i cui identificatori e commenti sono in inglese. I due documenti
+> legali restano **facenti fede in italiano**, con un riassunto inglese non vincolante in
+> testa: due versioni legali entrambe pubblicate che divergono sono un problema vero, non
+> una questione di stile.
 
 ---
 
@@ -337,12 +339,12 @@ web/                 l'interfaccia (HTML/CSS/JS, senza build)
   i18n.js            le parole dell'interfaccia, in italiano e in inglese
   icons.js           le icone SVG, incorporate (nessun CDN)
 tools/               script di supporto (avvio di Ollama e dell'interfaccia, guard di confine)
-docs/                documentazione, in italiano (architettura, aspetti legali)
+docs/                documentazione: architettura in inglese, i due legali in italiano
 tests/               i test
 workspace/           i tuoi dati — mai condivisi (in .gitignore)
 ```
 
-Documentazione tecnica: [`docs/architettura.md`](docs/architettura.md).
+Documentazione tecnica: [`docs/architecture.md`](docs/architecture.md), in inglese come il codice.
 
 ---
 

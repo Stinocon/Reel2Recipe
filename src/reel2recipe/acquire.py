@@ -218,7 +218,7 @@ def _author_comments(info: dict, most: int = 5, characters: int = 1500) -> list[
 
     The other comments are left out deliberately. They are strangers' text: noise for the
     extraction, and extra surface for a hostile imperative aimed at the model (see
-    "Confini di sicurezza" in docs/architettura.md). An author's comment is still
+    "Security boundaries" in docs/architecture.md). An author's comment is still
     third-party material and goes into the prompt inside its own delimiters, like the
     caption.
     """

@@ -50,10 +50,11 @@ of the whole chain — see [the note on limits](#honesty-about-the-limits). The 
 right; it is the words that slip.
 
 > **A note on this documentation.** This README and the add-on's are kept in English and
-> Italian. The technical documents under [`docs/`](docs/) are in **Italian only** — they
-> explain the *why* behind code whose comments are in Italian, and keeping two copies in step
-> would guarantee that one of them ends up lying. The legal documents are authoritative in
-> Italian, with a non-binding English summary at the top.
+> Italian, as two copies that move together. Everything else exists in one language only,
+> chosen by its audience: [`docs/architecture.md`](docs/architecture.md) is in English,
+> because it explains code whose identifiers and comments are English. The two legal
+> documents stay **authoritative in Italian**, with a non-binding English summary at the top:
+> two published legal versions that drift apart are a real problem, not a stylistic one.
 
 ---
 
@@ -347,7 +348,7 @@ tests/               the tests
 workspace/           your data — never shared (in .gitignore)
 ```
 
-Technical documentation: [`docs/architettura.md`](docs/architettura.md) (Italian).
+Technical documentation: [`docs/architecture.md`](docs/architecture.md).
 
 ---
 
