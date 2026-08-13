@@ -28,8 +28,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import pipeline
-from .documenti import ErroreDocumento, scrivi_markdown, scrivi_pdf
-from .mela import scrivi_melarecipe, scrivi_melarecipes, verso_melarecipe
+from .documents import DocumentError, write_markdown, write_pdf
+from .mela import write_melarecipe, write_melarecipes, to_melarecipe
 from .paths import REPO_ROOT, export_folder
 from .recipe import Recipe
 from .store import Library
@@ -280,14 +280,14 @@ def crea_app(db: str | None = None, url_ollama: str = "http://localhost:11434") 
 
         try:
             if formato == "markdown":
-                percorso, tipo = scrivi_markdown(ricetta, export_folder()), "text/markdown"
+                percorso, tipo = write_markdown(ricetta, export_folder()), "text/markdown"
             elif formato == "pdf":
-                percorso, tipo = scrivi_pdf(ricetta, export_folder()), "application/pdf"
+                percorso, tipo = write_pdf(ricetta, export_folder()), "application/pdf"
             elif formato == "mela":
-                percorso, tipo = scrivi_melarecipe(ricetta, export_folder()), "application/json"
+                percorso, tipo = write_melarecipe(ricetta, export_folder()), "application/json"
             else:
                 raise HTTPException(400, testo(lingua_ui, "formato_sconosciuto", formato=formato))
-        except ErroreDocumento as e:
+        except DocumentError as e:
             # Manca l'extra `doc`: è un problema di installazione, non della richiesta.
             raise HTTPException(503, str(e)) from e
 
@@ -299,13 +299,13 @@ def crea_app(db: str | None = None, url_ollama: str = "http://localhost:11434") 
             ricette = lib.all_recipes()
         if not ricette:
             raise HTTPException(404, testo(lingua_ui, "libreria_vuota"))
-        percorso = scrivi_melarecipes(ricette, export_folder() / "libreria")
+        percorso = write_melarecipes(ricette, export_folder() / "libreria")
         return FileResponse(percorso, media_type="application/zip", filename=percorso.name)
 
     @app.post("/api/preview-mela")
     def anteprima_mela(ricetta: dict) -> dict:
         """L'aspetto che avrà la ricetta in Mela, senza scriverla su disco."""
-        return verso_melarecipe(Recipe.from_dict(ricetta))
+        return to_melarecipe(Recipe.from_dict(ricetta))
 
     # ---- frontend statico ------------------------------------------------------------
 

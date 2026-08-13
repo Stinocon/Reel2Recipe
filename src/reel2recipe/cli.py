@@ -96,8 +96,8 @@ def comando_cook(args) -> int:
         print(spento(f"\n  Saved to the library with id {identificativo}."))
 
     if args.export:
-        from .mela import scrivi_melarecipe
-        percorso = scrivi_melarecipe(ricetta, args.export)
+        from .mela import write_melarecipe
+        percorso = write_melarecipe(ricetta, args.export)
         print(ok(f"  Exported: {percorso}"))
 
     return 0
@@ -177,8 +177,8 @@ def comando_batch(args) -> int:
 
     print(f"\nDone: {ok(str(riuscite))} succeeded out of {len(lavori)}.")
     if ricette and args.export:
-        from .mela import scrivi_melarecipes
-        percorso = scrivi_melarecipes(ricette, args.export)
+        from .mela import write_melarecipes
+        percorso = write_melarecipes(ricette, args.export)
         print(ok(f"Exported together to {percorso}"))
     return 0 if riuscite else 1
 
@@ -259,8 +259,8 @@ def lingua_del_parlato(args) -> str | None:
 
 def comando_export(args) -> int:
     from . import paths
-    from .documenti import ErroreDocumento, scrivi_markdown, scrivi_pdf
-    from .mela import scrivi_melarecipe, scrivi_melarecipes
+    from .documents import DocumentError, write_markdown, write_pdf
+    from .mela import write_melarecipe, write_melarecipes
     from .store import Library
 
     # Senza --out la destinazione la decide `paths.py`, come per tutto il resto: il
@@ -271,10 +271,10 @@ def comando_export(args) -> int:
 
     def scrivi_una(ricetta, formato: str) -> Path:
         if formato == "markdown":
-            return scrivi_markdown(ricetta, destinazione)
+            return write_markdown(ricetta, destinazione)
         if formato == "pdf":
-            return scrivi_pdf(ricetta, destinazione)
-        return scrivi_melarecipe(ricetta, destinazione)
+            return write_pdf(ricetta, destinazione)
+        return write_melarecipe(ricetta, destinazione)
 
     with Library(args.db) as lib:
         if args.all:
@@ -287,13 +287,13 @@ def comando_export(args) -> int:
                     if formato == "mela":
                         # Solo Mela ha un formato per più ricette insieme: uno zip che si
                         # importa in un colpo. Markdown e PDF sono un file per ricetta.
-                        percorso = scrivi_melarecipes(ricette, destinazione / "libreria")
+                        percorso = write_melarecipes(ricette, destinazione / "libreria")
                         print(ok(f"✓ {len(ricette)} recipes in {percorso}"))
                     else:
                         for ricetta in ricette:
                             scrivi_una(ricetta, formato)
                         print(ok(f"✓ {len(ricette)} recipes as {formato} in {destinazione}"))
-                except ErroreDocumento as e:
+                except DocumentError as e:
                     print(errore(str(e)))
                     return 1
         else:
@@ -304,7 +304,7 @@ def comando_export(args) -> int:
             for formato in formati:
                 try:
                     print(ok(f"✓ {scrivi_una(ricetta, formato)}"))
-                except ErroreDocumento as e:
+                except DocumentError as e:
                     print(errore(str(e)))
                     return 1
     return 0

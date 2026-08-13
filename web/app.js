@@ -276,7 +276,7 @@ function mostraRicetta(ricetta, avvertenze = [], modello = '', scorri = true) {
   const scheda = $('#scheda-ricetta');
 
   // Le intestazioni della scheda seguono la lingua **della ricetta**, non quella della
-  // pagina: è la stessa scelta già fatta per gli export in `mela.py` e `documenti.py`, e
+  // pagina: è la stessa scelta già fatta per gli export in `mela.py` e `documents.py`, e
   // per le `lacune`, che nella lingua della ricetta ci sono salvate dentro. Una ricetta
   // inglese sotto un titolo «Ingredienti» sarebbe una scheda mezza e mezza.
   const lr = ricetta.language || lingua();

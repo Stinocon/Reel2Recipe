@@ -124,7 +124,7 @@ def text_from(catalogue: Catalogue, language: str, key: str, **data) -> str:
 
     It lives here, and not next to each catalogue, because there are quite a few catalogues by
     now — the conversion messages just above, the export headings in `mela.py` and
-    `documenti.py`, the temperature notes in `recipe.py`, the progress lines in `pipeline.py` —
+    `documents.py`, the temperature notes in `recipe.py`, the progress lines in `pipeline.py` —
     and the function to read them had already been copied out three times identically.
 
     The fallback has two levels and the two serve different purposes: an unforeseen **language**
