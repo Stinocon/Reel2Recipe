@@ -346,6 +346,19 @@ workspace/           i tuoi dati — mai condivisi (in .gitignore)
 
 Documentazione tecnica: [`docs/architecture.md`](docs/architecture.md), in inglese come il codice.
 
+### Se stai leggendo il codice
+
+**Il codice è in inglese** — identificatori, commenti, test, script e documento di
+architettura. L'italiano che resta è deliberato e sta in quattro gruppi: il **formato già
+scritto sul disco** (colonne SQL, chiavi annidate delle ricette salvate, valori di
+`Provenance` e `System`), il **contratto col modello locale** (prompt, schema e delimitatori
+di `extract.py`), il **vocabolario di cucina**, che è dato (`cucchiaio`, `farina 00`, `q.b.`,
+e i pattern che rilevano le injection scritte in italiano), e la **superficie esterna**
+tenuta per compatibilità (le URL, il `?formato=` dell'export, gli alias `--porta`, `--lingua`,
+`elimina`, da cui dipende la riga di avvio dell'add-on).
+
+[`docs/naming.md`](docs/naming.md) è la mappa: cosa si è spostato, cosa no, e perché.
+
 ---
 
 ## Domande frequenti
