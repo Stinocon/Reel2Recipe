@@ -151,3 +151,53 @@ def test_the_addon_line_survives_the_rename():
     the rename could have broken: the value has to arrive in `port`, the new name."""
     args = _parser().parse_args(ADDON_INVOCATION)
     assert args.port == 8500
+
+
+# --------------------------------------------------------------------------------------
+# The add-on's second contract: the symbols its Dockerfile imports
+# --------------------------------------------------------------------------------------
+
+# The add-on's Dockerfile ends with a sanity check that imports these names directly, to make
+# sure the clone is installed in a shape where the code can still find `web/` and `data/`:
+#
+#     from reel2recipe.paths import REPO_ROOT
+#     from reel2recipe.units import load_tables
+#
+# It is a second contract between the two repos, and AGENTS.md §11 did not list it — it names
+# the start-up line, the three environment variables and the relative frontend calls, not this.
+# So it went unnoticed through two renames: `percorsi` → `paths` broke it first, `carica_tabelle`
+# → `load_tables` broke it again, and the add-on could not build for either. The failure was at
+# least loud (the build stops) rather than silent, but nothing here turned red.
+#
+# The pair below is the same one the Dockerfile imports. If it changes there, it changes here.
+ADDON_IMPORTS = [
+    ("reel2recipe.paths", "REPO_ROOT"),
+    ("reel2recipe.units", "load_tables"),
+]
+
+
+@pytest.mark.parametrize("module_name, symbol", ADDON_IMPORTS)
+def test_the_symbols_the_addon_imports_still_exist(module_name, symbol):
+    """A rename here breaks a build in another repository, and nothing there warns us."""
+    import importlib
+
+    module = importlib.import_module(module_name)
+    assert hasattr(module, symbol), (
+        f"`{module_name}.{symbol}` no longer exists, and the add-on's Dockerfile imports it: "
+        f"its build will stop. Update the check in Stinocon/addons/reel2recipe/Dockerfile "
+        f"together with this list."
+    )
+
+
+def test_the_addon_sanity_check_actually_passes():
+    """Not just that the names exist: that the check they are used in still holds.
+
+    It is the check that guarantees the code can find `web/` and `data/` by walking up from
+    the module — which holds while the project is installed in editable form, uv's default but
+    not an eternal guarantee.
+    """
+    from reel2recipe.paths import REPO_ROOT
+    from reel2recipe.units import load_tables
+
+    assert (REPO_ROOT / "web" / "index.html").is_file(), REPO_ROOT
+    assert load_tables().density, "the tables load but come out empty"
