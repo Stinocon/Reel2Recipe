@@ -1,15 +1,23 @@
-"""api.py — l'interfaccia web locale. FastAPI su http://localhost:8500.
+"""api.py — the local web interface. FastAPI on http://localhost:8500.
 
-È la "barra Cook": si incolla un link, si preme, e la pipeline fa il resto. La stessa
-app serve anche il frontend statico in `web/`, così non serve un secondo server né una
-toolchain di build.
+It is the "Cook bar": you paste a link, you press, and the pipeline does the rest. The same
+app also serves the static frontend in `web/`, so neither a second server nor a build
+toolchain is needed.
 
-L'estrazione è lunga (scaricamento + trascrizione + LLM possono richiedere minuti), quindi
-non blocca la richiesta HTTP: parte in un thread e l'avanzamento viene trasmesso via
-Server-Sent Events. La pagina mostra le fasi in tempo reale invece di una rotellina muta.
+Extraction is slow (download + transcription + LLM can take minutes), so it does not block the
+HTTP request: it starts in a thread and the progress is streamed over Server-Sent Events. The
+page shows the stages in real time instead of a mute spinner.
 
-Tutto resta locale: nessun dato lascia la macchina, l'app ascolta di default solo su
-127.0.0.1.
+Everything stays local: no data leaves the machine, and by default the app listens on
+127.0.0.1 only.
+
+**The URL paths are deliberately left as they are** — `/api/stato`, `/api/recipes`,
+`/api/cook/{job}/eventi`, and the `?formato=` of the export. They are this product's external
+surface, the one thing here you can reach with a `curl` or a bookmark, and `docs/` documents
+them. The rule in docs/naming.md for user-facing values is *add an English synonym, do not
+replace* — as the CLI does with `--porta` — and a second set of routes is surface this local,
+single-user app has no reason to grow. The JSON keys travelling over those paths did move,
+together with `web/app.js`, which is the only thing that reads them.
 """
 
 from __future__ import annotations
@@ -35,105 +43,122 @@ from .recipe import Recipe
 from .store import Library
 from .units import Catalogue, text_from
 
-CARTELLA_WEB = REPO_ROOT / "web"
+WEB_FOLDER = REPO_ROOT / "web"
 
 
-# Gli errori che l'interfaccia mostra all'utente.
+# The errors the interface shows the user.
 #
-# Seguono la lingua **dell'interfaccia**, non quella della ricetta, e per questo il
-# parametro si chiama `lingua_ui`: su `/api/cook` esiste gia' un `lingua` e vuol dire
-# tutt'altro — la lingua in cui produrre la ricetta. Due nomi diversi perche' sono due
-# cose diverse, e chiamarle uguale sarebbe costato un difetto silenzioso appena i due
-# valori divergono.
-TESTI: Catalogue = {
+# These follow the language **of the interface**, not of the recipe, which is why the parameter
+# is called `lingua_ui`: `/api/cook` already has a `language` meaning something else entirely —
+# the language to produce the recipe in. Two different names because they are two different
+# things, and calling them the same would have cost a silent defect the moment the two values
+# diverged.
+#
+# `"Libreria vuota."` was `"Library vuota."` until this pass: an earlier commit's
+# `Libreria → Library` rename had walked into an Italian string, and the test asserted the
+# broken text, so it protected the defect instead of catching it.
+TEXTS: Catalogue = {
     "it": {
-        "serve_url": "Serve l'URL di un reel.",
-        "lavoro_sconosciuto": "Lavoro sconosciuto.",
-        "ricetta_non_trovata": "Ricetta non trovata.",
-        "formato_sconosciuto": "Formato «{formato}» sconosciuto: usa mela, markdown o pdf.",
-        "libreria_vuota": "Library vuota.",
+        "url_required": "Serve l'URL di un reel.",
+        "unknown_job": "Lavoro sconosciuto.",
+        "recipe_not_found": "Ricetta non trovata.",
+        "unknown_format": "Formato «{format}» sconosciuto: usa mela, markdown o pdf.",
+        "empty_library": "Libreria vuota.",
     },
     "en": {
-        "serve_url": "The URL of a reel is required.",
-        "lavoro_sconosciuto": "Unknown job.",
-        "ricetta_non_trovata": "Recipe not found.",
-        "formato_sconosciuto": "Unknown format «{formato}»: use mela, markdown or pdf.",
-        "libreria_vuota": "The library is empty.",
+        "url_required": "The URL of a reel is required.",
+        "unknown_job": "Unknown job.",
+        "recipe_not_found": "Recipe not found.",
+        "unknown_format": "Unknown format «{format}»: use mela, markdown or pdf.",
+        "empty_library": "The library is empty.",
     },
 }
 
 
-def testo(lingua: str, chiave: str, **dati) -> str:
-    """Un errore dell'API nella lingua dell'interfaccia."""
-    return text_from(TESTI, lingua, chiave, **dati)
+def text(language: str, key: str, **data) -> str:
+    """An API error in the language of the interface."""
+    return text_from(TEXTS, language, key, **data)
 
 
 # --------------------------------------------------------------------------------------
-# Lavori in corso: un piccolo registro in memoria con code di avanzamento
+# Jobs under way: a small in-memory registry with progress queues
 # --------------------------------------------------------------------------------------
 
 
 @dataclass
-class Lavoro:
+class Job:
     id: str
-    eventi: asyncio.Queue = field(default_factory=asyncio.Queue)
-    finito: bool = False
-    esito: dict | None = None
+    events: asyncio.Queue = field(default_factory=asyncio.Queue)
+    finished: bool = False
+    outcome: dict | None = None
 
 
-class RegistroLavori:
-    """Tiene traccia delle estrazioni in corso e inoltra il loro avanzamento alla pagina.
+class JobRegistry:
+    """Keeps track of the extractions under way and forwards their progress to the page.
 
-    In-process e volatile di proposito: è un'app locale monoutente, non serve una coda
-    persistente. Se il processo si ferma i lavori in corso si perdono, e va bene così.
+    In-process and volatile on purpose: this is a local, single-user app, and a persistent
+    queue is not needed. If the process stops, the jobs under way are lost, and that is fine.
     """
 
     def __init__(self, loop: asyncio.AbstractEventLoop):
         self._loop = loop
-        self._lavori: dict[str, Lavoro] = {}
+        self._jobs: dict[str, Job] = {}
 
-    def nuovo(self) -> Lavoro:
-        lavoro = Lavoro(id=uuid.uuid4().hex[:12])
-        self._lavori[lavoro.id] = lavoro
-        return lavoro
+    def new(self) -> Job:
+        job = Job(id=uuid.uuid4().hex[:12])
+        self._jobs[job.id] = job
+        return job
 
-    def get(self, id: str) -> Lavoro | None:
-        return self._lavori.get(id)
+    def get(self, id: str) -> Job | None:
+        return self._jobs.get(id)
 
-    def emetti(self, lavoro: Lavoro, tipo: str, dati: dict) -> None:
-        """Chiamabile da un thread di lavoro: inoltra un evento nella coda asyncio in modo thread-safe."""
-        self._loop.call_soon_threadsafe(lavoro.eventi.put_nowait, {"tipo": tipo, **dati})
+    def emit(self, job: Job, kind: str, data: dict) -> None:
+        """Callable from a worker thread: forwards an event into the asyncio queue safely."""
+        self._loop.call_soon_threadsafe(job.events.put_nowait, {"kind": kind, **data})
 
-    def concludi(self, lavoro: Lavoro, esito: dict) -> None:
-        lavoro.esito = esito
-        lavoro.finito = True
-        self.emetti(lavoro, "fine", esito)
+    def finish(self, job: Job, outcome: dict) -> None:
+        job.outcome = outcome
+        job.finished = True
+        self.emit(job, "end", outcome)
 
 
 # --------------------------------------------------------------------------------------
-# Modelli di richiesta
+# Modelli di request
 # --------------------------------------------------------------------------------------
 
 
-class RichiestaCook(BaseModel):
+class CookRequest(BaseModel):
+    """The body of `/api/cook` and the query of `/api/cook-file`.
+
+    These field names are the **HTTP contract** with `web/app.js`, nothing more: no file on
+    disk is keyed this way. They moved to English in the same commit as the frontend that
+    sends them — the same rule already applied to `Library.list_`'s keys and to the pipeline's
+    stage names.
+
+    Worth knowing, because it bit during the migration: pydantic ignores unknown keyword
+    arguments by default. A field renamed on one side and not the other does not raise — the
+    value is silently dropped and the default takes over, which is exactly the defect
+    `/api/cook-file` had once already, in another form.
+    """
+
     url: str | None = None
-    didascalia: str | None = None
-    backend_asr: str = "auto"
-    modello_llm: str | None = None
-    salta_audio: bool = False
-    cookies_da_browser: str | None = None
-    # La lingua PARLATA nel reel, che riguarda l'ingresso e non l'uscita. `None` significa
-    # «la riconosce Whisper», ed è il predefinito: dedurla dalla lingua richiesta in uscita
-    # significherebbe dichiarare una lingua falsa ogni volta che si traduce.
-    lingua_audio: str | None = None
-    # I due assi di uscita. Se il sistema non è chiesto segue la lingua, ma resta
-    # sovrascrivibile: inglese con i grammi è una combinazione reale.
-    lingua: str = "it"
-    sistema: str | None = None
+    caption: str | None = None
+    asr_backend: str = "auto"
+    llm_model: str | None = None
+    skip_audio: bool = False
+    cookies_from_browser: str | None = None
+    # The language SPOKEN in the reel, which concerns the input and not the output. `None`
+    # means "let Whisper recognise it", and it is the default: deducing it from the requested
+    # output language would mean declaring a false language every time we translate.
+    audio_language: str | None = None
+    # The two output axes. If the system is not asked for it follows the language, but stays
+    # overridable: English with grams is a real combination.
+    language: str = "it"
+    system: str | None = None
 
-    def assi(self) -> dict:
-        return {"lingua": self.lingua,
-                "sistema": self.sistema or ("imperiale" if self.lingua == "en" else "metrico")}
+    def axes(self) -> dict:
+        return {"language": self.language,
+                "system": self.system or ("imperiale" if self.language == "en" else "metrico")}
 
 
 # --------------------------------------------------------------------------------------
@@ -141,245 +166,249 @@ class RichiestaCook(BaseModel):
 # --------------------------------------------------------------------------------------
 
 
-def crea_app(db: str | None = None, url_ollama: str = "http://localhost:11434") -> FastAPI:
+def create_app(db: str | None = None, ollama_url: str = "http://localhost:11434") -> FastAPI:
     app = FastAPI(title="Reel2Recipe", version="0.1.0")
-    registro: RegistroLavori | None = None
+    registry: JobRegistry | None = None
 
-    def libreria() -> Library:
+    def library() -> Library:
         return Library(db)
 
     @app.on_event("startup")
-    async def _avvio():
-        nonlocal registro
-        registro = RegistroLavori(asyncio.get_running_loop())
+    async def _startup():
+        nonlocal registry
+        registry = JobRegistry(asyncio.get_running_loop())
 
     # ---- diagnostica -----------------------------------------------------------------
 
     @app.get("/api/stato")
-    def stato() -> dict:
-        """Cosa è pronto e cosa manca. La pagina lo usa per avvisare prima di iniziare."""
-        return pipeline.controlla_ambiente(url_ollama)
+    def status() -> dict:
+        """What is ready and what is missing. The page uses it to warn before starting."""
+        return pipeline.check_environment(ollama_url)
 
     # ---- estrazione ------------------------------------------------------------------
 
     @app.post("/api/cook")
-    async def cook(richiesta: RichiestaCook) -> dict:
+    async def cook(request: CookRequest) -> dict:
         """Avvia un'estrazione da URL. Ritorna subito un id da seguire via SSE."""
-        if not richiesta.url or not richiesta.url.strip():
-            # Qui la lingua dell'interfaccia non arriva: l'unico riferimento e' quello
-            # della ricetta, che nell'uso normale coincide perche' la segue.
-            raise HTTPException(422, testo(richiesta.lingua, "serve_url"))
-        lavoro = registro.nuovo()
+        if not request.url or not request.url.strip():
+            # The interface's language does not reach this far: the only reference is the
+            # recipe's, which in normal use coincides because it follows it.
+            raise HTTPException(422, text(request.language, "url_required"))
+        job = registry.new()
         threading.Thread(
-            target=_esegui_da_url, args=(registro, lavoro, richiesta, url_ollama, db), daemon=True
+            target=_run_from_url, args=(registry, job, request, ollama_url, db), daemon=True
         ).start()
-        return {"job": lavoro.id}
+        return {"job": job.id}
 
     @app.post("/api/cook-file")
-    async def cook_file(file: UploadFile, didascalia: str = "",
-                        backend_asr: str = "auto", modello_llm: str | None = None,
-                        salta_audio: bool = False, lingua_audio: str | None = None,
-                        lingua: str = "it", sistema: str | None = None) -> dict:
-        """Come sopra, ma da un file caricato dalla pagina (trascina-e-rilascia).
+    async def cook_file(file: UploadFile, caption: str = "",
+                        asr_backend: str = "auto", llm_model: str | None = None,
+                        skip_audio: bool = False, audio_language: str | None = None,
+                        language: str = "it", system: str | None = None) -> dict:
+        """As above, but from a file uploaded by the page (drag and drop).
 
-        Le opzioni arrivano come parametri di query e non nel corpo, perché il corpo è già
-        il multipart del file. Sono **le stesse** di `/api/cook`: un file caricato non è un
-        cittadino di seconda classe. Prima lo era — backend ASR, modello e `salta_audio`
-        non erano nemmeno accettati, quindi chi trascinava un video otteneva sempre le
-        impostazioni predefinite senza che niente lo dicesse.
+        The options arrive as query parameters and not in the body, because the body is
+        already the file's multipart. They are **the same** as `/api/cook`'s: an uploaded file
+        is not a second-class citizen. It used to be — the ASR backend, the model and
+        `skip_audio` were not even accepted, so anyone dragging a video always got the default
+        settings with nothing saying so.
         """
-        suffisso = Path(file.filename or "reel.mp4").suffix or ".mp4"
-        temporaneo = Path(tempfile.gettempdir()) / f"r2r-{uuid.uuid4().hex[:8]}{suffisso}"
-        temporaneo.write_bytes(await file.read())
+        suffix = Path(file.filename or "reel.mp4").suffix or ".mp4"
+        temporary = Path(tempfile.gettempdir()) / f"r2r-{uuid.uuid4().hex[:8]}{suffix}"
+        temporary.write_bytes(await file.read())
 
-        richiesta = RichiestaCook(
-            didascalia=didascalia, backend_asr=backend_asr, modello_llm=modello_llm,
-            salta_audio=salta_audio, lingua_audio=lingua_audio,
-            lingua=lingua, sistema=sistema,
+        request = CookRequest(
+            caption=caption, asr_backend=asr_backend, llm_model=llm_model,
+            skip_audio=skip_audio, audio_language=audio_language,
+            language=language, system=system,
         )
-        lavoro = registro.nuovo()
+        job = registry.new()
         threading.Thread(
-            target=_esegui_da_file,
-            args=(registro, lavoro, temporaneo, richiesta, url_ollama, db),
+            target=_run_from_file,
+            args=(registry, job, temporary, request, ollama_url, db),
             daemon=True,
         ).start()
-        return {"job": lavoro.id}
+        return {"job": job.id}
 
     @app.get("/api/cook/{job}/eventi")
     async def eventi(job: str, lingua_ui: str = "it") -> StreamingResponse:
-        """Flusso SSE con l'avanzamento di un lavoro."""
-        lavoro = registro.get(job)
-        if not lavoro:
-            raise HTTPException(404, testo(lingua_ui, "lavoro_sconosciuto"))
+        """SSE stream with a job's progress."""
+        job = registry.get(job)
+        if not job:
+            raise HTTPException(404, text(lingua_ui, "unknown_job"))
 
-        async def genera():
+        async def generate():
             while True:
-                evento = await lavoro.eventi.get()
-                yield f"data: {json.dumps(evento, ensure_ascii=False)}\n\n"
-                if evento["tipo"] == "fine":
+                event = await job.events.get()
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                if event["kind"] == "end":
                     break
 
-        return StreamingResponse(genera(), media_type="text/event-stream",
+        return StreamingResponse(generate(), media_type="text/event-stream",
                                  headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
     # ---- libreria --------------------------------------------------------------------
 
     @app.get("/api/ricette")
-    def elenca(cerca: str | None = None) -> list[dict]:
-        with libreria() as lib:
-            return lib.list_(search=cerca)
+    def list_recipes(search: str | None = None) -> list[dict]:
+        with library() as lib:
+            return lib.list_(search=search)
 
     @app.get("/api/ricette/{id}")
-    def leggi(id: int, lingua_ui: str = "it") -> dict:
-        with libreria() as lib:
-            ricetta = lib.read(id)
-        if not ricetta:
-            raise HTTPException(404, testo(lingua_ui, "ricetta_non_trovata"))
-        d = ricetta.to_dict()
+    def read_recipe(id: int, lingua_ui: str = "it") -> dict:
+        with library() as lib:
+            recipe = lib.read(id)
+        if not recipe:
+            raise HTTPException(404, text(lingua_ui, "recipe_not_found"))
+        d = recipe.to_dict()
         d["id"] = id
         return d
 
     @app.put("/api/ricette/{id}")
-    def modifica(id: int, ricetta: dict, lingua_ui: str = "it") -> dict:
-        """Salva le correzioni manuali dell'utente. È il passaggio che rende affidabile
-        l'export: l'LLM propone, l'utente corregge, e solo poi si esporta."""
-        with libreria() as lib:
+    def update_recipe(id: int, recipe: dict, lingua_ui: str = "it") -> dict:
+        """Saves the user's manual corrections. It is the step that makes the export
+        trustworthy: the LLM proposes, the user corrects, and only then does it export."""
+        with library() as lib:
             if not lib.read(id):
-                raise HTTPException(404, testo(lingua_ui, "ricetta_non_trovata"))
-            ricetta.pop("id", None)
-            lib.update(id, Recipe.from_dict(ricetta))
+                raise HTTPException(404, text(lingua_ui, "recipe_not_found"))
+            recipe.pop("id", None)
+            lib.update(id, Recipe.from_dict(recipe))
         return {"ok": True}
 
     @app.delete("/api/ricette/{id}")
-    def elimina(id: int, lingua_ui: str = "it") -> dict:
-        with libreria() as lib:
+    def delete_recipe(id: int, lingua_ui: str = "it") -> dict:
+        with library() as lib:
             if not lib.delete(id):
-                raise HTTPException(404, testo(lingua_ui, "ricetta_non_trovata"))
+                raise HTTPException(404, text(lingua_ui, "recipe_not_found"))
         return {"ok": True}
 
     @app.post("/api/ricette")
-    def salva_nuova(ricetta: dict) -> dict:
-        """Salva in libreria una ricetta appena estratta (con eventuali correzioni)."""
-        with libreria() as lib:
-            id = lib.save(Recipe.from_dict(ricetta))
+    def save_new(recipe: dict) -> dict:
+        """Saves a freshly extracted recipe (with any corrections) into the library."""
+        with library() as lib:
+            id = lib.save(Recipe.from_dict(recipe))
         return {"id": id}
 
     # ---- export ----------------------------------------------------------------------
 
     @app.get("/api/ricette/{id}/export")
-    def export_singolo(id: int, formato: str = "mela", lingua_ui: str = "it") -> FileResponse:
-        """Scarica una ricetta. `formato` è `mela` (predefinito), `markdown` o `pdf`.
+    def export_one(id: int, formato: str = "mela", lingua_ui: str = "it") -> FileResponse:
+        """Downloads a recipe. `formato` is `mela` (the default), `markdown` or `pdf`.
 
-        Il predefinito resta Mela perché è il formato che l'app importa; gli altri due
-        servono a chi Mela non ce l'ha e vuole comunque tenersi la ricetta.
+        The query parameter keeps its Italian name for the same reason the routes do: it is
+        part of the URL, this product's external surface (see the module docstring). It is
+        also where a rename bit — see `tests/test_api.py`.
+
+        The default stays Mela because that is the format the app imports; the other two are
+        for anyone who does not have Mela and wants to keep the recipe anyway.
         """
-        with libreria() as lib:
-            ricetta = lib.read(id)
-        if not ricetta:
-            raise HTTPException(404, testo(lingua_ui, "ricetta_non_trovata"))
+        with library() as lib:
+            recipe = lib.read(id)
+        if not recipe:
+            raise HTTPException(404, text(lingua_ui, "recipe_not_found"))
 
         try:
             if formato == "markdown":
-                percorso, tipo = write_markdown(ricetta, export_folder()), "text/markdown"
+                path, tipo = write_markdown(recipe, export_folder()), "text/markdown"
             elif formato == "pdf":
-                percorso, tipo = write_pdf(ricetta, export_folder()), "application/pdf"
+                path, tipo = write_pdf(recipe, export_folder()), "application/pdf"
             elif formato == "mela":
-                percorso, tipo = write_melarecipe(ricetta, export_folder()), "application/json"
+                path, tipo = write_melarecipe(recipe, export_folder()), "application/json"
             else:
-                raise HTTPException(400, testo(lingua_ui, "formato_sconosciuto", formato=formato))
+                raise HTTPException(400, text(lingua_ui, "unknown_format", format=formato))
         except DocumentError as e:
-            # Manca l'extra `doc`: è un problema di installazione, non della richiesta.
+            # The `doc` extra is missing: an installation problem, not a problem with the request.
             raise HTTPException(503, str(e)) from e
 
-        return FileResponse(percorso, media_type=tipo, filename=percorso.name)
+        return FileResponse(path, media_type=tipo, filename=path.name)
 
     @app.get("/api/export")
-    def export_tutte(lingua_ui: str = "it") -> FileResponse:
-        with libreria() as lib:
-            ricette = lib.all_recipes()
-        if not ricette:
-            raise HTTPException(404, testo(lingua_ui, "libreria_vuota"))
-        percorso = write_melarecipes(ricette, export_folder() / "libreria")
-        return FileResponse(percorso, media_type="application/zip", filename=percorso.name)
+    def export_all(lingua_ui: str = "it") -> FileResponse:
+        with library() as lib:
+            recipes = lib.all_recipes()
+        if not recipes:
+            raise HTTPException(404, text(lingua_ui, "empty_library"))
+        path = write_melarecipes(recipes, export_folder() / "libreria")
+        return FileResponse(path, media_type="application/zip", filename=path.name)
 
     @app.post("/api/preview-mela")
-    def anteprima_mela(ricetta: dict) -> dict:
-        """L'aspetto che avrà la ricetta in Mela, senza scriverla su disco."""
-        return to_melarecipe(Recipe.from_dict(ricetta))
+    def mela_preview(recipe: dict) -> dict:
+        """What the recipe will look like in Mela, without writing it to disk."""
+        return to_melarecipe(Recipe.from_dict(recipe))
 
     # ---- frontend statico ------------------------------------------------------------
 
-    if CARTELLA_WEB.is_dir():
-        app.mount("/", StaticFiles(directory=CARTELLA_WEB, html=True), name="web")
+    if WEB_FOLDER.is_dir():
+        app.mount("/", StaticFiles(directory=WEB_FOLDER, html=True), name="web")
     else:  # pragma: no cover - solo se qualcuno cancella web/
         @app.get("/")
-        def _senza_frontend():
-            return JSONResponse({"errore": "Cartella web/ mancante."}, status_code=500)
+        def _no_frontend():
+            return JSONResponse({"error": "Cartella web/ mancante."}, status_code=500)
 
     return app
 
 
 # --------------------------------------------------------------------------------------
-# Esecuzione nei thread di lavoro
+# Esecuzione nei thread di job
 # --------------------------------------------------------------------------------------
 
 
-def _avanzamento(registro: RegistroLavori, lavoro: Lavoro):
-    def emetti(fase: str, messaggio: str) -> None:
-        registro.emetti(lavoro, "avanzamento", {"fase": fase, "messaggio": messaggio})
-    return emetti
+def _progress(registry: JobRegistry, job: Job):
+    def emit(stage: str, message: str) -> None:
+        registry.emit(job, "progress", {"stage": stage, "message": message})
+    return emit
 
 
-def _concludi_con_esito(registro: RegistroLavori, lavoro: Lavoro, esito: pipeline.Esito,
+def _finish_with_outcome(registry: JobRegistry, job: Job, outcome: pipeline.Outcome,
                         db: str | None) -> None:
-    if not esito.riuscito:
-        registro.concludi(lavoro, {"ok": False, "errore": esito.errore, "avvertenze": esito.avvertenze})
+    if not outcome.succeeded:
+        registry.finish(job, {"ok": False, "error": outcome.error, "warnings": outcome.warnings})
         return
     with Library(db) as lib:
-        identificativo = lib.save(esito.ricetta)
-    dati = esito.ricetta.to_dict()
-    dati["id"] = identificativo
-    registro.concludi(lavoro, {
+        identifier = lib.save(outcome.recipe)
+    data = outcome.recipe.to_dict()
+    data["id"] = identifier
+    registry.finish(job, {
         "ok": True,
-        "ricetta": dati,
-        "modello": esito.modello,
-        "avvertenze": esito.avvertenze,
+        "recipe": data,
+        "model": outcome.model,
+        "warnings": outcome.warnings,
     })
 
 
-def _esegui_da_url(registro: RegistroLavori, lavoro: Lavoro, richiesta: RichiestaCook,
-                   url_ollama: str, db: str | None) -> None:
+def _run_from_url(registry: JobRegistry, job: Job, request: CookRequest,
+                   ollama_url: str, db: str | None) -> None:
     try:
-        esito = pipeline.da_url(
-            richiesta.url, _avanzamento(registro, lavoro),
-            cookies_da_browser=richiesta.cookies_da_browser,
-            backend_asr=richiesta.backend_asr, lingua_audio=richiesta.lingua_audio,
-            modello_llm=richiesta.modello_llm,
-            salta_audio=richiesta.salta_audio, url_ollama=url_ollama,
-            **richiesta.assi(),
+        outcome = pipeline.from_url(
+            request.url, _progress(registry, job),
+            cookies_from_browser=request.cookies_from_browser,
+            asr_backend=request.asr_backend, audio_language=request.audio_language,
+            llm_model=request.llm_model,
+            skip_audio=request.skip_audio, ollama_url=ollama_url,
+            **request.axes(),
         )
-        _concludi_con_esito(registro, lavoro, esito, db)
-    except pipeline.NonEUnaRicetta as e:
-        registro.concludi(lavoro, {"ok": False, "errore": str(e), "non_ricetta": True})
+        _finish_with_outcome(registry, job, outcome, db)
+    except pipeline.NotARecipe as e:
+        registry.finish(job, {"ok": False, "error": str(e), "not_a_recipe": True})
     except Exception as e:
-        registro.concludi(lavoro, {"ok": False, "errore": f"{type(e).__name__}: {e}"})
+        registry.finish(job, {"ok": False, "error": f"{type(e).__name__}: {e}"})
 
 
-def _esegui_da_file(registro: RegistroLavori, lavoro: Lavoro, percorso: Path,
-                    richiesta: RichiestaCook, url_ollama: str, db: str | None) -> None:
+def _run_from_file(registry: JobRegistry, job: Job, path: Path,
+                    request: CookRequest, ollama_url: str, db: str | None) -> None:
     try:
-        esito = pipeline.da_file(
-            percorso, didascalia=richiesta.didascalia or "",
-            su_avanzamento=_avanzamento(registro, lavoro), url_ollama=url_ollama,
-            backend_asr=richiesta.backend_asr, lingua_audio=richiesta.lingua_audio,
-            modello_llm=richiesta.modello_llm,
-            salta_audio=richiesta.salta_audio,
-            **richiesta.assi(),
+        outcome = pipeline.from_file(
+            path, caption=request.caption or "",
+            on_progress=_progress(registry, job), ollama_url=ollama_url,
+            asr_backend=request.asr_backend, audio_language=request.audio_language,
+            llm_model=request.llm_model,
+            skip_audio=request.skip_audio,
+            **request.axes(),
         )
-        _concludi_con_esito(registro, lavoro, esito, db)
-    except pipeline.NonEUnaRicetta as e:
-        registro.concludi(lavoro, {"ok": False, "errore": str(e), "non_ricetta": True})
+        _finish_with_outcome(registry, job, outcome, db)
+    except pipeline.NotARecipe as e:
+        registry.finish(job, {"ok": False, "error": str(e), "not_a_recipe": True})
     except Exception as e:
-        registro.concludi(lavoro, {"ok": False, "errore": f"{type(e).__name__}: {e}"})
+        registry.finish(job, {"ok": False, "error": f"{type(e).__name__}: {e}"})
     finally:
-        percorso.unlink(missing_ok=True)   # il caricamento temporaneo non deve restare in giro
+        path.unlink(missing_ok=True)   # the temporary upload must not linger

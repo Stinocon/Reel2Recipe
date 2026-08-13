@@ -17,7 +17,10 @@ import re
 
 import pytest
 
-from reel2recipe import api, pipeline
+import ast
+from pathlib import Path
+
+from reel2recipe import api, documents, mela, pipeline, units
 from reel2recipe.paths import REPO_ROOT
 
 CARTELLA_WEB = REPO_ROOT / "web"
@@ -113,7 +116,7 @@ def test_ogni_chiave_del_markup_esiste_nel_catalogo():
     assert not (usate - chiavi), f"chiavi usate nel markup e assenti dal catalogo: {sorted(usate - chiavi)}"
 
 
-@pytest.mark.parametrize("modulo, catalogo", [("pipeline", pipeline.TESTI), ("api", api.TESTI)])
+@pytest.mark.parametrize("modulo, catalogo", [("pipeline", pipeline.TEXTS), ("api", api.TEXTS)])
 def test_i_cataloghi_python_sono_completi(modulo, catalogo):
     """Stessa regola per le stringhe che nascono nel server: avanzamento, avvertenze ed
     errori dell'API. Il ripiego sull'italiano c'è, ma serve a non rompere nulla — non a
@@ -125,7 +128,7 @@ def test_i_cataloghi_python_sono_completi(modulo, catalogo):
     assert not in_piu, f"{modulo}.TESTI, chiavi inglesi orfane: {sorted(in_piu)}"
 
 
-@pytest.mark.parametrize("modulo, catalogo", [("pipeline", pipeline.TESTI), ("api", api.TESTI)])
+@pytest.mark.parametrize("modulo, catalogo", [("pipeline", pipeline.TEXTS), ("api", api.TEXTS)])
 def test_i_segnaposto_coincidono_fra_le_lingue(modulo, catalogo):
     """Un `{titolo}` che sparisce nella traduzione inglese non dà errore: dà una frase a cui
     manca il pezzo che la rendeva utile. Un segnaposto *inventato* invece esplode, e lo fa
@@ -205,3 +208,53 @@ def test_ogni_chiave_della_scheda_libreria_esiste_nell_elenco(tmp_path):
         f"app.js legge dalle carte chiavi che `Library.list_` non produce: {mancanti}. "
         f"L'elenco ne produce: {sorted(disponibili)}"
     )
+
+
+@pytest.mark.parametrize("modulo, catalogo, sorgente", [
+    ("pipeline", pipeline.TEXTS, pipeline.__file__),
+    ("api", api.TEXTS, api.__file__),
+    ("mela", mela.TEXTS, mela.__file__),
+    ("documents", documents.TEXTS, documents.__file__),
+    ("units", units.MESSAGES, units.__file__),
+])
+def test_ogni_chiamata_passa_i_segnaposto_che_la_frase_chiede(modulo, catalogo, sorgente):
+    """I nomi passati a `text(...)` devono essere quelli che la frase aspetta.
+
+    Il guard qui sopra confronta i segnaposto **fra le due lingue**; questo confronta i
+    segnaposto con **chi li riempie**, che è un'altra cosa e ha lasciato passare un difetto
+    vero: durante la migrazione una rinomina meccanica ha trasformato
+    `text(lingua, "pronta", titolo=…)` in `title=…` mentre la frase diceva ancora `{titolo}`.
+    `str.format` solleva `KeyError`, quindi ogni lavorazione riuscita sarebbe esplosa
+    all'ultimo messaggio — ma nessun test lo vedeva, perché per arrivare lì servono Ollama e
+    un file vero. Il difetto è rimasto per due commit.
+
+    Si legge il sorgente invece di eseguirlo: interessa la chiamata scritta, non quella
+    percorsa da un test.
+    """
+    albero = ast.parse(Path(sorgente).read_text(encoding="utf-8"))
+    per_chiave: dict[str, set[str]] = {
+        chiave: set(re.findall(r"\{(\w+)\}", frase))
+        for chiave, frase in catalogo["it"].items()
+    }
+
+    controllate = 0
+    for nodo in ast.walk(albero):
+        if not isinstance(nodo, ast.Call) or len(nodo.args) < 2:
+            continue
+        nome = getattr(nodo.func, "id", None) or getattr(nodo.func, "attr", None)
+        if nome not in ("text", "message"):
+            continue
+        chiave_nodo = nodo.args[1]
+        if not (isinstance(chiave_nodo, ast.Constant) and isinstance(chiave_nodo.value, str)):
+            continue                      # chiave calcolata: non verificabile da qui
+        chiave = chiave_nodo.value
+        assert chiave in per_chiave, f"{modulo}: `{chiave}` non esiste nel catalogo"
+        passati = {kw.arg for kw in nodo.keywords if kw.arg}
+        attesi = per_chiave[chiave]
+        assert passati == attesi, (
+            f"{modulo}, chiave `{chiave}` (riga {nodo.lineno}): la frase chiede "
+            f"{sorted(attesi)}, la chiamata passa {sorted(passati)}"
+        )
+        controllate += 1
+
+    assert controllate, f"{modulo}: nessuna chiamata trovata, il guard si è scollegato"

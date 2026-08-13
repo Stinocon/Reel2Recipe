@@ -36,7 +36,7 @@ def test_invocazione_addon_e_valida():
     """La riga con cui l'add-on avvia l'interfaccia deve continuare a essere accettata."""
     args = _parser().parse_args(INVOCAZIONE_ADDON)
 
-    assert args.comando == "serve"
+    assert args.command == "serve"
     assert args.ollama == "http://127.0.0.1:11434"
     # 0.0.0.0 e non 127.0.0.1: a collegarsi è l'Ingress, da fuori dal container.
     assert args.host == "0.0.0.0"
@@ -79,30 +79,30 @@ def test_il_parlato_si_riconosce_da_se_per_impostazione_predefinita():
     trascrizione ne usciva storpiata e tutto il resto della catena lavorava su quella.
     """
     from reel2recipe import asr
-    from reel2recipe.cli import lingua_del_parlato
+    from reel2recipe.cli import spoken_language
 
     assert asr.DEFAULT_LANGUAGE is None
     args = _parser().parse_args(["cook", "https://esempio.test/reel"])
     assert args.spoken_language == "auto"
-    assert lingua_del_parlato(args) is None
+    assert spoken_language(args) is None
 
 
 @pytest.mark.parametrize("scelta, atteso", [("auto", None), ("it", "it"), ("en", "en")])
 def test_il_parlato_si_puo_forzare(scelta, atteso):
-    from reel2recipe.cli import lingua_del_parlato
+    from reel2recipe.cli import spoken_language
 
     args = _parser().parse_args(["cook", "https://esempio.test/reel", "--spoken-language", scelta])
-    assert lingua_del_parlato(args) == atteso
+    assert spoken_language(args) == atteso
 
 
 def test_il_parlato_non_segue_la_lingua_di_uscita():
     """Chiedere la ricetta in inglese non significa che il reel sia parlato in inglese:
     tradurre è il caso normale, e dedurre l'una dall'altra direbbe a Whisper una cosa falsa."""
-    from reel2recipe.cli import assi_di_uscita, lingua_del_parlato
+    from reel2recipe.cli import output_axes, spoken_language
 
     args = _parser().parse_args(["cook", "https://esempio.test/reel", "--language", "en"])
-    assert assi_di_uscita(args)["lingua"] == "en"
-    assert lingua_del_parlato(args) is None
+    assert output_axes(args)["language"] == "en"
+    assert spoken_language(args) is None
 
 
 def test_batch_accetta_la_stessa_opzione():
