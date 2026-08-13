@@ -286,7 +286,6 @@ class Tables:
     imperial_volume: frozenset[str]
     labels: dict[str, dict[str, str]]   # language → canonical unit → current form
     plural: dict[str, dict[str, str]]   # language → singular → plural
-    target: dict[str, dict[str, list[str]]]   # system → "peso"/"volume" → units
     temperature_aliases: dict[str, str]
     rounding_c: int
     density: dict[str, float]          # normalised key (name or alias) → g/ml
@@ -307,10 +306,6 @@ class Tables:
         if value is not None and abs(value - 1.0) > 1e-9:
             return self.plural.get(l, {}).get(u, u)
         return u
-
-    def target_units(self, system: str, dimension: str) -> list[str]:
-        """The units a result is to be expressed in, from the largest to the smallest."""
-        return self.target.get(code_of(system), {}).get(dimension, [])
 
     def is_already_in_system(self, unit: str, system: str) -> bool:
         """True if the unit can already be executed in the target system, and is therefore to
@@ -425,10 +420,6 @@ def load_tables(folder: str | None = None) -> Tables:
         imperial_volume=frozenset(_key(x) for x in (u.get("volume_imperiale") or [])),
         labels=per_language(u.get("etichette")),
         plural=per_language(u.get("plurale")),
-        target={
-            system: {dim: [_key(x) for x in units] for dim, units in (entries or {}).items()}
-            for system, entries in (u.get("destinazione") or {}).items()
-        },
         temperature_aliases={_key(k): x for k, x in (temp.get("alias") or {}).items()},
         rounding_c=int(temp.get("arrotondamento_c", 5)),
         density=density,
