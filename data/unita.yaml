@@ -1,22 +1,26 @@
-# unita.yaml — conversioni ESATTE fra unità di misura.
+# unita.yaml — EXACT conversions between units of measurement.
 #
-# Qui dentro non ci sono stime. Ogni valore è una definizione ufficiale o un'equivalenza
-# standard (US customary → SI). Le approssimazioni culinarie — "un pizzico", "q.b.",
-# "un filo d'olio" — stanno in `vaghe.yaml` e sono etichettate come stime.
+# There are no estimates in here. Every value is an official definition or a standard
+# equivalence (US customary → SI). The culinary approximations — "un pizzico", "q.b.",
+# "un filo d'olio" — live in `vaghe.yaml` and are labelled as estimates.
 #
-# Il volume si riporta sempre a millilitri, il peso sempre a grammi. Il passaggio
-# volume→peso NON avviene qui: richiede la densità dello specifico ingrediente e vive
-# in `densita.yaml`. Senza densità nota, non si converte (v. units.py).
+# The keys of this file are English, the unit names are not: "cucchiaio" and "cucchiaino" are
+# the kitchen vocabulary the model produces and the cook reads, exactly like the ingredient
+# names in `densita.yaml`. The keys are code, the names are data.
 #
-# aggiornato: 2026-07-23
+# Volume is always brought back to millilitres, weight always to grams. The volume→weight step
+# does NOT happen here: it needs the specific ingredient's density and lives in `densita.yaml`.
+# With no known density, nothing is converted (see units.py).
+#
+# updated: 2026-07-23
 
 volume:
-  # unità metriche
+  # metric units
   ml: 1.0
   cl: 10.0
   dl: 100.0
   l: 1000.0
-  # unità US customary (definizioni esatte)
+  # US customary units (exact definitions)
   cup: 236.5882365
   tbsp: 14.78676478125
   tsp: 4.92892159375
@@ -24,8 +28,8 @@ volume:
   pint: 473.176473
   quart: 946.352946
   gallon: 3785.411784
-  # convenzioni italiane: il cucchiaio/cucchiaino da cucina è standardizzato a 15/5 ml.
-  # Non è una stima vaga come "un bicchiere", è la misura convenzionale dei ricettari.
+  # Italian conventions: the kitchen cucchiaio/cucchiaino is standardised at 15/5 ml. It is
+  # not a vague estimate like "un bicchiere", it is the recipe books' conventional measure.
   cucchiaio: 15.0
   cucchiaino: 5.0
 
@@ -37,16 +41,17 @@ weight:
   oz: 28.349523125
   lb: 453.59237
 
-# Unità di volume GIÀ METRICHE. Per chi cucina col sistema metrico vanno bene così come
-# sono: "500 ml di latte" è già una misura eseguibile, convertirla in grammi la peggiora.
+# Volume units that are ALREADY METRIC. For someone cooking in metric they are fine as they
+# are: "500 ml di latte" is already an executable measure, converting it to grams makes it
+# worse.
 metric_volume:
   - ml
   - cl
   - dl
   - l
 
-# Unità di volume del sistema anglosassone, speculari alle precedenti: per chi cucina in
-# quel sistema sono già eseguibili e non vanno toccate.
+# Volume units of the Anglo-Saxon system, mirroring the ones above: for someone cooking in
+# that system they are already executable and are not to be touched.
 imperial_volume:
   - cup
   - tbsp
@@ -56,9 +61,9 @@ imperial_volume:
   - quart
   - gallon
 
-# Etichette d'uscita per lingua: sostituiscono il nome tecnico dell'unità quando esiste una
-# forma corrente. In italiano "tbsp" si dice cucchiaio; in inglese "cucchiaio" si dice tbsp.
-# La tabella è simmetrica di proposito — è il cuore della bidirezionalità.
+# Output labels per language: they replace the unit's technical name when a current form
+# exists. In Italian "tbsp" is said cucchiaio; in English "cucchiaio" is said tbsp. The table
+# is symmetric on purpose — it is the heart of the bidirectionality.
 labels:
   it:
     tbsp: cucchiaio
@@ -81,9 +86,9 @@ labels:
     pizzico: pinch
     mazzetto: bunch
 
-# Plurali per lingua, per scrivere "2 cucchiai" e non "2 cucchiaio". L'inglese è quasi
-# sempre regolare (+s), ma va dichiarato comunque: le unità simboliche non si pluralizzano
-# ("2 g", non "2 gs"), e indovinare produrrebbe proprio quell'errore.
+# Plurals per language, so as to write "2 cucchiai" and not "2 cucchiaio". English is almost
+# always regular (+s), but it has to be declared anyway: symbolic units do not pluralise
+# ("2 g", not "2 gs"), and guessing would produce exactly that error.
 plural:
   it:
     cucchiaio: cucchiai
@@ -115,7 +120,7 @@ plural:
     pinch: pinches
     bunch: bunches
 
-# Unità di conteggio: non si convertono, si contano. Restano tali e quali.
+# Counting units: they are not converted, they are counted. They stay exactly as they are.
 count:
   - pz
   - unita
@@ -130,10 +135,10 @@ count:
   - bustina
   - uovo
 
-# Sinonimi e forme flesse → unità canonica. Il confronto avviene in minuscolo,
-# senza punteggiatura e senza accenti (v. units._chiave).
+# Synonyms and inflected forms → the canonical unit. The comparison happens in lower case,
+# without punctuation and without accents (see units._key).
 alias:
-  # peso
+  # weight
   grammo: g
   grammi: g
   gr: g
@@ -158,7 +163,7 @@ alias:
   pound: lb
   pounds: lb
   lbs: lb
-  # volume metrico
+  # metric volume
   millilitro: ml
   millilitri: ml
   mls: ml
@@ -169,7 +174,7 @@ alias:
   litro: l
   litri: l
   lt: l
-  # volume US
+  # US volume
   cups: cup
   tablespoon: tbsp
   tablespoons: tbsp
@@ -184,12 +189,12 @@ alias:
   pints: pint
   quarts: quart
   gallons: gallon
-  # volume italiano
+  # Italian volume
   cucchiai: cucchiaio
   cucchiaiata: cucchiaio
   cucchiaiate: cucchiaio
   cucchiaini: cucchiaino
-  # conteggio
+  # counting
   pezzo: pz
   pezzi: pz
   unita: pz
@@ -204,9 +209,9 @@ alias:
   bustine: bustina
   uova: uovo
 
-# Unità che indicano una misura "a cucchiaio": se la conversione in peso dà un valore
-# molto piccolo, conviene tenere l'unità originale (più utile a chi cucina) e mettere
-# il peso fra parentesi come commento. Soglia e comportamento in units.py.
+# Units denoting a "by the spoon" measure: if the conversion to weight gives a very small
+# value, it is better to keep the original unit (more useful to the cook) and put the weight
+# in brackets as a comment. Threshold and behaviour in units.py.
 spoon_measures:
   - cucchiaio
   - cucchiaino
@@ -214,7 +219,7 @@ spoon_measures:
   - tsp
 
 temperature:
-  # Le formule sono in units.py; qui solo i sinonimi riconosciuti.
+  # The formulas are in units.py; here only the recognised synonyms.
   alias:
     c: "°C"
     "°c": "°C"
@@ -223,6 +228,6 @@ temperature:
     f: "°F"
     "°f": "°F"
     fahrenheit: "°F"
-  # I forni si regolano a scatti di 5 °C: arrotondare al grado singolo darebbe
-  # una falsa precisione ("176,7 °C") che nessun forno sa impostare.
+  # Ovens are set in steps of 5 °C: rounding to the single degree would give a false
+  # precision ("176,7 °C") that no oven can be set to.
   rounding_c: 5

@@ -17,23 +17,23 @@ Homepage = "https://github.com/Stinocon/Reel2Recipe"
 Repository = "https://github.com/Stinocon/Reel2Recipe"
 
 [project.optional-dependencies]
-# Trascrizione locale, portabile ovunque (CPU, ctranslate2). È il backend ASR di riferimento.
-# Il modello (~1.5 GB per large-v3-turbo) si scarica alla prima esecuzione e resta in cache.
+# Local transcription, portable everywhere (CPU, ctranslate2). It is the reference ASR backend.
+# The model (~1.5 GB for large-v3-turbo) is downloaded on the first run and stays cached.
 asr = [
     "faster-whisper>=1.1.0",
 ]
-# Acceleratore ASR per Apple Silicon (Metal). Molto più veloce di faster-whisper sui Mac M-series;
-# `asr.py` lo usa se presente e ripiega su faster-whisper altrimenti.
+# ASR accelerator for Apple Silicon (Metal). Much faster than faster-whisper on M-series Macs;
+# `asr.py` uses it when present and falls back to faster-whisper otherwise.
 asr-mlx = [
     "mlx-whisper>=0.4.2; sys_platform == 'darwin' and platform_machine == 'arm64'",
 ]
-# Export in PDF, per chi non usa Mela. Il Markdown non richiede nulla; reportlab è Python
-# puro e non tira dentro librerie di sistema, che è ciò che serve per poter girare anche
-# dentro un container o su un Raspberry.
+# PDF export, for anyone not using Mela. Markdown needs nothing; reportlab is pure Python and
+# does not drag in system libraries, which is what makes it able to run inside a container or
+# on a Raspberry Pi too.
 doc = [
     "reportlab>=4.2",
 ]
-# Interfaccia web locale (la barra "Cook").
+# The local web interface (the "Cook" bar).
 api = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.34",
