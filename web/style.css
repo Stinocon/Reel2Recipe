@@ -1,9 +1,13 @@
-/* Reel2Recipe — foglio di stile.
+/* Reel2Recipe — stylesheet.
  *
- * Estetica "cucina accogliente": tonalità calde di crema e terracotta, un accento
- * verde-erba, tipografia con una serif per i titoli. Niente dipendenze esterne, niente
- * framework: tutto qui dentro, così l'interfaccia funziona anche offline.
- * Chiaro e scuro entrambi supportati.
+ * A "warm kitchen" look: warm cream and terracotta tones, a grass-green accent, a serif for
+ * the headings. No external dependencies, no framework: everything is in here, so the
+ * interface works offline too. Both light and dark are supported.
+ *
+ * The class names are Italian and stay that way: they live across three files at once —
+ * `index.html`, `app.js` and this one — so moving them is a step of its own, with no gain
+ * in readability and with a silent way of breaking. `tests/test_web.py` guards that every
+ * class used has a rule here.
  */
 
 :root {
@@ -42,17 +46,17 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* Le icone dell'interfaccia (Material Symbols incorporate, v. icons.js e NOTICE.md).
-   `currentColor` nel loro fill fa il resto: seguono il colore del testo che le circonda,
-   quindi non serve una variante per ogni contesto. `display: block` toglie lo spazio che
-   il browser riserva sotto un elemento inline, che le disallineerebbe dal testo. */
+/* The interface icons (Material Symbols, embedded — see icons.js and NOTICE.md).
+   `currentColor` in their fill does the rest: they follow the colour of the surrounding
+   text, so no variant is needed per context. `display: block` removes the space the browser
+   reserves under an inline element, which would misalign them from the text. */
 .ic { display: block; flex-shrink: 0; }
 
-/* L'attributo `hidden` deve vincere sempre. Il browser lo implementa con
-   `[hidden] { display: none }`, che ha la stessa specificità di un selettore di classe:
-   una regola come `.modale { display: flex }`, venendo dopo, lo annullerebbe e mostrerebbe
-   l'elemento all'avvio. È già successo con il pannello opzioni e con i due overlay, che
-   sfocavano l'intera pagina col loro backdrop-filter. */
+/* The `hidden` attribute has to win, always. The browser implements it with
+   `[hidden] { display: none }`, which has the same specificity as a class selector: a rule
+   like `.modale { display: flex }`, coming later, would cancel it and show the element on
+   start-up. It has already happened with the options panel and with both overlays, which
+   blurred the whole page with their backdrop-filter. */
 [hidden] { display: none !important; }
 
 body {
@@ -75,7 +79,7 @@ body {
     radial-gradient(circle at 50% 100%, rgba(224, 164, 88, 0.05), transparent 55%);
 }
 
-/* ---------- Intestazione ---------- */
+/* ---------- Header ---------- */
 
 .intestazione {
   max-width: 960px;
@@ -103,8 +107,8 @@ body {
 }
 .sottotitolo { color: var(--inchiostro-tenue); font-size: 0.92rem; }
 
-/* La lingua dell'interfaccia e lo stato dei componenti stanno insieme in coda alla
-   testata: sono le due cose che si guardano prima di cominciare, non mentre si lavora. */
+/* The interface language and the components' status sit together at the end of the header:
+   they are the two things you look at before starting, not while working. */
 .strumenti-testata {
   display: flex;
   align-items: center;
@@ -147,7 +151,7 @@ body {
 
 main { max-width: 960px; margin: 0 auto; padding: 1rem 1.5rem 4rem; }
 
-/* ---------- Barra Cook ---------- */
+/* ---------- Cook bar ---------- */
 
 .pannello-cook {
   background: var(--carta);
@@ -237,7 +241,7 @@ main { max-width: 960px; margin: 0 auto; padding: 1rem 1.5rem 4rem; }
 .cook-nota { margin-top: 0.9rem; font-size: 0.85rem; color: var(--inchiostro-tenue); min-height: 1.2em; }
 .cook-nota.errore { color: var(--terracotta-scura); }
 
-/* ---------- Rilascio file ---------- */
+/* ---------- File drop ---------- */
 
 .drop-overlay {
   position: fixed; inset: 0; z-index: 100;
@@ -251,11 +255,11 @@ main { max-width: 960px; margin: 0 auto; padding: 1rem 1.5rem 4rem; }
   border: 3px dashed var(--terracotta); border-radius: 24px;
   padding: 3rem 4rem; background: var(--carta);
 }
-/* L'icona sta su una riga sua, sopra il testo: centrata a mano perché `display: block`
-   della classe .ic la ancorerebbe a sinistra. */
+/* The icon sits on a line of its own, above the text: centred by hand because the
+   `display: block` of the .ic class would anchor it to the left. */
 .drop-messaggio .ic { margin: 0 auto 0.4rem; }
 
-/* ---------- Avanzamento ---------- */
+/* ---------- Progress ---------- */
 
 .pannello-avanzamento {
   background: var(--carta); border: 1px solid var(--bordo);
@@ -288,7 +292,7 @@ main { max-width: 960px; margin: 0 auto; padding: 1rem 1.5rem 4rem; }
   color: var(--inchiostro-tenue); cursor: pointer; font-family: var(--sans);
 }
 
-/* ---------- Scheda ricetta ---------- */
+/* ---------- Recipe card ---------- */
 
 .scheda-ricetta {
   background: var(--carta); border: 1px solid var(--bordo);
@@ -348,9 +352,9 @@ main { max-width: 960px; margin: 0 auto; padding: 1rem 1.5rem 4rem; }
 
 .lista-lacune { list-style: none; display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.5rem; }
 .lacuna { font-size: 0.86rem; color: var(--inchiostro-tenue); padding-left: 1.2rem; position: relative; }
-/* Il marcatore è l'icona «warning» delle Material Symbols come data URI: in CSS non si
-   può chiamare la funzione JS delle icone, e un data URI resta comunque offline.
-   Il colore è fissato qui perché un'immagine di sfondo non eredita `color`. */
+/* The marker is the Material Symbols "warning" icon as a data URI: CSS cannot call the
+   icons' JS function, and a data URI stays offline all the same. The colour is fixed here
+   because a background image does not inherit `color`. */
 .lacuna::before {
   content: ''; position: absolute; left: 0; top: 0.15rem;
   width: 0.95rem; height: 0.95rem;
@@ -359,14 +363,14 @@ main { max-width: 960px; margin: 0 auto; padding: 1rem 1.5rem 4rem; }
 
 .scheda-azioni { display: flex; gap: 0.75rem; margin-top: 1.8rem; flex-wrap: wrap; }
 
-/* ---------- Pulsanti ---------- */
+/* ---------- Buttons ---------- */
 
 .btn-primario, .btn-secondario, .btn-testo, .btn-pericolo {
   font-family: var(--sans); font-size: 0.92rem; font-weight: 600;
   border-radius: var(--raggio-piccolo); padding: 0.7rem 1.2rem; cursor: pointer;
   transition: all 0.15s; border: 1px solid transparent;
-  /* inline-flex perché ogni pulsante porta la sua icona accanto al testo: allineate al
-     centro e con uno spazio proprio, invece di dipendere dalla riga di testo. */
+  /* inline-flex because every button carries its icon next to the text: centred and with a
+     gap of their own, instead of depending on the text line. */
   display: inline-flex; align-items: center; gap: 0.45rem;
 }
 .btn-primario { background: var(--erba); color: #fff; box-shadow: 0 3px 10px rgba(106,143,95,0.3); }
@@ -376,12 +380,12 @@ main { max-width: 960px; margin: 0 auto; padding: 1rem 1.5rem 4rem; }
 .btn-testo { background: none; color: var(--inchiostro-tenue); padding: 0.7rem 0.5rem; }
 .btn-testo:hover { color: var(--terracotta); }
 
-/* L'unica azione distruttiva dell'interfaccia. Sobria a riposo — non deve attirare il
-   dito — e rossa solo al passaggio, quando l'intenzione è già espressa. */
+/* The interface's only destructive action. Sober at rest — it must not attract the finger —
+   and red only on hover, once the intention has been expressed. */
 .btn-pericolo { background: none; color: var(--inchiostro-tenue); border-color: var(--bordo); }
 .btn-pericolo:hover { background: var(--terracotta-scura); border-color: var(--terracotta-scura); color: #fff; }
 
-/* ---------- Libreria ---------- */
+/* ---------- Library ---------- */
 
 .libreria-testata { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.3rem; flex-wrap: wrap; }
 .libreria-testata h2 { font-family: var(--serif); font-size: 1.5rem; }
@@ -402,8 +406,8 @@ main { max-width: 960px; margin: 0 auto; padding: 1rem 1.5rem 4rem; }
 .carta-copertina {
   height: 130px; background: var(--crema-scura); background-size: cover; background-position: center;
   display: flex; align-items: center; justify-content: center;
-  /* Il segnaposto per le ricette senza copertina: presente ma discreto, non deve
-     competere col titolo sotto. */
+  /* The placeholder for recipes with no cover: present but discreet, it must not compete
+     with the title below. */
   color: var(--bordo);
 }
 .carta-corpo { padding: 0.9rem 1rem; flex: 1; display: flex; flex-direction: column; gap: 0.35rem; }
@@ -413,7 +417,7 @@ main { max-width: 960px; margin: 0 auto; padding: 1rem 1.5rem 4rem; }
 
 .libreria-vuota { text-align: center; color: var(--inchiostro-tenue); padding: 3rem 1rem; font-size: 0.95rem; }
 
-/* ---------- Modale ---------- */
+/* ---------- Modal ---------- */
 
 .modale {
   position: fixed; inset: 0; z-index: 200; background: rgba(43, 36, 32, 0.5);
@@ -442,7 +446,7 @@ main { max-width: 960px; margin: 0 auto; padding: 1rem 1.5rem 4rem; }
 }
 .toast.errore { background: var(--terracotta-scura); }
 
-/* ---------- Piè di pagina ---------- */
+/* ---------- Footer ---------- */
 
 .pie-pagina {
   text-align: center; padding: 2rem 1.5rem 3rem; color: var(--inchiostro-tenue);
@@ -450,8 +454,8 @@ main { max-width: 960px; margin: 0 auto; padding: 1rem 1.5rem 4rem; }
   max-width: 640px; margin: 0 auto;
 }
 .pie-pagina strong { color: var(--terracotta); }
-/* L'avvertenza è la cosa che conta di più qui dentro: chi porta la ricetta in cucina deve
-   sapere che l'estrazione è automatica. Leggibile, non nascosta in un grigio da nota legale. */
+/* The warning is the thing that matters most in here: whoever takes the recipe into the
+   kitchen has to know the extraction is automatic. Readable, not hidden in legal-note grey. */
 .pie-avvertenza { font-size: 0.8rem; line-height: 1.6; opacity: 0.9; }
 .pie-collegamenti a { color: var(--inchiostro-tenue); text-decoration: underline; text-underline-offset: 2px; }
 .pie-collegamenti a:hover { color: var(--terracotta); }

@@ -1,56 +1,61 @@
-# Materiale di terzi e licenze
+# Third-party material and licences
 
-Reel2Recipe è distribuito con licenza MIT (v. [`LICENSE`](LICENSE)). Questo file registra ciò
-che, dentro o attorno al progetto, è **lavoro di qualcun altro**, e a quali condizioni. Vale
-lo stesso criterio delle densità in `data/`: un'attribuzione che nessuno può verificare non è
-un'attribuzione.
+Reel2Recipe is distributed under the MIT licence (see [`LICENSE`](LICENSE)). This file records
+what, inside or around the project, is **somebody else's work**, and on what terms. The same
+criterion applies as to the densities in `data/`: an attribution nobody can verify is not an
+attribution.
 
-Le due categorie sotto sono distinte, e la differenza conta legalmente quanto praticamente.
+This file is in English, unlike the two legal documents in `docs/`, and deliberately so: those
+are authoritative in Italian for the user of this tool, whereas a NOTICE is read by whoever
+reuses the code — and Apache-2.0, which is what governs the entry below, expects it in English.
 
-## 1. Materiale di terzi ridistribuito in questo repository
+The two categories below are distinct, and the difference matters legally as much as
+practically.
 
-È ciò che ricevi clonando. È coperto dalla propria licenza, non da quella di Reel2Recipe.
+## 1. Third-party material redistributed in this repository
 
-| Cosa | Dove | Autore | Licenza |
+This is what you receive by cloning. It is covered by its own licence, not by Reel2Recipe's.
+
+| What | Where | Author | Licence |
 |---|---|---|---|
-| **Material Symbols**, tracciati delle icone (Outlined, 24 px, `viewBox 0 -960 960 960`), incorporati come dati di percorso SVG | `web/icons.js` (`ICON_PATHS`), la favicon in `web/index.html`, il marcatore delle lacune in `web/style.css` | Google | [Apache-2.0](https://github.com/google/material-design-icons/blob/master/LICENSE) |
+| **Material Symbols**, icon outlines (Outlined, 24 px, `viewBox 0 -960 960 960`), embedded as SVG path data | `web/icons.js` (`ICON_PATHS`), the favicon in `web/index.html`, the gap marker in `web/style.css` | Google | [Apache-2.0](https://github.com/google/material-design-icons/blob/master/LICENSE) |
 
-Le icone sono **incorporate anziché caricate da un CDN** perché l'interfaccia deve funzionare
-senza rete, come tutto il resto del prodotto: nessuna richiesta a Google, né la prima volta né
-dopo. Incorporarle non cambia la loro licenza — l'attribuzione qui sopra viaggia con ogni
-copia di questo repository.
+The icons are **embedded rather than loaded from a CDN** because the interface has to work
+without a network, like the rest of the product: no request to Google, neither the first time
+nor afterwards. Embedding them does not change their licence — the attribution above travels
+with every copy of this repository.
 
-Il nome originale di ogni icona è riportato nel commento sopra la sua voce in `web/icons.js`,
-così è ritrovabile nel catalogo su [fonts.google.com/icons](https://fonts.google.com/icons).
+The original name of each icon is recorded in the comment above its entry in `web/icons.js`, so
+it can be found again in the catalogue at [fonts.google.com/icons](https://fonts.google.com/icons).
 
-## 2. Strumenti che Reel2Recipe usa ma **non** include
+## 2. Tools Reel2Recipe uses but does **not** include
 
-Nessuno di questi è ridistribuito qui. Si installano a parte (`./install.sh` se ne occupa) e
-restano sotto la licenza e i termini dei rispettivi autori, **che accetti installandoli**, non
-usando Reel2Recipe.
+None of these is redistributed here. They are installed separately (`./install.sh` takes care
+of it) and remain under the licence and terms of their respective authors, **which you accept
+by installing them**, not by using Reel2Recipe.
 
-| Strumento | Ruolo qui | Autore | Licenza |
+| Tool | Role here | Author | Licence |
 |---|---|---|---|
-| [yt-dlp](https://github.com/yt-dlp/yt-dlp) | acquisizione del reel e dei suoi metadati | contributori yt-dlp | Unlicense |
-| [Whisper](https://github.com/openai/whisper) via [faster-whisper](https://github.com/SYSTRAN/faster-whisper) / [mlx-whisper](https://github.com/ml-explore/mlx-examples) | trascrizione locale del parlato | OpenAI; SYSTRAN; Apple | MIT |
-| [Ollama](https://ollama.com) e i modelli [Qwen2.5](https://github.com/QwenLM/Qwen2.5) | strutturazione della ricetta, in locale | Ollama; Alibaba Cloud | MIT; Qwen (Apache-2.0 per la maggior parte delle taglie) |
-| [ffmpeg](https://ffmpeg.org) | estrazione della traccia audio | FFmpeg | LGPL/GPL secondo la build |
-| [ReportLab](https://www.reportlab.com/opensource/) | export in PDF (extra opzionale `doc`) | ReportLab | BSD-3-Clause |
-| [FastAPI](https://fastapi.tiangolo.com) e [uvicorn](https://www.uvicorn.org) | interfaccia web locale (extra `api`) | Sebastián Ramírez; Encode | MIT; BSD-3-Clause |
+| [yt-dlp](https://github.com/yt-dlp/yt-dlp) | fetching the reel and its metadata | yt-dlp contributors | Unlicense |
+| [Whisper](https://github.com/openai/whisper) via [faster-whisper](https://github.com/SYSTRAN/faster-whisper) / [mlx-whisper](https://github.com/ml-explore/mlx-examples) | local speech transcription | OpenAI; SYSTRAN; Apple | MIT |
+| [Ollama](https://ollama.com) and the [Qwen2.5](https://github.com/QwenLM/Qwen2.5) models | structuring the recipe, locally | Ollama; Alibaba Cloud | MIT; Qwen (Apache-2.0 for most sizes) |
+| [ffmpeg](https://ffmpeg.org) | extracting the audio track | FFmpeg | LGPL/GPL depending on the build |
+| [ReportLab](https://www.reportlab.com/opensource/) | PDF export (optional `doc` extra) | ReportLab | BSD-3-Clause |
+| [FastAPI](https://fastapi.tiangolo.com) and [uvicorn](https://www.uvicorn.org) | local web interface (`api` extra) | Sebastián Ramírez; Encode | MIT; BSD-3-Clause |
 
-## 3. Dati di conversione
+## 3. Conversion data
 
-Le densità in `data/densita.yaml` derivano da **USDA FoodData Central** (dominio pubblico) e
-dalla **Ingredient Weight Chart di King Arthur Baking**, citate voce per voce nel campo
-`fonte`. Sono dati di fatto, non materiale protetto: il valore aggiunto qui è averli
-verificati e resi tracciabili.
+The densities in `data/densita.yaml` derive from **USDA FoodData Central** (public domain) and
+from **King Arthur Baking's Ingredient Weight Chart**, cited entry by entry in the `source`
+field. They are matters of fact, not protected material: the value added here is having
+verified them and made them traceable.
 
-## 4. Idee distillate, non installate
+## 4. Ideas distilled, not installed
 
-Alcune pratiche di questo repository vengono da progetti di terzi, adottate come **idea** e
-riscritte in forma nativa — mai installate come codice o hook. La più visibile è il criterio
-contro l'over-engineering descritto in [`docs/architecture.md`](docs/architecture.md)
-(«si aggiunge ciò che risolve un problema già visto»), distillato dalla "decision ladder" di
-[Ponytail](https://github.com/DietrichGebert/ponytail) (MIT). Un'idea non è materiale
-protetto e questa citazione non è un obbligo di licenza: sta qui perché è giusto dire da dove
-viene.
+Some practices in this repository come from third-party projects, adopted as an **idea** and
+rewritten in native form — never installed as code or as a hook. The most visible is the
+criterion against over-engineering described in [`docs/architecture.md`](docs/architecture.md)
+("what gets added is what solves a problem already seen"), distilled from the "decision ladder"
+of [Ponytail](https://github.com/DietrichGebert/ponytail) (MIT). An idea is not protected
+material and this citation is not a licence obligation: it is here because it is right to say
+where something came from.

@@ -1,16 +1,16 @@
 // icons.js — the interface icons, embedded.
 //
-// Sono le Material Symbols di Google (Outlined, 24 px), incluse qui come dati di tracciato
-// invece di essere caricate da un CDN: l'interfaccia deve funzionare **senza rete**, come
-// tutto il resto del prodotto. Nessuna richiesta a Google, a nessuna
-// esecuzione, né la prima volta né dopo.
+// They are Google's Material Symbols (Outlined, 24 px), included here as path data rather
+// than loaded from a CDN: the interface has to work **without a network**, like the rest of
+// the product. No request to Google, on any run, neither the first time nor afterwards.
 //
-// Licenza Apache-2.0, di Google. L'attribuzione sta in NOTICE.md e viaggia con ogni copia
-// del repository: incorporarle non cambia la loro licenza.
+// Apache-2.0 licence, by Google. The attribution lives in NOTICE.md and travels with every
+// copy of the repository: embedding them does not change their licence.
 //
-// I nomi sono in italiano come il resto del codice; il commento sopra ogni voce riporta il
-// name originale, per poter ritrovare l'icon nel catalogo (fonts.google.com/icons).
-// Tutte condividono viewBox "0 -960 960 960", che è la convenzione delle Material Symbols.
+// The **keys are Italian** and stay that way: they are this catalogue's vocabulary, like the
+// unit names in `data/`. The comment above each entry carries the original Material Symbols
+// name, so the icon can be found again in the catalogue (fonts.google.com/icons). All of them
+// share viewBox "0 -960 960 960", which is the Material Symbols convention.
 
 const ICON_PATHS = {
   // skillet
@@ -57,19 +57,19 @@ const ICON_PATHS = {
   chiudi: 'm256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z',
 };
 
-// Un'icon come stringa SVG. `currentColor` fa sì che segua il colore del testo che la
-// circonda, così non serve una variante per ogni contesto (chiaro, scuro, dentro un
-// bottone colorato). aria-hidden perché sono decorative: il significato sta nel testo
-// accanto, e uno screen reader che le leggesse aggiungerebbe solo rumore.
+// An icon as an SVG string. `currentColor` makes it follow the colour of the surrounding
+// text, so no variant is needed per context (light, dark, inside a coloured button).
+// aria-hidden because they are decorative: the meaning is in the text next to them, and a
+// screen reader announcing them would only add noise.
 export function icon(name, size = 20) {
   const d = ICON_PATHS[name];
   if (!d) return '';
   return `<svg class="ic" width="${size}" height="${size}" viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true"><path d="${d}"/></svg>`;
 }
 
-// Riempie gli elementi statici di index.html marcati `data-icon="name"`, con
-// `data-icon-size` opzionale. Serve a non duplicare i tracciati fra HTML e JS: il markup
-// dichiara QUALE icon vuole, i dati stanno in un posto solo.
+// Fills the static elements of index.html marked `data-icon="name"`, with an optional
+// `data-icon-size`. It exists so the path data is not duplicated between HTML and JS: the
+// markup declares WHICH icon it wants, the data lives in one place.
 export function fillIcons(root = document) {
   for (const el of root.querySelectorAll('[data-icon]')) {
     el.innerHTML = icon(el.dataset.icon, Number(el.dataset.iconSize) || 20);
