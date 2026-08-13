@@ -1,24 +1,32 @@
-"""Gate sul comportamento del modello locale: rispetta la regola «non inventare»?
+"""A gate on the local model's behaviour: does it honour the "invent nothing" rule?
 
-Perché esiste. La qualità di Reel2Recipe non dipende solo dal nostro codice: dipende anche
-da quanto il modello locale rispetta il prompt. Provando un reel vero è emerso che
-`qwen2.5:7b-instruct`, davanti a un elenco di ingredienti senza dosi («Salsa: soia, mirin e
-dashi»), **distribuiva dosi plausibili** — «1 tazza» di soia che nessuno aveva mai scritto.
-È il fallimento peggiore possibile per questo progetto: un numero inventato di cui l'utente non
-sa che è inventato. È la regola d'oro "non inventare" (v. docs/architettura.md) messa alla
-prova sul modello davvero installato. Il modello predefinito, `qwen2.5:14b`, non lo fa.
+Why it exists. Reel2Recipe's quality does not depend on our code alone: it also depends on how
+far the local model honours the prompt. Trying a real reel turned up that
+`qwen2.5:7b-instruct`, faced with a list of ingredients with no amounts ("Salsa: soia, mirin e
+dashi"), **handed out plausible amounts** — "1 tazza" of soy sauce that nobody had ever
+written. It is the worst possible failure for this project: an invented number the user does
+not know is invented. It is the golden rule "invent nothing" (see docs/architettura.md) put to
+the test against the model actually installed. The default model, `qwen2.5:14b`, does not do
+it.
 
-Quel difetto è stato scoperto per caso. Questo test fa in modo che non serva più la fortuna.
+That defect was found by chance. This test makes sure luck is no longer required.
 
-Non gira di default: richiede Ollama acceso e costa da decine di secondi a qualche minuto,
-quindi non sta nel percorso di `./check.sh`. Si lancia deliberatamente, dopo aver toccato il
-prompt di `extract.py` o cambiato il modello predefinito:
+It does not run by default: it needs Ollama up and costs anything from tens of seconds to a
+few minutes, so it is not on `./check.sh`'s path. It is launched deliberately, after touching
+`extract.py`'s prompt or changing the default model:
 
     R2R_TEST_MODELLO=1 uv run pytest tests/test_modello.py -v
 
-Con `R2R_MODELLO` si prova un modello specifico invece del predefinito:
+`R2R_MODELLO` tries a specific model instead of the default:
 
     R2R_TEST_MODELLO=1 R2R_MODELLO=qwen2.5:7b-instruct uv run pytest tests/test_modello.py -v
+
+**Being opt-in has already cost something.** During the migration to English a mechanical
+rename of the keyword arguments reached this file too, and it started calling
+`extract_draft(transcript=…)` when the parameter did not yet exist. The suite could not
+notice — this module is skipped without `R2R_TEST_MODELLO` — so the test that protects the
+project's central promise sat uncallable for two commits. Run it in the same session you
+touch it, even by accident.
 """
 
 from __future__ import annotations
@@ -29,9 +37,9 @@ import pytest
 
 from reel2recipe import extract
 
-# Una didascalia costruita apposta: un ingrediente CON la dose e tre gruppi SENZA. È la
-# forma in cui gli autori scrivono davvero, ed è la trappola in cui cade un modello piccolo.
-DIDASCALIA = """\
+# A caption built on purpose: one ingredient WITH its amount and three groups WITHOUT. It is
+# the shape authors really write in, and it is the trap a small model falls into.
+CAPTION = """\
 Yaki Udon, pronti in 10 minuti netti!
 
 🥣 INGREDIENTI:
@@ -44,96 +52,97 @@ PROCEDIMENTO:
 Taglia le verdure, rosola il maiale, aggiungi gli udon e la salsa. Salta tutto.
 """
 
-# Gli ingredienti che nella didascalia NON hanno alcuna dose. Per ognuno il modello deve
-# lasciare quantità e unità vuote e dichiarare la lacuna, non riempire a intuito.
-SENZA_DOSE = ("cipolla", "carote", "cavolo", "soia", "mirin", "dashi", "udon")
+# The ingredients that have NO amount at all in the caption. For each of them the model has to
+# leave quantity and unit empty and declare the gap, not fill them in by intuition.
+WITHOUT_AMOUNT = ("cipolla", "carote", "cavolo", "soia", "mirin", "dashi", "udon")
 
 
-def _senza_ollama() -> bool:
+def _without_ollama() -> bool:
     return not extract.ollama_up()
 
 
 pytestmark = [
     pytest.mark.skipif(
         os.environ.get("R2R_TEST_MODELLO") != "1",
-        reason="gate sul modello: lento e richiede Ollama. Attiva con R2R_TEST_MODELLO=1",
+        reason="model gate: slow and needs Ollama. Enable it with R2R_TEST_MODELLO=1",
     ),
-    pytest.mark.skipif(_senza_ollama(), reason="Ollama non risponde"),
+    pytest.mark.skipif(_without_ollama(), reason="Ollama is not answering"),
 ]
 
 
 @pytest.fixture(scope="module")
-def bozza() -> dict:
-    """Una sola estrazione per tutto il modulo: è la parte lenta."""
+def draft() -> dict:
+    """One extraction for the whole module: it is the slow part."""
     return extract.extract_draft(
-        caption=DIDASCALIA,
+        caption=CAPTION,
         transcript="",
         title="Yaki Udon",
         model=os.environ.get("R2R_MODELLO"),
     ).draft
 
 
-def _ingredienti_senza_dose(bozza: dict) -> list[dict]:
+def _ingredients_without_amount(draft: dict) -> list[dict]:
     return [
-        i for i in (bozza.get("ingredienti") or [])
-        if any(parola in (i.get("nome") or "").lower() for parola in SENZA_DOSE)
+        i for i in (draft.get("ingredienti") or [])
+        if any(word in (i.get("nome") or "").lower() for word in WITHOUT_AMOUNT)
     ]
 
 
-def test_non_inventa_le_dosi_mancanti(bozza):
-    """Il test che conta. Un elenco senza dosi deve restare senza dosi.
+def test_it_does_not_invent_the_missing_amounts(draft):
+    """The test that matters. A list with no amounts has to stay with no amounts.
 
-    Si controlla la comparsa di un **numero**, che è il danno vero: un peso plausibile di cui
-    chi cucina non sa che è inventato. Una parola finita per sbaglio in `unita_raw` (il 14b
-    manda "polvere" per «Dashi in polvere») non è questo problema, ed è già neutralizzata a
-    valle da `units.py`, che la rende come nota fra parentesi invece che come unità.
+    What is checked is the appearance of a **number**, which is the real damage: a plausible
+    weight the cook does not know was invented. A word that ended up in `unita_raw` by mistake
+    (the 14b sends "polvere" for "Dashi in polvere") is not this problem, and is already
+    neutralised downstream by `units.py`, which renders it as a note in brackets rather than
+    as a unit.
 
-    Se questo diventa rosso, il modello in uso non è affidabile per il compito: non
-    "aggiustare" il test — cambiare modello o rinforzare il prompt.
+    If this goes red, the model in use is not reliable for the job: do not "fix" the test —
+    change model or strengthen the prompt.
     """
-    inventate = [
+    invented = [
         (i.get("nome"), i.get("quantita_raw"), i.get("unita_raw"))
-        for i in _ingredienti_senza_dose(bozza)
+        for i in _ingredients_without_amount(draft)
         if any(c.isdigit() for c in f"{i.get('quantita_raw') or ''} {i.get('unita_raw') or ''}")
     ]
-    assert not inventate, (
-        "il modello ha inventato quantità per ingredienti che nella didascalia non ne "
-        f"avevano: {inventate}. È la violazione della regola 2 del prompt: non inventare."
+    assert not invented, (
+        "the model invented quantities for ingredients that had none in the caption: "
+        f"{invented}. It is a violation of rule 2 of the prompt: invent nothing."
     )
 
 
-def test_riporta_la_dose_che_c_era(bozza):
-    """Speculare al precedente: la prudenza non deve diventare cecità. Gli 80 g del maiale
-    sono scritti, e devono uscire — grezzi, non convertiti."""
-    maiale = [i for i in (bozza.get("ingredienti") or []) if "maiale" in (i.get("nome") or "").lower()]
-    assert maiale, "il maiale è sparito dall'estrazione"
-    grezzo = f"{maiale[0].get('quantita_raw') or ''} {maiale[0].get('unita_raw') or ''}".lower()
-    assert "80" in grezzo, f"la dose dichiarata non è stata riportata: {grezzo!r}"
-    # Il modello non deve convertire: 80 g non diventano cup, once o altro (§3).
-    assert not any(u in grezzo for u in ("cup", "oz", "once")), f"il modello ha convertito: {grezzo!r}"
+def test_it_reports_the_amount_that_was_there(draft):
+    """The mirror of the previous one: caution must not become blindness. The pork's 80 g are
+    written down, and they have to come out — raw, not converted."""
+    pork = [i for i in (draft.get("ingredienti") or []) if "maiale" in (i.get("nome") or "").lower()]
+    assert pork, "the pork has vanished from the extraction"
+    raw = f"{pork[0].get('quantita_raw') or ''} {pork[0].get('unita_raw') or ''}".lower()
+    assert "80" in raw, f"the stated amount was not reported: {raw!r}"
+    # The model must not convert: 80 g do not become cups, ounces or anything else (§3).
+    assert not any(u in raw for u in ("cup", "oz", "once")), f"the model converted: {raw!r}"
 
 
-def test_dichiara_le_lacune(bozza):
-    """Non inventare non basta: il buco va anche dichiarato, o l'utente non sa che c'è."""
-    assert (bozza.get("lacune") or []), "nessuna lacuna dichiarata malgrado tre gruppi senza dosi"
+def test_it_declares_the_gaps(draft):
+    """Inventing nothing is not enough: the hole also has to be declared, or the user does not
+    know it is there."""
+    assert (draft.get("lacune") or []), "no gap declared despite three groups without amounts"
 
 
-def test_riconosce_i_gruppi_scritti_con_i_due_punti(bozza):
-    """«Verdure:», «Salsa:» sono il modo in cui le didascalie raggruppano davvero.
-    Meno critico dei precedenti — un gruppo mancato è un peggioramento, non un pericolo."""
-    gruppi = {(i.get("gruppo") or "").strip().lower() for i in (bozza.get("ingredienti") or [])}
-    assert {"verdure", "salsa"} & gruppi, f"nessun gruppo riconosciuto: {gruppi}"
+def test_it_recognises_the_groups_written_with_a_colon(draft):
+    """"Verdure:", "Salsa:" are how captions really group things. Less critical than the
+    previous ones — a missed group is a degradation, not a danger."""
+    groups = {(i.get("gruppo") or "").strip().lower() for i in (draft.get("ingredienti") or [])}
+    assert {"verdure", "salsa"} & groups, f"no group recognised: {groups}"
 
 
 # ----------------------------------------------------------------------------------
-# Lingua di uscita del modello
+# The model's output language
 # ----------------------------------------------------------------------------------
 
-# Un materiale in inglese, per verificare la traduzione verso l'italiano — la direzione
-# affidabile. La direzione opposta (input IT lungo → output EN) è un limite noto di
-# qwen2.5:14b, che resta ancorato all'italiano: è affidabilità del modello, non del codice,
-# e non la si mette a gate.
-DIDASCALIA_EN = """\
+# Material in English, to check the translation towards Italian — the reliable direction. The
+# opposite direction (long IT input → EN output) is a known limit of qwen2.5:14b, which stays
+# anchored to Italian: that is the model's reliability, not the code's, and it is not gated.
+CAPTION_EN = """\
 Quick Carbonara!
 INGREDIENTS:
 200g spaghetti
@@ -145,37 +154,38 @@ METHOD: Fry the pancetta, mix the eggs with pecorino, combine off the heat.
 
 
 @pytest.fixture(scope="module")
-def bozza_it_da_en() -> dict:
+def italian_draft_from_english() -> dict:
     return extract.extract_draft(
-        caption=DIDASCALIA_EN, transcript="", title="Carbonara",
+        caption=CAPTION_EN, transcript="", title="Carbonara",
         model=os.environ.get("R2R_MODELLO"), language="it",
     ).draft
 
 
-def test_traduce_verso_l_italiano(bozza_it_da_en):
-    """Un reel inglese chiesto in italiano deve uscire in italiano: è il caso dell'utente
-    italiano che guarda un video americano, il più comune per questo progetto."""
-    nomi = " ".join((i.get("nome") or "").lower() for i in (bozza_it_da_en.get("ingredienti") or []))
-    # Almeno un termine chiaramente tradotto: "eggs" -> "uova", "black pepper" -> "pepe".
-    assert "uova" in nomi or "pepe" in nomi, f"nomi non tradotti in italiano: {nomi}"
+def test_it_translates_towards_italian(italian_draft_from_english):
+    """An English reel asked for in Italian has to come out in Italian: it is the case of the
+    Italian user watching an American video, the commonest one for this project."""
+    names = " ".join((i.get("nome") or "").lower()
+                     for i in (italian_draft_from_english.get("ingredienti") or []))
+    # At least one clearly translated term: "eggs" -> "uova", "black pepper" -> "pepe".
+    assert "uova" in names or "pepe" in names, f"names not translated into Italian: {names}"
 
 
 # ----------------------------------------------------------------------------------
-# I quattro difetti trovati su reel veri
+# The four defects found on real reels
 # ----------------------------------------------------------------------------------
 #
-# Sei estrazioni su materiale reale (09/08/2026) hanno prodotto quattro difetti. Li avevamo
-# scoperti solo perché qualcuno stava guardando: nessun test copriva il prompt e lo schema di
-# `extract.py`, quindi un domani che rimettesse `porzioni` fra i campi opzionali o
-# indebolisse l'istruzione su `null` non avrebbe fatto diventare rosso niente.
+# Six extractions on real material (09/08/2026) produced four defects. We had found them only
+# because somebody was watching: no test covered `extract.py`'s prompt and schema, so a future
+# change putting `porzioni` back among the optional fields, or weakening the instruction about
+# `null`, would have turned nothing red.
 #
-# La didascalia qui sotto è **sintetica**, scritta apposta: riproduce i quattro pattern senza
-# portare in repo materiale di terzi (v. docs/legale.md). Le verifiche guardano il RISULTATO
-# della catena completa, non le scelte interne del modello: la stessa dose può arrivare come
-# "1¼"+"cups" o come "300"+"ml" e va bene comunque — ciò che non deve succedere è che
-# diventi un millilitro.
+# The caption below is **synthetic**, written on purpose: it reproduces the four patterns
+# without bringing third-party material into the repo (see docs/legale.md). The checks look at
+# the RESULT of the whole chain, not at the model's internal choices: the same amount may
+# arrive as "1¼"+"cups" or as "300"+"ml" and either is fine — what must not happen is that it
+# becomes one millilitre.
 
-DIDASCALIA_AMBIGUA = """\
+AMBIGUOUS_CAPTION = """\
 Torta di mele della nonna — per 6 persone
 
 INGREDIENTI:
@@ -191,102 +201,102 @@ Mescola tutto e inforna a 180°C per 40 minuti.
 
 
 @pytest.fixture(scope="module")
-def ricetta_ambigua():
-    """Una sola estrazione, portata fino in fondo alla catena: è il risultato che conta."""
+def ambiguous_recipe():
+    """One extraction, carried all the way down the chain: it is the result that counts."""
     from reel2recipe.recipe import Source, from_draft
 
-    bozza = extract.extract_draft(
-        caption=DIDASCALIA_AMBIGUA, transcript="", title="Torta di mele",
+    draft = extract.extract_draft(
+        caption=AMBIGUOUS_CAPTION, transcript="", title="Torta di mele",
         model=os.environ.get("R2R_MODELLO"),
     ).draft
-    return bozza, from_draft(bozza, source=Source.now(url=None, author="test"))
+    return draft, from_draft(draft, source=Source.now(url=None, author="test"))
 
 
-def _ingrediente(ricetta, parola):
-    for i in ricetta.ingredients:
-        if parola in i.name.lower():
+def _ingredient(recipe, word):
+    for i in recipe.ingredients:
+        if word in i.name.lower():
             return i
     return None
 
 
-def test_una_dose_scritta_due_volte_non_diventa_un_millilitro(ricetta_ambigua):
-    """Il difetto peggiore trovato: «1¼ cups (300 ml)» produceva «1 ml» d'acqua, dichiarato
-    come certo. Non importa quale delle due rappresentazioni sceglie il modello — devono
-    portare entrambe allo stesso posto."""
-    _, ricetta = ricetta_ambigua
-    latte = _ingrediente(ricetta, "latte")
-    assert latte, "il latte è sparito dall'estrazione"
-    assert latte.quantity.unit == "ml", f"il latte non è un volume: {latte.mela_line()!r}"
-    assert 250 <= latte.quantity.value <= 350, (
-        f"il latte doveva restare intorno ai 300 ml, è uscito {latte.mela_line()!r}"
+def test_an_amount_written_twice_does_not_become_one_millilitre(ambiguous_recipe):
+    """The worst defect found: "1¼ cups (300 ml)" produced "1 ml" of water, declared as
+    certain. It does not matter which of the two representations the model picks — both have
+    to lead to the same place."""
+    _, recipe = ambiguous_recipe
+    milk = _ingredient(recipe, "latte")
+    assert milk, "the milk has vanished from the extraction"
+    assert milk.quantity.unit == "ml", f"the milk is not a volume: {milk.mela_line()!r}"
+    assert 250 <= milk.quantity.value <= 350, (
+        f"the milk should have stayed around 300 ml, it came out as {milk.mela_line()!r}"
     )
 
 
-def test_porzioni_e_cottura_non_si_possono_omettere(ricetta_ambigua):
-    """Erano opzionali nello schema e il modello li ometteva SEMPRE, anche quando la fonte
-    li dichiarava. Se questo torna rosso, guardare `required` in extract.py prima del prompt."""
-    _, ricetta = ricetta_ambigua
-    assert ricetta.servings and "6" in ricetta.servings, f"porzioni: {ricetta.servings!r}"
-    assert ricetta.cook_time_min == 40, f"cottura: {ricetta.cook_time_min!r}"
+def test_servings_and_cooking_time_cannot_be_omitted(ambiguous_recipe):
+    """They were optional in the schema and the model omitted them ALWAYS, even when the source
+    stated them. If this goes red again, look at `required` in extract.py before the prompt."""
+    _, recipe = ambiguous_recipe
+    assert recipe.servings and "6" in recipe.servings, f"servings: {recipe.servings!r}"
+    assert recipe.cook_time_min == 40, f"cooking time: {recipe.cook_time_min!r}"
 
 
-def test_il_tempo_di_preparazione_non_si_inventa(ricetta_ambigua):
-    """La didascalia dichiara solo la cottura. Reso obbligatorio, il campo veniva riempito
-    con un numero plausibile — e spezzando un intervallo di cottura fra i due campi."""
-    _, ricetta = ricetta_ambigua
-    assert ricetta.prep_time_min is None, (
-        f"preparazione inventata: {ricetta.prep_time_min!r} (la fonte non la dichiara)"
+def test_the_preparation_time_is_not_invented(ambiguous_recipe):
+    """The caption states only the cooking time. Made required, the field was filled with a
+    plausible number — and by splitting a cooking range across the two fields."""
+    _, recipe = ambiguous_recipe
+    assert recipe.prep_time_min is None, (
+        f"prep time invented: {recipe.prep_time_min!r} (the source does not state it)"
     )
 
 
-def _grezzo(bozza: dict, parola: str) -> dict | None:
-    for i in bozza.get("ingredienti") or []:
-        if parola in (i.get("nome") or "").lower():
+def _raw(draft: dict, word: str) -> dict | None:
+    for i in draft.get("ingredienti") or []:
+        if word in (i.get("nome") or "").lower():
             return i
     return None
 
 
-@pytest.mark.parametrize("parola, espressione", [("sale", "q.b"), ("cannella", "pizzico")])
-def test_una_misura_vaga_ricevuta_non_diventa_una_lacuna_falsa(ricetta_ambigua, parola, espressione):
-    """Il modello mette «q.b.» e «un pizzico» un po' dove capita — nel nome, fra parentesi nel
-    nome, nelle note — e il codice non vedeva alcuna indicazione: dichiarava «quantità non
-    indicata nel reel», che è falso. Una lacuna che mente vale meno di nessuna lacuna.
+@pytest.mark.parametrize("word, expression", [("sale", "q.b"), ("cannella", "pizzico")])
+def test_a_vague_measure_received_does_not_become_a_false_gap(ambiguous_recipe, word, expression):
+    """The model puts "q.b." and "un pizzico" more or less wherever it likes — in the name, in
+    brackets within the name, in the notes — and the code saw no indication at all: it declared
+    "quantity not given in the reel", which is false. A gap that lies is worth less than no gap.
 
-    La verifica riguarda **ciò che possiamo controllare**: se l'espressione è arrivata in un
-    campo qualsiasi, deve diventare una quantità indeterminata o una stima. Quando il modello
-    la **perde per strada** — capita, ed è un difetto suo, non nostro — non c'è nulla da
-    recuperare e asserirlo renderebbe questo gate ballerino invece che informativo. In quel
-    caso il test si salta dicendo perché, così l'informazione non va persa.
+    The check concerns **what we can control**: if the expression arrived in any field at all,
+    it has to become an open-ended quantity or an estimate. When the model **loses it on the
+    way** — it happens, and it is its defect, not ours — there is nothing to recover, and
+    asserting it would make this gate flaky instead of informative. In that case the test skips
+    while saying why, so the information is not lost.
     """
     from reel2recipe.units import Provenance
 
-    bozza, ricetta = ricetta_ambigua
-    grezzo = _grezzo(bozza, parola)
-    assert grezzo, f"«{parola}» è sparito dall'estrazione"
+    draft, recipe = ambiguous_recipe
+    raw = _raw(draft, word)
+    assert raw, f"«{word}» has vanished from the extraction"
 
-    campi = " ".join(str(grezzo.get(c) or "") for c in ("nome", "quantita_raw", "unita_raw", "note"))
-    # I punti si tolgono da ENTRAMBI i lati: «q.b.» è impossibile da tokenizzare in modo
-    # affidabile, e normalizzare solo il testo cercato produceva uno skip falso.
-    if espressione.replace(".", "") not in campi.lower().replace(".", ""):
+    fields = " ".join(str(raw.get(c) or "") for c in ("nome", "quantita_raw", "unita_raw", "note"))
+    # The dots are stripped from BOTH sides: "q.b." is impossible to tokenise reliably, and
+    # normalising only the text being searched for produced a false skip.
+    if expression.replace(".", "") not in fields.lower().replace(".", ""):
         pytest.skip(
-            f"il modello non ha riportato «{espressione}» per «{parola}» in nessun campo "
-            f"({campi!r}): è una perdita del modello, non un difetto della normalizzazione"
+            f"the model did not report «{expression}» for «{word}» in any field "
+            f"({fields!r}): that is a loss by the model, not a defect of the normalisation"
         )
 
-    ingr = _ingrediente(ricetta, parola)
+    ingr = _ingredient(recipe, word)
     assert ingr and ingr.quantity.provenance in {
         Provenance.INDETERMINATE, Provenance.ESTIMATED_VAGUE
     }, (
-        f"«{parola}»: il modello aveva riportato l'indicazione ({campi!r}) ma è uscita come "
+        f"«{word}»: the model had reported the indication ({fields!r}) but it came out as "
         f"{ingr.quantity.provenance.value} ({ingr.mela_line()!r})"
     )
 
 
-def test_una_parola_fra_parentesi_non_diventa_un_unita(ricetta_ambigua):
-    """«1 mela grande (facoltativa)» dava «1 (facoltativa) mela»."""
-    _, ricetta = ricetta_ambigua
-    mela = _ingrediente(ricetta, "mela")
-    assert mela, "la mela è sparita dall'estrazione"
-    assert not (mela.quantity.unit or "").startswith("("), (
-        f"una parentesi è stata scambiata per un'unità: {mela.mela_line()!r}"
+def test_a_word_in_brackets_does_not_become_a_unit(ambiguous_recipe):
+    """"1 mela grande (facoltativa)" gave "1 (facoltativa) mela"."""
+    _, recipe = ambiguous_recipe
+    apple = _ingredient(recipe, "mela")
+    assert apple, "the apple has vanished from the extraction"
+    assert not (apple.quantity.unit or "").startswith("("), (
+        f"a bracket was mistaken for a unit: {apple.mela_line()!r}"
     )
