@@ -27,7 +27,7 @@ const STAGES = {
 
 const ESTIMATE_PROVENANCES = new Set(['stimato:vaghe', 'indeterminato', 'assente']);
 
-let currentRecipe = null;   // la recipe appena estratta, non ancora rivista
+let currentRecipe = null;   // the freshly extracted recipe, not yet reviewed
 // These are needed to redraw the card when the language changes: without them the switch
 // would lose the uncertainty warning and the model's name, which are not part of the recipe.
 let currentWarnings = [];
@@ -565,7 +565,7 @@ function wireUp() {
 // Words first, icons second: `applyTexts` rewrites the content of some elements, and the
 // icons of the static pieces have to land on top of that, not underneath.
 applyTexts();
-fillIcons();   // le icone dei pezzi statici di index.html (marchio, Cook, area di rilascio)
+fillIcons();   // the icons of index.html's static pieces (logo, Cook, drop area)
 wireUp();
 
 // The static markup is redrawn by `i18n.js`; here we redraw what is built at runtime. The

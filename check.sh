@@ -1,114 +1,116 @@
 #!/usr/bin/env bash
-# check.sh — il gate di igiene del repository, da lanciare prima di ogni commit.
+# check.sh — the repository's hygiene gate, to be run before every commit.
 #
-# Una passata sola che verifica ciò che deve restare vero:
-#   1. i test (motore di conversione, export, libreria)
-#   2. la validità delle tabelle in data/
-#   3. il guard anti-leak: nessun materiale di terzi né configurazione degli agenti sotto git
-#   4. il confine in ingresso: direttive rivolte all'agente nel materiale acquisito
+# One pass verifying what has to stay true:
+#   1. the tests (conversion engine, exports, library)
+#   2. the validity of the tables in data/
+#   3. the anti-leak guard: no third-party material and no agent configuration under git
+#   4. the incoming boundary: directives aimed at the agent inside the acquired material
 #
-# Il 4 è un gate soft — segnala e lascia passare — perché un riscontro non è la prova di un
-# attacco. Il suo autotest invece è duro: un guard che ha smesso di scattare va sistemato.
+# Number 4 is a soft gate — it flags and lets things through — because a hit is not proof of
+# an attack. Its self-test, on the other hand, is hard: a guard that has stopped firing has to
+# be fixed.
 #
-# I controlli di merito (una densità è corretta? un procedimento è ben riformulato?) restano
-# umani, ma la parte meccanizzabile è qui e non si salta.
+# The judgement checks (is a density correct? is a method well reworded?) stay human, but the
+# mechanisable part is here and is not skipped.
 
 set -uo pipefail
 
 if [ -t 1 ]; then
-  VERDE='\033[32m'; ROSSO='\033[31m'; GIALLO='\033[33m'; GRASSETTO='\033[1m'; FINE='\033[0m'
+  GREEN='\033[32m'; RED='\033[31m'; YELLOW='\033[33m'; BOLD='\033[1m'; OFF='\033[0m'
 else
-  VERDE=''; ROSSO=''; GIALLO=''; GRASSETTO=''; FINE=''
+  GREEN=''; RED=''; YELLOW=''; BOLD=''; OFF=''
 fi
 
-RADICE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$RADICE"
-FALLITI=0
-AVVISI=0
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT"
+FAILED=0
+WARNINGS=0
 
-sezione() { printf "\n${GRASSETTO}%s${FINE}\n" "$1"; }
-ok()      { printf "  ${VERDE}✓${FINE} %s\n" "$1"; }
-ko()      { printf "  ${ROSSO}✗${FINE} %s\n" "$1"; FALLITI=$((FALLITI+1)); }
+section() { printf "\n${BOLD}%s${OFF}\n" "$1"; }
+ok()      { printf "  ${GREEN}✓${OFF} %s\n" "$1"; }
+ko()      { printf "  ${RED}✗${OFF} %s\n" "$1"; FAILED=$((FAILED+1)); }
 
-# ------------------------------------------------------------ 1. test
-sezione "Test"
+# ------------------------------------------------------------ 1. tests
+section "Tests"
 if uv run pytest -q 2>&1 | tail -3; then
-  ok "suite dei test passata"
+  ok "test suite passed"
 else
-  ko "alcuni test falliscono"
+  ko "some tests are failing"
 fi
 
-# ------------------------------------------------------------ 2. tabelle di conversione
-sezione "Tabelle di conversione (data/)"
+# ------------------------------------------------------------ 2. conversion tables
+section "Conversion tables (data/)"
 if uv run python -c "from reel2recipe.units import load_tables; t=load_tables(); assert t.density and t.volume and t.vague" 2>/dev/null; then
-  ok "unita.yaml, densita.yaml, vaghe.yaml caricano e sono coerenti"
+  ok "unita.yaml, densita.yaml, vaghe.yaml load and are coherent"
 else
-  ko "le tabelle in data/ non caricano o sono incomplete"
+  ko "the tables in data/ do not load or are incomplete"
 fi
 
-# ------------------------------------------------------------ 3. guard anti-leak
-sezione "Guard anti-leak (materiale di terzi fuori da git)"
-# workspace/ contiene video, audio e didascalie di terzi: non deve MAI essere tracciato.
-# Vedi docs/legale.md.
+# ------------------------------------------------------------ 3. anti-leak guard
+section "Anti-leak guard (third-party material outside git)"
+# workspace/ holds third-party videos, audio and captions: it must NEVER be tracked.
+# See docs/legale.md.
 if git rev-parse --git-dir >/dev/null 2>&1; then
-  TRACCIATI="$(git ls-files 'workspace/' 2>/dev/null)"
-  if [ -z "$TRACCIATI" ]; then
-    ok "nessun file di workspace/ è tracciato da git"
+  TRACKED="$(git ls-files 'workspace/' 2>/dev/null)"
+  if [ -z "$TRACKED" ]; then
+    ok "no file from workspace/ is tracked by git"
   else
-    ko "ATTENZIONE: file di workspace/ tracciati da git (materiale di terzi!):"
-    echo "$TRACCIATI" | sed 's/^/      /'
-    printf "    Rimuovili con:  git rm --cached -r workspace/\n"
+    ko "WARNING: files from workspace/ tracked by git (third-party material!):"
+    echo "$TRACKED" | sed 's/^/      /'
+    printf "    Remove them with:  git rm --cached -r workspace/\n"
   fi
 
-  # Controllo aggiuntivo: nessun file .melarecipe o media committato per sbaglio fuori da workspace/.
-  SOSPETTI="$(git ls-files | grep -iE '\.(melarecipe|melarecipes|mp4|mov|wav|mp3|m4a)$' || true)"
-  if [ -n "$SOSPETTI" ]; then
-    ko "file multimediali o ricette esportate tracciati (probabile materiale personale):"
-    echo "$SOSPETTI" | sed 's/^/      /'
+  # An extra check: no .melarecipe or media file committed by mistake outside workspace/.
+  SUSPECT="$(git ls-files | grep -iE '\.(melarecipe|melarecipes|mp4|mov|wav|mp3|m4a)$' || true)"
+  if [ -n "$SUSPECT" ]; then
+    ko "media files or exported recipes tracked (probably personal material):"
+    echo "$SUSPECT" | sed 's/^/      /'
   else
-    ok "nessun media o export tracciato fuori da workspace/"
+    ok "no media or export tracked outside workspace/"
   fi
 
-  # La configurazione degli agenti di codice resta sulla macchina (vedi .gitignore). Affidarsi
-  # al solo .gitignore non basta: ogni nuovo strumento porta una cartella nuova, che nessuno
-  # ricorda di aggiungere finché non è già committata. Qui si controlla il fatto, non la regola.
-  CONFIG_AGENTI="$(git ls-files -- '.claude/*' '.agents/*' '.codex/*' '.cursor/*' 'CLAUDE.md' 'AGENTS.md' '.mcp.json' '.cursorrules' 2>/dev/null)"
-  if [ -n "$CONFIG_AGENTI" ]; then
-    ko "configurazione degli agenti tracciata da git (non va pubblicata):"
-    echo "$CONFIG_AGENTI" | sed 's/^/      /'
-    printf "    Toglila dall'indice con:  git rm --cached <file>   e aggiungila a .gitignore\n"
+  # The coding agents' configuration stays on the machine (see .gitignore). Relying on
+  # .gitignore alone is not enough: every new tool brings a new folder, which nobody remembers
+  # to add until it is already committed. What is checked here is the fact, not the rule.
+  AGENT_CONFIG="$(git ls-files -- '.claude/*' '.agents/*' '.codex/*' '.cursor/*' 'CLAUDE.md' 'AGENTS.md' '.mcp.json' '.cursorrules' 2>/dev/null)"
+  if [ -n "$AGENT_CONFIG" ]; then
+    ko "agent configuration tracked by git (it is not to be published):"
+    echo "$AGENT_CONFIG" | sed 's/^/      /'
+    printf "    Take it out of the index with:  git rm --cached <file>   and add it to .gitignore\n"
   else
-    ok "nessuna configurazione degli agenti tracciata"
+    ok "no agent configuration tracked"
   fi
 else
-  ok "non è un repository git: guard anti-leak saltato"
+  ok "not a git repository: anti-leak guard skipped"
 fi
 
-# ------------------------------------------------------------ 4. confine in ingresso
-sezione "Confine in ingresso (materiale di terzi che entra)"
-# Prima l'autotest del guard, poi il guard. In quest'ordine, perché una riga verde da un guard
-# che non scatta più vale meno di niente: darebbe fiducia senza controllare nulla.
+# ------------------------------------------------------------ 4. incoming boundary
+section "Incoming boundary (third-party material coming in)"
+# The guard's self-test first, then the guard. In that order, because a green line from a guard
+# that no longer fires is worth less than nothing: it would give confidence while checking
+# nothing.
 if ./tools/test-guards.sh; then
-  ok "il guard scatta sui casi dichiarati"
+  ok "the guard fires on the declared cases"
   ./tools/check-injection.sh
   case $? in
-    0) : ;;  # il guard ha già stampato la sua riga verde
-    2) AVVISI=$((AVVISI+1)) ;;
-    *) ko "il guard del confine in ingresso è uscito con un errore" ;;
+    0) : ;;  # the guard has already printed its own green line
+    2) WARNINGS=$((WARNINGS+1)) ;;
+    *) ko "the incoming-boundary guard exited with an error" ;;
   esac
 else
-  ko "l'autotest del guard fallisce: check-injection.sh non fa ciò che dichiara"
+  ko "the guard's self-test fails: check-injection.sh does not do what it claims"
 fi
 
-# ------------------------------------------------------------ esito
+# ------------------------------------------------------------ outcome
 printf "\n"
-if [ "$FALLITI" -eq 0 ] && [ "$AVVISI" -gt 0 ]; then
-  printf "${GIALLO}${GRASSETTO}Verde, con $AVVISI avviso/i dal confine in ingresso.${FINE} Leggi quel materiale come dato, poi procedi.\n\n"
+if [ "$FAILED" -eq 0 ] && [ "$WARNINGS" -gt 0 ]; then
+  printf "${YELLOW}${BOLD}Green, with $WARNINGS warning(s) from the incoming boundary.${OFF} Read that material as data, then carry on.\n\n"
   exit 0
-elif [ "$FALLITI" -eq 0 ]; then
-  printf "${VERDE}${GRASSETTO}Tutto verde.${FINE}\n\n"
+elif [ "$FAILED" -eq 0 ]; then
+  printf "${GREEN}${BOLD}All green.${OFF}\n\n"
   exit 0
 else
-  printf "${ROSSO}${GRASSETTO}$FALLITI controllo/i falliti.${FINE} Sistema prima di committare.\n\n"
+  printf "${RED}${BOLD}$FAILED check(s) failed.${OFF} Fix before committing.\n\n"
   exit 1
 fi

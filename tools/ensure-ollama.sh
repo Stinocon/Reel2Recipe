@@ -1,37 +1,37 @@
 #!/usr/bin/env bash
-# ensure-ollama.sh — garantisce che Ollama sia in ascolto.
+# ensure-ollama.sh — makes sure Ollama is listening.
 #
-# Ollama non è un accessorio di questo progetto: è il cervello che struttura la ricetta
-# (`extract.py`). Se è giù, la pipeline arriva fino alla trascrizione e poi fallisce — nel
-# momento peggiore, dopo aver già scaricato il reel e fatto girare Whisper. Meglio
-# accorgersene a inizio sessione che a metà lavoro.
+# Ollama is not an accessory of this project: it is the brain that structures the recipe
+# (`extract.py`). If it is down, the pipeline gets as far as the transcription and then fails —
+# at the worst possible moment, after having already downloaded the reel and run Whisper.
+# Better to find out at the start of a session than halfway through the work.
 #
-# Idempotente e non bloccante, pensato per l'hook SessionStart: se l'API risponde già non fa
-# nulla; se Ollama è installato ma fermo lo avvia in background; se non è installato avvisa e
-# basta, senza bloccare la sessione (si può comunque lavorare al codice e alle tabelle).
-# Il demone da fermo è leggero: carica i modelli solo alla prima richiesta.
+# Idempotent and non-blocking, meant for the SessionStart hook: if the API already answers it
+# does nothing; if Ollama is installed but stopped it starts it in the background; if it is not
+# installed it just says so, without blocking the session (you can still work on the code and
+# the tables). The idle daemon is light: it loads the models only on the first request.
 #
-# Uso:  bash tools/ensure-ollama.sh        (URL sovrascrivibile con R2R_OLLAMA_URL)
-set -uo pipefail   # niente -e: un controllo soft non deve abortire al primo curl fallito
+# Usage:  bash tools/ensure-ollama.sh        (URL overridable with R2R_OLLAMA_URL)
+set -uo pipefail   # no -e: a soft check must not abort on the first failed curl
 
 URL="${R2R_OLLAMA_URL:-http://localhost:11434}"
 
 if curl -sf --max-time 3 "${URL}/api/tags" >/dev/null 2>&1; then
-  echo "[ollama] già attivo su ${URL}"
+  echo "[ollama] already up on ${URL}"
   exit 0
 fi
 
 if ! command -v ollama >/dev/null 2>&1; then
-  echo "[ollama] non installato: l'estrazione non funzionerà (brew install ollama, oppure ./install.sh). Salto."
+  echo "[ollama] not installed: extraction will not work (brew install ollama, or ./install.sh). Skipping."
   exit 0
 fi
 
 nohup ollama serve >/tmp/r2r-ollama.log 2>&1 &
-for _ in 1 2 3 4 5 6 7 8 9 10; do   # ~5 s di attesa, senza bloccare l'avvio della sessione
+for _ in 1 2 3 4 5 6 7 8 9 10; do   # ~5 s of waiting, without blocking the session start
   if curl -sf --max-time 2 "${URL}/api/tags" >/dev/null 2>&1; then
-    echo "[ollama] avviato su ${URL} (log: /tmp/r2r-ollama.log)"
+    echo "[ollama] started on ${URL} (log: /tmp/r2r-ollama.log)"
     exit 0
   fi
   sleep 0.5
 done
-echo "[ollama] avvio lanciato ma non ancora raggiungibile; vedi /tmp/r2r-ollama.log"
+echo "[ollama] start launched but not reachable yet; see /tmp/r2r-ollama.log"
