@@ -57,8 +57,16 @@ axis, and the second one is what to plan around.
    export's `?formato=` (external surface — the rule is *add a synonym*, as the CLI does with
    `--porta`); the SQL columns, the nested ingredient keys, the draft's keys and the file
    names (format); every user-facing Italian string.
-3. **Still to do:** the `data/*.yaml` keys with their loader, the test modules' own prose
-   (see below), `web/app.js`'s and `web/i18n.js`'s own identifiers, then `docs/`.
+3. **Done since:** the `data/*.yaml` keys with their loader (the tables live in the repo, so
+   nothing on a user's disk is keyed that way), and the frontend — `web/i18n.js`'s catalogue
+   keys and placeholders, `web/app.js`'s identifiers and prose, and `icone.js` → `icons.js`
+   with its `data-icon` attributes.
+4. **Deliberately left:** the element **ids** and the **CSS class names**. They live across
+   three files at once — `index.html`, `app.js` and `style.css` — so moving them is a step of
+   its own with no readability gain for the JavaScript, and a missed class breaks the styling
+   silently. `tests/test_web.py` now guards ids in both directions and classes against
+   `style.css`, so the step is safe to take later if it is ever worth taking.
+5. **Still to do:** the test modules' own prose (see below), then `docs/`.
 
 ### What the hard modules taught
 

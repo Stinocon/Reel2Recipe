@@ -179,8 +179,8 @@ def test_ogni_chiave_letta_dalla_pagina_esiste_nel_json_del_server():
     # `id` lo aggiunge l'API dopo il salvataggio, non `to_dict()`.
     disponibili = set(ricetta) | {"id"}
 
-    lette = set(re.findall(r"\bricetta(?:Corrente)?\.(\w+)", MODULI["app.js"]))
-    assert lette, "nessun accesso a `ricetta.` in app.js: il guard si è scollegato"
+    lette = set(re.findall(r"\b(?:current)?[Rr]ecipe\.(\w+)", MODULI["app.js"]))
+    assert lette, "nessun accesso a `recipe.` in app.js: il guard si è scollegato"
 
     mancanti = sorted(lette - disponibili)
     assert not mancanti, (
@@ -258,3 +258,79 @@ def test_ogni_chiamata_passa_i_segnaposto_che_la_frase_chiede(modulo, catalogo, 
         controllate += 1
 
     assert controllate, f"{modulo}: nessuna chiamata trovata, il guard si è scollegato"
+
+
+def test_ogni_chiamata_a_t_passa_i_segnaposto_che_la_frase_chiede():
+    """Lo stesso guard del lato Python, per il lato senza toolchain.
+
+    `t('minuti', { quanti: … })` contro una frase che dice `{how_many}` non solleva niente:
+    `t()` sostituisce ciò che trova e lascia il resto letterale, quindi a schermo compare
+    «{how_many} min». È successo davvero durante la migrazione, quando le chiavi e i
+    segnaposto del catalogo sono passati all'inglese e i punti di chiamata no.
+
+    Si legge il sorgente, come gli altri guard qui: nessun interprete JavaScript, solo la
+    forma `t('chiave', { a: …, b: … })` che è l'unica usata in `app.js`.
+    """
+    catalogo = _chiavi_i18n()
+    testi = MODULI["i18n.js"]
+
+    # I segnaposto dichiarati da ciascuna chiave, letti dal blocco italiano.
+    per_chiave: dict[str, set[str]] = {}
+    chiave_corrente = None
+    for riga in testi.split("export const LINGUE")[0].splitlines():
+        if intestazione := re.match(r"^    (\w+):", riga):
+            chiave_corrente = intestazione.group(1)
+            per_chiave.setdefault(chiave_corrente, set())
+        if chiave_corrente:
+            per_chiave[chiave_corrente].update(re.findall(r"\{(\w+)\}", riga))
+
+    controllate = 0
+    for chiave, corpo in re.findall(r"t\('(\w+)',\s*\{([^}]*)\}", MODULI["app.js"]):
+        assert chiave in catalogo["it"], f"`{chiave}` non esiste nel catalogo"
+        passati = set(re.findall(r"(\w+)\s*:", corpo)) | {
+            n for n in re.findall(r"^\s*(\w+)\s*$", corpo)   # forma abbreviata { cerca }
+        }
+        attesi = per_chiave.get(chiave, set())
+        assert passati == attesi, (
+            f"t('{chiave}'): la frase chiede {sorted(attesi)}, la chiamata passa {sorted(passati)}"
+        )
+        controllate += 1
+
+    assert controllate, "nessuna chiamata `t(chiave, {…})` trovata: il guard si è scollegato"
+
+
+# Classi presenti nel markup ma senza una regola in `style.css`. Non sono un danno — un
+# gancio inutilizzato non rompe niente — ma esistevano già prima della migrazione, e
+# metterle qui per nome è più onesto che allentare il guard fino a non farlo scattare più.
+CLASSI_SENZA_STILE = {"btn-cook-testo", "fase-testo", "libreria"}
+
+
+def test_ogni_classe_usata_ha_una_regola_nel_foglio_di_stile():
+    """Una classe scritta male non solleva niente: l'elemento si disegna senza stile.
+
+    È il difetto che il frontend rende invisibile — nessuna toolchain, nessun compilatore —
+    e la rinomina degli identificatori di `app.js` ci è caduta dentro: `'fase'` era diventato
+    `'stage'`, `scheda-copertina` era diventato `card-cover`, e `style.css` continuava a
+    definire i nomi di prima. La pagina avrebbe funzionato e sarebbe stata illeggibile.
+
+    I nomi delle classi restano in italiano di proposito: vivono in tre file — `index.html`,
+    `app.js` e `style.css` — e spostarli è un passo suo, che non fa parte di questa
+    migrazione (v. docs/naming.md).
+    """
+    stile = (CARTELLA_WEB / "style.css").read_text(encoding="utf-8")
+    definite = set(re.findall(r"\.([a-z][\w-]*)", stile))
+
+    usate: set[str] = set()
+    for sorgente in (MODULI["app.js"], INDEX):
+        for m in re.finditer(r"""class="([a-z][\w -]*)\"""", sorgente):
+            usate |= set(m.group(1).split())
+        for m in re.finditer(r"""className\s*=\s*'([a-z][\w -]*)'""", sorgente):
+            usate |= set(m.group(1).split())
+        for m in re.finditer(r"""classList\.(?:add|remove|toggle)\('([\w-]+)'\)""", sorgente):
+            usate.add(m.group(1))
+        for m in re.finditer(r"""querySelector(?:All)?\('\.([\w-]+)""", sorgente):
+            usate.add(m.group(1))
+
+    assert usate, "nessuna classe trovata: il guard si è scollegato"
+    orfane = sorted(usate - definite - CLASSI_SENZA_STILE)
+    assert not orfane, f"classi usate ma senza regola in style.css: {orfane}"

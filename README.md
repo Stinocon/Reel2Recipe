@@ -340,7 +340,7 @@ src/reel2recipe/     the code
 data/                the conversion tables (readable and editable)
 web/                 the interface (HTML/CSS/JS, no build step)
   i18n.js            the interface's words, in Italian and English
-  icone.js           the SVG icons, embedded (no CDN)
+  icons.js           the SVG icons, embedded (no CDN)
 tools/               support scripts (starting Ollama and the interface, boundary guards)
 docs/                documentation, in Italian (architecture, legal matters)
 tests/               the tests
