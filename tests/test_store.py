@@ -1,4 +1,4 @@
-"""Test della libreria SQLite: salvataggio, deduplica, ricerca full-text."""
+"""Tests for the SQLite library: saving, deduplication, full-text search."""
 
 from __future__ import annotations
 
@@ -10,114 +10,114 @@ from reel2recipe.store import Library
 
 @pytest.fixture
 def lib(tmp_path):
-    with Library(tmp_path / "test.db") as libreria:
-        yield libreria
+    with Library(tmp_path / "test.db") as library:
+        yield library
 
 
-def _ricetta(titolo, url=None, ingredienti=None):
+def _recipe(title, url=None, ingredients=None):
     return from_draft(
         {
-            "titolo": titolo,
+            "titolo": title,
             "ingredienti": [{"quantita_raw": "1", "unita_raw": "", "nome": n}
-                            for n in (ingredienti or ["farina"])],
+                            for n in (ingredients or ["farina"])],
             "procedimento": ["Mescola tutto."],
         },
         source=Source.now(url=url, author="tester"),
     )
 
 
-def test_salva_e_rileggi(lib):
-    id = lib.save(_ricetta("Pane fatto in casa"))
-    riletta = lib.read(id)
-    assert riletta.title == "Pane fatto in casa"
+def test_save_and_read_back(lib):
+    id = lib.save(_recipe("Pane fatto in casa"))
+    reread = lib.read(id)
+    assert reread.title == "Pane fatto in casa"
 
 
-def test_deduplica_sullurl(lib):
-    """Reimportare lo stesso reel aggiorna la ricetta, non ne crea una seconda."""
+def test_deduplication_on_the_url(lib):
+    """Re-importing the same reel updates the recipe, it does not create a second one."""
     url = "https://instagram.com/reel/ABC/"
-    primo = lib.save(_ricetta("Versione 1", url=url))
-    secondo = lib.save(_ricetta("Versione 2", url=url))
-    assert primo == secondo
+    first = lib.save(_recipe("Versione 1", url=url))
+    second = lib.save(_recipe("Versione 2", url=url))
+    assert first == second
     assert lib.count() == 1
-    assert lib.read(primo).title == "Versione 2"
+    assert lib.read(first).title == "Versione 2"
 
 
-def test_ricette_senza_url_non_si_deduplicano(lib):
-    """Due file locali diversi restano due ricette distinte anche a titolo uguale."""
-    a = lib.save(_ricetta("Uguale"))
-    b = lib.save(_ricetta("Uguale"))
+def test_recipes_without_a_url_do_not_deduplicate(lib):
+    """Two different local files stay two distinct recipes even under the same title."""
+    a = lib.save(_recipe("Uguale"))
+    b = lib.save(_recipe("Uguale"))
     assert a != b
     assert lib.count() == 2
 
 
-def test_ricerca_full_text(lib):
-    lib.save(_ricetta("Torta di mele", ingredienti=["mele", "farina", "zucchero"]))
-    lib.save(_ricetta("Risotto ai funghi", ingredienti=["riso", "funghi"]))
+def test_full_text_search(lib):
+    lib.save(_recipe("Torta di mele", ingredients=["mele", "farina", "zucchero"]))
+    lib.save(_recipe("Risotto ai funghi", ingredients=["riso", "funghi"]))
 
     assert len(lib.list_(search="mele")) == 1
     assert len(lib.list_(search="funghi")) == 1
     assert lib.list_(search="mele")[0]["title"] == "Torta di mele"
 
 
-def test_ricerca_per_prefisso(lib):
-    """Cercando "zucch" si trovano sia "zucchine" sia "zucchero"."""
-    lib.save(_ricetta("Frittata", ingredienti=["zucchine", "uova"]))
-    lib.save(_ricetta("Biscotti", ingredienti=["zucchero", "farina"]))
+def test_prefix_search(lib):
+    """Searching "zucch" finds both "zucchine" and "zucchero"."""
+    lib.save(_recipe("Frittata", ingredients=["zucchine", "uova"]))
+    lib.save(_recipe("Biscotti", ingredients=["zucchero", "farina"]))
     assert len(lib.list_(search="zucch")) == 2
 
 
-def test_ricerca_ignora_accenti(lib):
-    """L'indice è configurato per ignorare i diacritici: "pere" trova "però"."""
-    lib.save(_ricetta("Marmellata", ingredienti=["pere", "zucchero"]))
-    assert len(lib.list_(search="però")) >= 0   # non deve sollevare eccezioni sui caratteri
+def test_search_ignores_accents(lib):
+    """The index is configured to ignore diacritics: "pere" finds "però"."""
+    lib.save(_recipe("Marmellata", ingredients=["pere", "zucchero"]))
+    assert len(lib.list_(search="però")) >= 0   # must not raise on the characters
 
 
-def test_aggiorna(lib):
-    id = lib.save(_ricetta("Bozza"))
-    lib.update(id, _ricetta("Definitiva"))
+def test_update(lib):
+    id = lib.save(_recipe("Bozza"))
+    lib.update(id, _recipe("Definitiva"))
     assert lib.read(id).title == "Definitiva"
 
 
-def test_elimina(lib):
-    id = lib.save(_ricetta("Da cancellare"))
+def test_delete(lib):
+    id = lib.save(_recipe("Da cancellare"))
     assert lib.delete(id) is True
     assert lib.read(id) is None
     assert lib.delete(9999) is False
 
 
-def test_elenco_riporta_le_incertezze(lib):
-    """La libreria deve poter segnalare le ricette con stime da rivedere."""
+def test_the_listing_reports_the_uncertainties(lib):
+    """The library has to be able to flag the recipes with estimates worth reviewing."""
     r = from_draft({
         "titolo": "Con stime",
         "ingredienti": [{"quantita_raw": "1", "unita_raw": "pizzico", "nome": "sale"}],
     })
     lib.save(r)
-    voce = lib.list_()[0]
-    assert voce["has_uncertainties"] is True
-    assert voce["n_ingredients"] == 1
+    entry = lib.list_()[0]
+    assert entry["has_uncertainties"] is True
+    assert entry["n_ingredients"] == 1
 
 
 # ----------------------------------------------------------------------------------
-# Migrazione dello schema
+# Schema migration
 # ----------------------------------------------------------------------------------
 
 
-def test_migra_un_indice_fts_contentless(tmp_path):
-    """Un database creato dalle prime versioni deve tornare eliminabile e correggibile.
+def test_it_migrates_a_contentless_fts_index(tmp_path):
+    """A database created by the early versions has to become deletable and correctable again.
 
-    Le prime versioni creavano `ricette_fts` con `content=''`, che non ammette DELETE:
-    eliminare o correggere una ricetta sollevava «cannot DELETE from contentless fts5
-    table». Lo schema è stato corretto, ma `CREATE VIRTUAL TABLE IF NOT EXISTS` non tocca
-    una tabella esistente, quindi i database creati prima restavano rotti in silenzio —
-    e se ne accorgeva solo chi provava a cancellare qualcosa. Caso visto su un database vero.
+    The early versions created `ricette_fts` with `content=''`, which does not allow DELETE:
+    removing or correcting a recipe raised "cannot DELETE from contentless fts5 table". The
+    schema was fixed, but `CREATE VIRTUAL TABLE IF NOT EXISTS` does not touch a table that
+    already exists, so databases created before stayed broken silently — and only someone
+    trying to delete something would find out. Seen on a real database.
     """
     import sqlite3
 
-    percorso = tmp_path / "vecchio.db"
+    path = tmp_path / "vecchio.db"
 
-    # Si costruisce a mano un database nella forma vecchia, poi ci si mette dentro una
-    # ricetta passando dalla Library (che nel frattempo lo migra).
-    conn = sqlite3.connect(percorso)
+    # A database is built by hand in the old shape, then a recipe is put into it through the
+    # Library (which migrates it on the way).
+    conn = sqlite3.connect(path)
     conn.executescript("""
         CREATE TABLE ricette (
             id INTEGER PRIMARY KEY AUTOINCREMENT, titolo TEXT NOT NULL, dati TEXT NOT NULL,
@@ -130,23 +130,23 @@ def test_migra_un_indice_fts_contentless(tmp_path):
     conn.commit()
     conn.close()
 
-    with Library(percorso) as libreria:
-        id = libreria.save(_ricetta("Focaccia genovese", ingredienti=["farina", "olio"]))
-        assert libreria.delete(id) is True, "l'eliminazione deve funzionare dopo la migrazione"
-        assert libreria.read(id) is None
+    with Library(path) as library:
+        id = library.save(_recipe("Focaccia genovese", ingredients=["farina", "olio"]))
+        assert library.delete(id) is True, "deletion has to work after the migration"
+        assert library.read(id) is None
 
 
-def test_la_migrazione_conserva_le_ricette_e_la_ricerca(tmp_path):
-    """Si ricostruisce l'indice, non i dati: le ricette già salvate restano, e restano
-    trovabili con la ricerca full-text."""
+def test_the_migration_keeps_the_recipes_and_the_search(tmp_path):
+    """The index is rebuilt, not the data: the recipes already saved stay, and stay findable
+    with the full-text search."""
     import sqlite3
 
-    percorso = tmp_path / "con-dati.db"
-    with Library(percorso) as libreria:
-        libreria.save(_ricetta("Torta di mele", ingredienti=["mele", "farina"]))
+    path = tmp_path / "con-dati.db"
+    with Library(path) as library:
+        library.save(_recipe("Torta di mele", ingredients=["mele", "farina"]))
 
-    # Si riporta l'indice alla forma vecchia, simulando un database nato prima della correzione.
-    conn = sqlite3.connect(percorso)
+    # The index is put back into the old shape, simulating a database born before the fix.
+    conn = sqlite3.connect(path)
     conn.executescript("""
         DROP TABLE ricette_fts;
         CREATE VIRTUAL TABLE ricette_fts USING fts5(
@@ -156,14 +156,14 @@ def test_la_migrazione_conserva_le_ricette_e_la_ricerca(tmp_path):
     conn.commit()
     conn.close()
 
-    with Library(percorso) as libreria:
-        assert len(libreria.all_recipes()) == 1, "la migrazione non deve perdere ricette"
-        assert [v["title"] for v in libreria.list_(search="mele")] == ["Torta di mele"]
+    with Library(path) as library:
+        assert len(library.all_recipes()) == 1, "the migration must not lose recipes"
+        assert [v["title"] for v in library.list_(search="mele")] == ["Torta di mele"]
 
 
-def test_gli_assi_sopravvivono_al_salvataggio(lib):
-    """Lingua e sistema di una ricetta devono tornare identici dopo un giro nel database:
-    servono all'export, che avviene dopo il salvataggio."""
+def test_the_axes_survive_the_save(lib):
+    """A recipe's language and system have to come back identical after a round through the
+    database: the export needs them, and it happens after the save."""
     from reel2recipe.units import Language, System
     r = from_draft(
         {"titolo": "Pancakes", "ingredienti": [{"quantita_raw": "1", "unita_raw": "cup", "nome": "flour"}],
@@ -171,24 +171,24 @@ def test_gli_assi_sopravvivono_al_salvataggio(lib):
         language=Language.EN, system=System.IMPERIAL,
     )
     id = lib.save(r)
-    riletta = lib.read(id)
-    assert riletta.language == "en"
-    assert riletta.system == "imperiale"
-    # E la quantità è ancora in cup, non riconvertita in grammi.
-    assert riletta.ingredients[0].quantity.unit == "cup"
+    reread = lib.read(id)
+    assert reread.language == "en"
+    assert reread.system == "imperiale"
+    # And the quantity is still in cups, not reconverted into grams.
+    assert reread.ingredients[0].quantity.unit == "cup"
 
 
 # ----------------------------------------------------------------------------------
-# La rete di compatibilità sulle chiavi salvate prima della migrazione all'inglese
+# The compatibility net over the keys saved before the migration to English
 # ----------------------------------------------------------------------------------
 
-# Una ricetta come la scriveva il codice prima che i campi di `Recipe` passassero
-# all'inglese. Non è un mock: è la forma esatta che sta dentro i database già sul disco
-# degli utenti, chiavi di primo livello in italiano e dizionari annidati dell'ingrediente
-# pure — questi ultimi non sono mai cambiati, perché `to_dict()` li costruisce con stringhe
-# letterali. Sta scritta a mano di proposito: generarla dal codice attuale proverebbe solo
-# che il codice attuale è coerente con se stesso.
-RICETTA_VECCHIA = {
+# A recipe as the code wrote it before `Recipe`'s fields moved to English. It is not a mock:
+# it is the exact shape sitting inside the databases already on users' disks — top-level keys
+# in Italian and the nested ingredient dictionaries in Italian too, the latter never having
+# changed because `to_dict()` builds them from string literals. It is written by hand on
+# purpose: generating it from the current code would only prove that the current code is
+# consistent with itself.
+OLD_RECIPE = {
     "titolo": "Torta di mele della nonna",
     "procedimento": ["Sbuccia le mele.", "Inforna a 180 °C."],
     "descrizione": "Quella di sempre.",
@@ -203,8 +203,8 @@ RICETTA_VECCHIA = {
     "trascrizione": "oggi facciamo la torta di mele",
     "lingua": "it",
     "sistema": "metrico",
-    # Le due chiavi calcolate che `to_dict()` aggiunge in coda: sul disco ci sono, e l'elenco
-    # della libreria legge la prima invece di ricalcolarla.
+    # The two computed keys `to_dict()` appends: they are there on disk, and the library
+    # listing reads the first rather than recomputing it.
     "tempo_totale_min": 65,
     "ha_incertezze": True,
     "fonte": {
@@ -237,16 +237,16 @@ RICETTA_VECCHIA = {
 }
 
 
-def test_una_ricetta_salvata_prima_della_migrazione_si_rilegge():
-    """Il caso che rende delicata la rinomina dei campi di `Recipe`.
+def test_a_recipe_saved_before_the_migration_still_loads():
+    """The case that makes renaming `Recipe`'s fields delicate.
 
-    I campi di `Recipe` *sono* le chiavi JSON con cui la ricetta finisce nel database, perché
-    `to_dict()` parte da `asdict(self)`. Rinominarli senza rete renderebbe illeggibile ogni
-    ricetta già salvata, e la libreria personale è esattamente ciò che questo progetto esiste
-    per non perdere: chi salva ricette su Instagram poi non le ritrova più, e una libreria che
-    smette di aprirsi è lo stesso danno con un altro nome.
+    `Recipe`'s fields *are* the JSON keys the recipe ends up under in the database, because
+    `to_dict()` starts from `asdict(self)`. Renaming them without a net would make every recipe
+    already saved unreadable, and the personal library is exactly what this project exists not
+    to lose: people who save recipes on Instagram never find them again, and a library that
+    stops opening is the same damage under another name.
     """
-    r = Recipe.from_dict(RICETTA_VECCHIA)
+    r = Recipe.from_dict(OLD_RECIPE)
 
     assert r.title == "Torta di mele della nonna"
     assert r.method == ["Sbuccia le mele.", "Inforna a 180 °C."]
@@ -262,8 +262,8 @@ def test_una_ricetta_salvata_prima_della_migrazione_si_rilegge():
     assert r.transcript == "oggi facciamo la torta di mele"
     assert (r.language, r.system) == ("it", "metrico")
 
-    # `Source` era ricostruita con `Source(**d)`: con le chiavi vecchie quello splat
-    # solleverebbe TypeError, e lo farebbe mentre si apre la libreria.
+    # `Source` used to be rebuilt with `Source(**d)`: with the old keys that splat would
+    # raise TypeError, and it would do so while the library is being opened.
     assert r.source is not None
     assert r.source.author == "nonna"
     assert r.source.platform == "instagram"
@@ -271,7 +271,7 @@ def test_una_ricetta_salvata_prima_della_migrazione_si_rilegge():
     assert r.source.acquired_at == "2025-01-01T10:00:00+00:00"
     assert r.source.url == "https://www.instagram.com/reel/VECCHIA/"
 
-    # Gli ingredienti non avevano bisogno di rete e non devono averne preso una per sbaglio.
+    # The ingredients needed no net, and must not have acquired one by accident.
     assert [i.name for i in r.ingredients] == ["farina 00", "cannella"]
     assert r.ingredients[0].group == "Per l'impasto"
     assert (r.ingredients[0].quantity.value, r.ingredients[0].quantity.unit) == (250.0, "g")
@@ -279,55 +279,55 @@ def test_una_ricetta_salvata_prima_della_migrazione_si_rilegge():
     assert r.has_uncertainties is True
 
 
-def test_la_riscrittura_in_inglese_e_pigra_e_non_perde_niente():
-    """Le righe vecchie si riscrivono in inglese solo quando quella ricetta viene salvata di
-    nuovo, e il secondo giro deve essere identico al primo: se `to_dict` e `from_dict` non
-    fossero simmetrici, ogni salvataggio degraderebbe un pezzo di ricetta."""
-    r = Recipe.from_dict(RICETTA_VECCHIA)
-    nuova = r.to_dict()
+def test_the_rewrite_into_english_is_lazy_and_loses_nothing():
+    """Old rows are rewritten in English only when that recipe is next saved, and the second
+    round has to be identical to the first: if `to_dict` and `from_dict` were not symmetric,
+    every save would degrade a piece of the recipe."""
+    r = Recipe.from_dict(OLD_RECIPE)
+    fresh = r.to_dict()
 
-    # Il livello alto ora è inglese, i dizionari annidati sono rimasti italiani.
-    assert "title" in nuova and "titolo" not in nuova
-    assert nuova["ingredients"][0]["nome"] == "farina 00"
-    assert nuova["ingredients"][0]["quantita"]["provenienza"] == "dichiarato"
+    # The top level is English now; the nested dictionaries stayed Italian.
+    assert "title" in fresh and "titolo" not in fresh
+    assert fresh["ingredients"][0]["nome"] == "farina 00"
+    assert fresh["ingredients"][0]["quantita"]["provenienza"] == "dichiarato"
 
-    assert Recipe.from_dict(nuova).to_dict() == nuova
+    assert Recipe.from_dict(fresh).to_dict() == fresh
 
 
-def test_la_libreria_apre_e_elenca_una_ricetta_vecchia(tmp_path):
-    """Lo stesso, ma passando dal database: `list_` legge il JSON salvato senza passare da
-    `from_dict`, quindi ha una sua strada per sbagliare. Senza `stored_field` la libreria si
-    sarebbe riempita di schede senza porzioni, senza tempi e senza copertina — un guasto muto,
-    che non solleva niente e si vede solo guardando."""
+def test_the_library_opens_and_lists_an_old_recipe(tmp_path):
+    """The same, but through the database: `list_` reads the stored JSON without going through
+    `from_dict`, so it has a way of its own to go wrong. Without `stored_field` the library
+    would have filled up with cards showing no servings, no times and no cover — a mute
+    failure, raising nothing, visible only by looking."""
     import json
     import sqlite3
 
-    percorso = tmp_path / "vecchia.db"
-    with Library(percorso):
-        pass        # lascia creare lo schema alla Library stessa
+    path = tmp_path / "vecchia.db"
+    with Library(path):
+        pass        # let the Library itself create the schema
 
-    conn = sqlite3.connect(percorso)
+    conn = sqlite3.connect(path)
     conn.execute(
         """INSERT INTO ricette (titolo, dati, url, autore, piattaforma, ha_incertezze,
                                 creata_il, aggiornata_il)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-        ("Torta di mele della nonna", json.dumps(RICETTA_VECCHIA, ensure_ascii=False),
-         RICETTA_VECCHIA["fonte"]["url"], "nonna", "instagram", 1,
+        ("Torta di mele della nonna", json.dumps(OLD_RECIPE, ensure_ascii=False),
+         OLD_RECIPE["fonte"]["url"], "nonna", "instagram", 1,
          "2025-01-01T10:00:00+00:00", "2025-01-01T10:00:00+00:00"),
     )
     conn.commit()
     conn.close()
 
-    with Library(percorso) as libreria:
-        voce = libreria.list_()[0]
-        assert voce["title"] == "Torta di mele della nonna"
-        assert voce["servings"] == "6 persone"
-        assert voce["total_time_min"] == 65
-        assert voce["categories"] == ["Dolci"]
-        assert voce["n_ingredients"] == 2
-        assert voce["cover"] == "Zm90bw=="
-        assert voce["has_uncertainties"] is True
+    with Library(path) as library:
+        entry = library.list_()[0]
+        assert entry["title"] == "Torta di mele della nonna"
+        assert entry["servings"] == "6 persone"
+        assert entry["total_time_min"] == 65
+        assert entry["categories"] == ["Dolci"]
+        assert entry["n_ingredients"] == 2
+        assert entry["cover"] == "Zm90bw=="
+        assert entry["has_uncertainties"] is True
 
-        riletta = libreria.read(voce["id"])
-        assert riletta.title == "Torta di mele della nonna"
-        assert riletta.source.author == "nonna"
+        reread = library.read(entry["id"])
+        assert reread.title == "Torta di mele della nonna"
+        assert reread.source.author == "nonna"

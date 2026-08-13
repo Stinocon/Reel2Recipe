@@ -1,14 +1,13 @@
-"""test_api.py — che le scelte dell'utente arrivino davvero alla pipeline.
+"""test_api.py — that the user's choices really reach the pipeline.
 
-Questi test non provano l'estrazione (serve Ollama, e c'è `test_modello.py` per quello):
-provano il **cablaggio**. Il pannello delle opzioni disegnava una scelta della lingua che
-non veniva letta da nessuno, quindi ogni lavorazione usciva in italiano metrico qualunque
-cosa si scegliesse. Nessun test copriva quel tratto perché `tests/` non aveva alcun test
-dell'API: il difetto non aveva modo di farsi vedere.
+These tests do not prove the extraction (that needs Ollama, and `test_modello.py` is there for
+it): they prove the **wiring**. The options panel drew a language choice that nobody read, so
+every job came out in Italian metric whatever was chosen. No test covered that stretch because
+`tests/` had no API test at all: the defect had no way of showing itself.
 
-La pipeline viene sostituita da una spia che registra gli argomenti ricevuti e dichiara un
-esito fallito. Fallito di proposito: così `_concludi_con_esito` esce subito e non tocca la
-libreria, e il test resta sul cablaggio senza portarsi dietro un database.
+The pipeline is replaced by a spy that records the arguments it receives and declares a failed
+outcome. Failed on purpose: that way `_finish_with_outcome` returns immediately and does not
+touch the library, and the test stays on the wiring without dragging a database along.
 """
 
 from __future__ import annotations
@@ -23,29 +22,29 @@ TestClient = pytest.importorskip("fastapi.testclient").TestClient
 
 
 @pytest.fixture
-def spia(monkeypatch):
-    """Sostituisce `pipeline.from_url` e `pipeline.from_file` con una spia sugli argomenti.
+def spy(monkeypatch):
+    """Replaces `pipeline.from_url` and `pipeline.from_file` with a spy on the arguments.
 
-    La lavorazione gira in un thread, quindi la chiamata HTTP torna prima che la spia sia
-    stata invocata: l'evento è ciò che permette di aspettarla senza una pausa a caso.
+    The job runs in a thread, so the HTTP call returns before the spy has been invoked: the
+    event is what makes it possible to wait for it without an arbitrary pause.
     """
-    ricevuti: dict = {}
-    chiamata = threading.Event()
+    received: dict = {}
+    called = threading.Event()
 
-    def falsa(*args, **kwargs):
-        ricevuti.update(kwargs)
-        ricevuti["posizionali"] = args
-        chiamata.set()
-        return pipeline.Outcome(error="spia: nessuna lavorazione vera")
+    def fake(*args, **kwargs):
+        received.update(kwargs)
+        received["positional"] = args
+        called.set()
+        return pipeline.Outcome(error="spy: no real processing")
 
-    monkeypatch.setattr(pipeline, "from_url", falsa)
-    monkeypatch.setattr(pipeline, "from_file", falsa)
+    monkeypatch.setattr(pipeline, "from_url", fake)
+    monkeypatch.setattr(pipeline, "from_file", fake)
 
-    def attendi() -> dict:
-        assert chiamata.wait(timeout=5), "la pipeline non è mai stata chiamata"
-        return ricevuti
+    def wait_for_it() -> dict:
+        assert called.wait(timeout=5), "the pipeline was never called"
+        return received
 
-    return attendi
+    return wait_for_it
 
 
 @pytest.fixture
@@ -54,8 +53,8 @@ def client(tmp_path):
         yield c
 
 
-def _ricetta_minima() -> dict:
-    """Una ricetta valida e piccola, nella forma che `to_dict()` produce."""
+def _minimal_recipe() -> dict:
+    """A valid, small recipe, in the shape `to_dict()` produces."""
     from reel2recipe.recipe import Source, from_draft
 
     return from_draft(
@@ -67,174 +66,176 @@ def _ricetta_minima() -> dict:
 
 
 # --------------------------------------------------------------------------------------
-# I due assi di uscita, dalla richiesta alla pipeline
+# The two output axes, from the request to the pipeline
 # --------------------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
-    "richiesta, lingua_attesa, sistema_atteso",
+    "request_body, expected_language, expected_system",
     [
-        ({}, "it", "metrico"),                                    # predefiniti
-        ({"language": "en"}, "en", "imperiale"),                    # il sistema segue la lingua
-        ({"language": "en", "system": "metrico"}, "en", "metrico"),  # inglese coi grammi
+        ({}, "it", "metrico"),                                       # the defaults
+        ({"language": "en"}, "en", "imperiale"),                     # the system follows the language
+        ({"language": "en", "system": "metrico"}, "en", "metrico"),  # English with grams
         ({"language": "it", "system": "imperiale"}, "it", "imperiale"),
     ],
 )
-def test_cook_inoltra_lingua_e_sistema(client, spia, richiesta, lingua_attesa, sistema_atteso):
-    risposta = client.post("/api/cook", json={"url": "https://esempio.test/reel/1", **richiesta})
-    assert risposta.status_code == 200
-    ricevuti = spia()
-    assert ricevuti["language"] == lingua_attesa
-    assert ricevuti["system"] == sistema_atteso
+def test_cook_forwards_language_and_system(client, spy, request_body, expected_language,
+                                           expected_system):
+    response = client.post("/api/cook", json={"url": "https://esempio.test/reel/1", **request_body})
+    assert response.status_code == 200
+    received = spy()
+    assert received["language"] == expected_language
+    assert received["system"] == expected_system
 
 
-def test_cook_inoltra_le_opzioni_di_lavorazione(client, spia):
+def test_cook_forwards_the_processing_options(client, spy):
     client.post("/api/cook", json={
         "url": "https://esempio.test/reel/1",
         "asr_backend": "mlx", "llm_model": "qwen2.5:14b", "skip_audio": True,
     })
-    ricevuti = spia()
-    assert ricevuti["asr_backend"] == "mlx"
-    assert ricevuti["llm_model"] == "qwen2.5:14b"
-    assert ricevuti["skip_audio"] is True
+    received = spy()
+    assert received["asr_backend"] == "mlx"
+    assert received["llm_model"] == "qwen2.5:14b"
+    assert received["skip_audio"] is True
 
 
-def test_cook_non_dichiara_una_lingua_del_parlato_che_non_sa(client, spia):
-    """Senza una scelta esplicita, a Whisper non si dice nulla: la riconosce da sé.
+def test_cook_does_not_declare_a_spoken_language_it_does_not_know(client, spy):
+    """Without an explicit choice, Whisper is told nothing: it recognises the language itself.
 
-    Non basta che `asr.DEFAULT_LANGUAGE` sia `None` — l'API deve anche non inventarsi
-    un valore per conto suo, per esempio deducendolo dalla lingua richiesta in uscita.
+    It is not enough for `asr.DEFAULT_LANGUAGE` to be `None` — the API must also not invent a
+    value of its own, for instance by deducing it from the requested output language.
     """
     client.post("/api/cook", json={"url": "https://esempio.test/reel/1", "language": "en"})
-    assert spia()["audio_language"] is None
+    assert spy()["audio_language"] is None
 
 
-def test_cook_inoltra_la_lingua_del_parlato_forzata(client, spia):
+def test_cook_forwards_the_forced_spoken_language(client, spy):
     client.post("/api/cook", json={"url": "https://esempio.test/reel/1", "audio_language": "en"})
-    assert spia()["audio_language"] == "en"
+    assert spy()["audio_language"] == "en"
 
 
-def test_cook_senza_url_e_rifiutato(client):
+def test_cook_without_a_url_is_refused(client):
     assert client.post("/api/cook", json={"url": "   "}).status_code == 422
 
 
 # --------------------------------------------------------------------------------------
-# Il file caricato: le stesse opzioni del link, non un sottoinsieme
+# The uploaded file: the same options as the link, not a subset
 # --------------------------------------------------------------------------------------
 
 
-def test_cook_file_inoltra_tutte_le_opzioni(client, spia):
-    """Il caricamento accettava solo lingua e sistema: backend ASR, modello e `salta_audio`
-    venivano scartati in silenzio. Trascinare un video non deve valere meno che incollare
-    un link."""
-    risposta = client.post(
+def test_cook_file_forwards_every_option(client, spy):
+    """The upload accepted only language and system: the ASR backend, the model and
+    `skip_audio` were dropped in silence. Dragging a video must not be worth less than pasting
+    a link."""
+    response = client.post(
         "/api/cook-file",
         params={"asr_backend": "faster-whisper", "llm_model": "qwen2.5:14b",
                 "skip_audio": "true", "language": "en", "audio_language": "it",
                 "caption": "una prova"},
         files={"file": ("reel.mp4", b"non un video vero", "video/mp4")},
     )
-    assert risposta.status_code == 200
+    assert response.status_code == 200
 
-    ricevuti = spia()
-    assert ricevuti["asr_backend"] == "faster-whisper"
-    assert ricevuti["llm_model"] == "qwen2.5:14b"
-    assert ricevuti["skip_audio"] is True
-    assert ricevuti["caption"] == "una prova"
-    assert ricevuti["language"] == "en"
-    assert ricevuti["system"] == "imperiale"
-    assert ricevuti["audio_language"] == "it"
+    received = spy()
+    assert received["asr_backend"] == "faster-whisper"
+    assert received["llm_model"] == "qwen2.5:14b"
+    assert received["skip_audio"] is True
+    assert received["caption"] == "una prova"
+    assert received["language"] == "en"
+    assert received["system"] == "imperiale"
+    assert received["audio_language"] == "it"
 
 
-def test_cook_file_ripulisce_il_temporaneo(client, spia):
-    """Il file caricato viene scritto in una cartella temporanea e deve sparire a fine
-    lavorazione, riuscita o meno: è materiale di terzi (AGENTS.md §7)."""
+def test_cook_file_cleans_up_the_temporary(client, spy):
+    """The uploaded file is written into a temporary folder and has to vanish when the job
+    ends, successful or not: it is third-party material (AGENTS.md §7)."""
     client.post("/api/cook-file", files={"file": ("reel.mp4", b"xxx", "video/mp4")})
-    percorso = spia()["posizionali"][0]
-    # La spia scatta *dentro* la lavorazione, il file sparisce subito dopo: si concede
-    # un attimo al thread per arrivare al `finally`.
+    path = spy()["positional"][0]
+    # The spy fires *inside* the job and the file vanishes just afterwards: the thread is
+    # given a moment to reach its `finally`.
     for _ in range(50):
-        if not percorso.exists():
+        if not path.exists():
             break
         threading.Event().wait(0.02)
-    assert not percorso.exists(), f"temporaneo rimasto sul disco: {percorso}"
+    assert not path.exists(), f"temporary left on disk: {path}"
 
 
 # --------------------------------------------------------------------------------------
-# La regola di ripiego sta in un punto solo
+# The fallback rule lives in one place only
 # --------------------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("lingua, atteso", [("it", "metrico"), ("en", "imperiale")])
-def test_il_sistema_segue_la_lingua(lingua, atteso):
-    assert api.CookRequest(language=lingua).axes()["system"] == atteso
+@pytest.mark.parametrize("language, expected", [("it", "metrico"), ("en", "imperiale")])
+def test_the_system_follows_the_language(language, expected):
+    assert api.CookRequest(language=language).axes()["system"] == expected
 
 
-def test_il_sistema_chiesto_esplicitamente_vince():
-    assi = api.CookRequest(language="en", system="metrico").axes()
-    assert assi == {"language": "en", "system": "metrico"}
+def test_an_explicitly_asked_system_wins():
+    axes = api.CookRequest(language="en", system="metrico").axes()
+    assert axes == {"language": "en", "system": "metrico"}
 
 
 # --------------------------------------------------------------------------------------
-# Gli errori dell'API seguono la lingua dell'INTERFACCIA
+# The API's errors follow the language of the INTERFACE
 # --------------------------------------------------------------------------------------
 
 
-def test_errori_tradotti(client):
-    """`lingua_ui` e non `lingua`: su `/api/cook` quest'ultimo esiste già e vuol dire
-    un'altra cosa — in che lingua produrre la ricetta. Chiamarli uguale avrebbe legato la
-    lingua dei bottoni a quella del contenuto senza che nessuno lo avesse deciso."""
+def test_translated_errors(client):
+    """`lingua_ui` and not `language`: on `/api/cook` the latter already exists and means
+    something else — which language to produce the recipe in. Calling them the same would have
+    tied the buttons' language to the content's without anybody deciding it."""
     assert client.get("/api/export?lingua_ui=en").json()["detail"] == "The library is empty."
     assert client.get("/api/export?lingua_ui=it").json()["detail"] == "Libreria vuota."
     assert client.get("/api/ricette/999?lingua_ui=en").json()["detail"] == "Recipe not found."
 
 
-def test_errori_in_italiano_senza_indicazione(client):
-    """Senza `lingua_ui` si ripiega sull'italiano, che è la lingua in cui il progetto è
-    scritto: un ripiego deve essere una lingua vera, non una chiave grezza."""
+def test_errors_in_italian_when_nothing_is_stated(client):
+    """Without `lingua_ui` it falls back to Italian, the language the project is written in: a
+    fallback has to be a real language, not a raw key."""
     assert client.get("/api/export").json()["detail"] == "Libreria vuota."
 
 
-def test_una_lingua_ignota_non_fa_sparire_il_messaggio(client):
-    """Il ripiego serve proprio a questo: meglio una frase italiana dentro un'uscita in
-    un'altra lingua che un `KeyError` davanti all'utente."""
+def test_an_unknown_language_does_not_make_the_message_vanish(client):
+    """That is exactly what the fallback is for: better an Italian sentence inside output in
+    another language than a `KeyError` in front of the user."""
     assert client.get("/api/export?lingua_ui=de").json()["detail"] == "Libreria vuota."
 
 
 # --------------------------------------------------------------------------------------
-# L'export: il formato chiesto deve essere quello prodotto
+# The export: the format asked for has to be the one produced
 # --------------------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("formato, tipo, estensione", [
+@pytest.mark.parametrize("formato, media_type, extension", [
     ("mela", "application/json", ".melarecipe"),
     ("markdown", "text/markdown", ".md"),
     ("pdf", "application/pdf", ".pdf"),
 ])
-def test_l_export_rispetta_il_formato_chiesto(client, formato, tipo, estensione):
-    """Il parametro di query deve arrivare davvero al codice che sceglie il formato.
+def test_the_export_honours_the_format_asked_for(client, formato, media_type, extension):
+    """The query parameter has to actually reach the code that picks the format.
 
-    Nessun test lo copriva, e durante la migrazione il parametro è stato rinominato da
-    `formato` a `format_` nella firma Python — che in FastAPI *è* il nome del parametro di
-    query. La pagina continuava a mandare `?formato=`, che a quel punto non corrispondeva a
-    nulla: ogni export cadeva sul valore predefinito e restituiva un `.melarecipe` con
-    l'etichetta del formato chiesto. Nessun errore, un file sbagliato, e lo si vede solo
-    aprendolo. Trovato eseguendo il prodotto, non la suite.
+    No test covered it, and during the migration the parameter was renamed from `formato` to
+    `format_` in the Python signature — which in FastAPI *is* the query parameter's name. The
+    page kept sending `?formato=`, which by then matched nothing: every export fell through to
+    the default and returned a `.melarecipe` labelled with the format that had been asked for.
+    No error, a wrong file, and you only see it on opening it. Found by running the product,
+    not the suite.
     """
     if formato == "pdf":
         pytest.importorskip("reportlab")
 
-    id = client.post("/api/ricette", json=_ricetta_minima()).json()["id"]
-    risposta = client.get(f"/api/ricette/{id}/export?formato={formato}")
+    id = client.post("/api/ricette", json=_minimal_recipe()).json()["id"]
+    response = client.get(f"/api/ricette/{id}/export?formato={formato}")
 
-    assert risposta.status_code == 200
-    assert risposta.headers["content-type"].startswith(tipo)
-    assert estensione in risposta.headers.get("content-disposition", "")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith(media_type)
+    assert extension in response.headers.get("content-disposition", "")
 
 
-def test_un_formato_sconosciuto_non_diventa_un_mela(client):
-    """Il verso opposto: un formato che non esiste deve dirlo, non ripiegare in silenzio."""
-    id = client.post("/api/ricette", json=_ricetta_minima()).json()["id"]
-    risposta = client.get(f"/api/ricette/{id}/export?formato=sbagliato")
-    assert risposta.status_code == 400
-    assert "sbagliato" in risposta.json()["detail"]
+def test_an_unknown_format_does_not_become_a_mela(client):
+    """The other way round: a format that does not exist has to say so, not fall back
+    silently."""
+    id = client.post("/api/ricette", json=_minimal_recipe()).json()["id"]
+    response = client.get(f"/api/ricette/{id}/export?formato=sbagliato")
+    assert response.status_code == 400
+    assert "sbagliato" in response.json()["detail"]
