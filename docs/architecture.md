@@ -324,6 +324,30 @@ install alongside — a necessary condition for running inside a container or on
 
 ---
 
+## The two contracts with the Home Assistant add-on
+
+The add-on lives in another repository (`Stinocon/addons`) and **clones this one at build
+time**, from `main`. Neither repo checks the other, so a rename here can stop a build there
+with nothing warning us. Two of the coupling points are contracts in the strict sense, and
+both are held still by `tests/test_cli.py`:
+
+1. **The start-up line.** `r2r --ollama URL serve --host 0.0.0.0 --porta 8500`. `--ollama` is a
+   *global* option and goes before the subcommand; put after, argparse exits with code 2, s6
+   restarts for ever and the Ingress answers 502 without naming the cause. It has happened.
+   Every Italian option name is still accepted as an alias for exactly this reason.
+2. **The symbols its Dockerfile imports.** The build ends with a sanity check —
+   `from reel2recipe.paths import REPO_ROOT`, `from reel2recipe.units import load_tables` —
+   that verifies the clone is installed in a shape where the code can still find `web/` and
+   `data/`. This one was *not* written down anywhere, and two consecutive renames broke it:
+   `percorsi` → `paths`, then `carica_tabelle` → `load_tables`. The add-on could not build
+   through either, and the check that says "the coupling points hold" kept coming back green
+   because it was reading a list of four that should have had five.
+
+The remaining links — the three environment variables and the frontend's relative API calls —
+are not tested from here, because breaking them shows up immediately in the add-on's log.
+
+---
+
 ## Why the structure stays flat
 
 This project's value lies in its clarity: lean, clean, as simple as possible without
