@@ -5,7 +5,7 @@ far the local model honours the prompt. Trying a real reel turned up that
 `qwen2.5:7b-instruct`, faced with a list of ingredients with no amounts ("Salsa: soia, mirin e
 dashi"), **handed out plausible amounts** — "1 tazza" of soy sauce that nobody had ever
 written. It is the worst possible failure for this project: an invented number the user does
-not know is invented. It is the golden rule "invent nothing" (see docs/architettura.md) put to
+not know is invented. It is the golden rule "invent nothing" (see docs/architecture.md) put to
 the test against the model actually installed. The default model, `qwen2.5:14b`, does not do
 it.
 

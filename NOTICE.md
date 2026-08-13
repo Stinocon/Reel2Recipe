@@ -49,7 +49,7 @@ verificati e resi tracciabili.
 
 Alcune pratiche di questo repository vengono da progetti di terzi, adottate come **idea** e
 riscritte in forma nativa — mai installate come codice o hook. La più visibile è il criterio
-contro l'over-engineering descritto in [`docs/architettura.md`](docs/architettura.md)
+contro l'over-engineering descritto in [`docs/architecture.md`](docs/architecture.md)
 («si aggiunge ciò che risolve un problema già visto»), distillato dalla "decision ladder" di
 [Ponytail](https://github.com/DietrichGebert/ponytail) (MIT). Un'idea non è materiale
 protetto e questa citazione non è un obbligo di licenza: sta qui perché è giusto dire da dove
