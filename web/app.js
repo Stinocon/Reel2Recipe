@@ -279,27 +279,27 @@ function mostraRicetta(ricetta, avvertenze = [], modello = '', scorri = true) {
   // pagina: è la stessa scelta già fatta per gli export in `mela.py` e `documenti.py`, e
   // per le `lacune`, che nella lingua della ricetta ci sono salvate dentro. Una ricetta
   // inglese sotto un titolo «Ingredienti» sarebbe una scheda mezza e mezza.
-  const lr = ricetta.lingua || lingua();
+  const lr = ricetta.language || lingua();
 
-  const copertina = ricetta.immagini?.[0]
-    ? `<img class="scheda-copertina" src="data:image/jpeg;base64,${ricetta.immagini[0]}" alt="" />`
+  const copertina = ricetta.images?.[0]
+    ? `<img class="scheda-copertina" src="data:image/jpeg;base64,${ricetta.images[0]}" alt="" />`
     : '';
 
   const meta = [];
-  if (ricetta.porzioni) meta.push(`<span>${icona('piatto', 16)} ${esc(ricetta.porzioni)}</span>`);
-  if (ricetta.tempo_totale_min) meta.push(`<span>${icona('tempo', 16)} ${t('minuti', { quanti: ricetta.tempo_totale_min }, lr)}</span>`);
-  if (ricetta.fonte?.autore) meta.push(`<span>${icona('autore', 16)} ${esc(ricetta.fonte.autore)}</span>`);
+  if (ricetta.servings) meta.push(`<span>${icona('piatto', 16)} ${esc(ricetta.servings)}</span>`);
+  if (ricetta.total_time_min) meta.push(`<span>${icona('tempo', 16)} ${t('minuti', { quanti: ricetta.total_time_min }, lr)}</span>`);
+  if (ricetta.source?.author) meta.push(`<span>${icona('autore', 16)} ${esc(ricetta.source.author)}</span>`);
 
   scheda.innerHTML = `
     ${copertina}
     <div class="scheda-corpo">
-      <h2 class="scheda-titolo">${esc(ricetta.titolo)}</h2>
+      <h2 class="scheda-titolo">${esc(ricetta.title)}</h2>
       <div class="scheda-meta">${meta.join('')}${modello ? `<span class="badge-fonte">${icona('modello', 16)} ${esc(modello)}</span>` : ''}</div>
       ${avvertenze?.length ? `<div class="avviso-incertezze"><strong>${esc(t('scheda_nota', {}, lr))}</strong> ${avvertenze.map(esc).join(' ')}</div>` : ''}
       <h3 class="sezione-titolo">${esc(t('scheda_ingredienti', {}, lr))}</h3>
       ${renderIngredienti(ricetta, lr)}
       <h3 class="sezione-titolo">${esc(t('scheda_procedimento', {}, lr))}</h3>
-      <ol class="lista-procedimento">${(ricetta.procedimento || []).map((p) => `<li class="passo">${esc(p)}</li>`).join('')}</ol>
+      <ol class="lista-procedimento">${(ricetta.method || []).map((p) => `<li class="passo">${esc(p)}</li>`).join('')}</ol>
       ${renderLacune(ricetta, lr)}
       <div class="scheda-azioni">
         <button class="btn-primario" id="btn-salva-scheda">${icona('salva')} ${esc(t('btn_salva'))}</button>
@@ -327,12 +327,12 @@ function mostraRicetta(ricetta, avvertenze = [], modello = '', scorri = true) {
 }
 
 function renderIngredienti(ricetta, lr) {
-  const gruppi = [...new Set((ricetta.ingredienti || []).map((i) => i.gruppo))];
+  const gruppi = [...new Set((ricetta.ingredients || []).map((i) => i.gruppo))];
   const mostraGruppi = gruppi.filter(Boolean).length > 0 && gruppi.length > 1;
   let html = '<ul class="lista-ingredienti">';
   for (const gruppo of gruppi) {
     if (mostraGruppi && gruppo) html += `<li class="gruppo-titolo">${esc(gruppo)}</li>`;
-    for (const ing of ricetta.ingredienti.filter((i) => i.gruppo === gruppo)) {
+    for (const ing of ricetta.ingredients.filter((i) => i.gruppo === gruppo)) {
       const incerta = PROVENIENZE_STIMA.has(ing.quantita?.provenienza);
       const tag = incerta
         ? `<span class="tag-provenienza stima">${esc(t('tag_stima', {}, lr))}</span>`
@@ -345,9 +345,9 @@ function renderIngredienti(ricetta, lr) {
 }
 
 function renderLacune(ricetta, lr) {
-  if (!ricetta.lacune?.length) return '';
+  if (!ricetta.gaps?.length) return '';
   return `<h3 class="sezione-titolo">${esc(t('scheda_da_verificare', {}, lr))}</h3>
-    <ul class="lista-lacune">${ricetta.lacune.map((l) => `<li class="lacuna">${esc(l)}</li>`).join('')}</ul>`;
+    <ul class="lista-lacune">${ricetta.gaps.map((l) => `<li class="lacuna">${esc(l)}</li>`).join('')}</ul>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -371,7 +371,7 @@ async function eliminaRicettaCorrente() {
   if (!ricettaCorrente?.id) return;
   // Conferma esplicita: è l'unica azione distruttiva dell'interfaccia e non si può
   // annullare. Il titolo nel messaggio evita di cancellare la ricetta sbagliata.
-  if (!confirm(t('conferma_elimina', { titolo: ricettaCorrente.titolo }))) return;
+  if (!confirm(t('conferma_elimina', { titolo: ricettaCorrente.title }))) return;
   try {
     await api(`/api/ricette/${ricettaCorrente.id}`, { method: 'DELETE' });
     $('#scheda-ricetta').hidden = true;
@@ -392,19 +392,19 @@ function apriModifica(ricetta) {
   const contenuto = $('#modale-contenuto');
   // Modifica testuale: ingredienti e passi uno per riga. Semplice e diretto — chi corregge
   // vuole aggiustare due parole, non compilare un form a venti campi.
-  const righeIng = (ricetta.ingredienti || []).map((i) => i.riga).join('\n');
-  const righeProc = (ricetta.procedimento || []).join('\n');
+  const righeIng = (ricetta.ingredients || []).map((i) => i.riga).join('\n');
+  const righeProc = (ricetta.method || []).join('\n');
 
   contenuto.innerHTML = `
     <h2 class="scheda-titolo">${esc(t('modale_titolo'))}</h2>
     <p class="suggerimento-modifica">${esc(t('modale_suggerimento'))}</p>
     <div class="campo-modifica">
       <label>${esc(t('campo_titolo'))}</label>
-      <input id="mod-titolo" value="${esc(ricetta.titolo)}" />
+      <input id="mod-titolo" value="${esc(ricetta.title)}" />
     </div>
     <div class="campo-modifica">
       <label>${esc(t('campo_porzioni'))}</label>
-      <input id="mod-porzioni" value="${esc(ricetta.porzioni || '')}" />
+      <input id="mod-porzioni" value="${esc(ricetta.servings || '')}" />
     </div>
     <div class="campo-modifica">
       <label>${esc(t('campo_ingredienti'))}</label>
@@ -428,11 +428,11 @@ function applicaModifiche(ricetta) {
   // Le correzioni testuali sostituivano l'estratto: le righe modificate diventano il
   // testo "riga" di ciascun ingrediente. La conversione è già avvenuta; qui l'utente
   // ha l'ultima parola, e la sua parola vince.
-  ricetta.titolo = $('#mod-titolo').value.trim() || ricetta.titolo;
-  ricetta.porzioni = $('#mod-porzioni').value.trim() || null;
+  ricetta.title = $('#mod-titolo').value.trim() || ricetta.title;
+  ricetta.servings = $('#mod-porzioni').value.trim() || null;
 
   let gruppo = null;
-  ricetta.ingredienti = $('#mod-ingredienti').value.split('\n')
+  ricetta.ingredients = $('#mod-ingredienti').value.split('\n')
     .map((r) => r.trim()).filter(Boolean)
     .map((riga) => {
       if (riga.startsWith('#')) { gruppo = riga.replace(/^#\s*/, ''); return null; }
@@ -445,7 +445,7 @@ function applicaModifiche(ricetta) {
     })
     .filter(Boolean);
 
-  ricetta.procedimento = $('#mod-procedimento').value.split('\n').map((r) => r.trim()).filter(Boolean);
+  ricetta.method = $('#mod-procedimento').value.split('\n').map((r) => r.trim()).filter(Boolean);
 
   $('#modale').hidden = true;
   mostraRicetta(ricetta, [], '');
@@ -466,20 +466,20 @@ async function caricaLibreria(cerca = '') {
       : t('libreria_vuota');
 
     griglia.innerHTML = voci.map((v) => {
-      const copertina = v.copertina
-        ? `style="background-image:url('data:image/jpeg;base64,${v.copertina}')"`
+      const copertina = v.cover
+        ? `style="background-image:url('data:image/jpeg;base64,${v.cover}')"`
         : '';
       const meta = [
-        v.porzioni, v.tempo_totale_min ? t('minuti', { quanti: v.tempo_totale_min }) : null,
-        t('carta_ingredienti', { quanti: v.n_ingredienti }),
+        v.servings, v.total_time_min ? t('minuti', { quanti: v.total_time_min }) : null,
+        t('carta_ingredienti', { quanti: v.n_ingredients }),
       ].filter(Boolean).join(' · ');
       return `<article class="carta-ricetta" data-id="${v.id}">
-        <div class="carta-copertina" ${copertina}>${v.copertina ? '' : icona('piatto', 34)}</div>
+        <div class="carta-copertina" ${copertina}>${v.cover ? '' : icona('piatto', 34)}</div>
         <div class="carta-corpo">
-          <div class="carta-titolo">${esc(v.titolo)}</div>
+          <div class="carta-titolo">${esc(v.title)}</div>
           <div class="carta-meta">
             <span>${esc(meta)}</span>
-            ${v.ha_incertezze ? `<span class="carta-badge-incerta">${icona('avviso', 14)} ${esc(t('carta_da_rivedere'))}</span>` : ''}
+            ${v.has_uncertainties ? `<span class="carta-badge-incerta">${icona('avviso', 14)} ${esc(t('carta_da_rivedere'))}</span>` : ''}
           </div>
         </div>
       </article>`;

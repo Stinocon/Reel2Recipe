@@ -21,7 +21,7 @@ c'è [`legale.md`](legale.md).
                      ▼   RecipeDraft — quantità GREZZE, mai convertite dal modello
                   units    ← data/unita.yaml + densita.yaml + vaghe.yaml (lingua × sistema)
                      │
-                     ▼   Ricetta — quantità metriche + provenienza + lacune
+                     ▼   Recipe — quantità metriche + provenienza + gaps
               ┌──────┴──────┬─────────────┐
               ▼             ▼             ▼
             store         mela        documenti
@@ -54,7 +54,7 @@ d'occhio un dato da una stima.
 
 **La regola d'oro: non inventare.** Vale per il modello e per il codice, e non solo per le
 quantità. Se un peso, un tempo o un passaggio non è deducibile dal materiale, non si completa
-a caso: si lascia il buco e lo si dichiara fra le `lacune`. Una ricetta incompleta ma onesta
+a caso: si lascia il buco e lo si dichiara fra i `gaps`. Una ricetta incompleta ma onesta
 è utilizzabile; una completata a caso è dannosa, perché in cucina un peso sbagliato di cui non
 sai che è sbagliato fa danni veri. Il prompt di `extract.py` lo impone al modello, `units.py`
 e `recipe.py` lo rispettano nel codice, e `tests/test_modello.py` lo verifica sul modello
@@ -212,7 +212,7 @@ I due lati seguono però assi diversi, e la differenza è deliberata. La **pagin
 lingua dell'interfaccia, che viaggia su ogni chiamata come `lingua_ui` — nome distinto da
 `lingua`, che su `/api/cook` significa già un'altra cosa: in che lingua *produrre la ricetta*.
 L'**avanzamento e le avvertenze** seguono invece la lingua della ricetta, perché finiscono
-accanto alle `lacune`, che nella lingua della ricetta ci sono salvate dentro; farli divergere
+accanto ai `gaps`, che nella lingua della ricetta ci sono salvati dentro; farli divergere
 darebbe una scheda mezza in una lingua e mezza nell'altra. Nell'uso normale i due valori
 coincidono comunque, perché la lingua della ricetta segue quella dell'interfaccia.
 

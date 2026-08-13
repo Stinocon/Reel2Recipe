@@ -31,7 +31,7 @@ from . import pipeline
 from .documenti import ErroreDocumento, scrivi_markdown, scrivi_pdf
 from .mela import scrivi_melarecipe, scrivi_melarecipes, verso_melarecipe
 from .paths import REPO_ROOT, export_folder
-from .recipe import Ricetta
+from .recipe import Recipe
 from .store import Library
 from .units import Catalogue, text_from
 
@@ -247,7 +247,7 @@ def crea_app(db: str | None = None, url_ollama: str = "http://localhost:11434") 
             if not lib.read(id):
                 raise HTTPException(404, testo(lingua_ui, "ricetta_non_trovata"))
             ricetta.pop("id", None)
-            lib.update(id, Ricetta.from_dict(ricetta))
+            lib.update(id, Recipe.from_dict(ricetta))
         return {"ok": True}
 
     @app.delete("/api/ricette/{id}")
@@ -261,7 +261,7 @@ def crea_app(db: str | None = None, url_ollama: str = "http://localhost:11434") 
     def salva_nuova(ricetta: dict) -> dict:
         """Salva in libreria una ricetta appena estratta (con eventuali correzioni)."""
         with libreria() as lib:
-            id = lib.save(Ricetta.from_dict(ricetta))
+            id = lib.save(Recipe.from_dict(ricetta))
         return {"id": id}
 
     # ---- export ----------------------------------------------------------------------
@@ -305,7 +305,7 @@ def crea_app(db: str | None = None, url_ollama: str = "http://localhost:11434") 
     @app.post("/api/preview-mela")
     def anteprima_mela(ricetta: dict) -> dict:
         """L'aspetto che avrà la ricetta in Mela, senza scriverla su disco."""
-        return verso_melarecipe(Ricetta.from_dict(ricetta))
+        return verso_melarecipe(Recipe.from_dict(ricetta))
 
     # ---- frontend statico ------------------------------------------------------------
 

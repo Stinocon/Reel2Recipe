@@ -136,3 +136,72 @@ def test_i_segnaposto_coincidono_fra_le_lingue(modulo, catalogo):
         assert attesi == trovati, (
             f"{modulo}.TESTI['{chiave}']: segnaposto it={sorted(attesi)} en={sorted(trovati)}"
         )
+
+
+# --------------------------------------------------------------------------------------
+# Il contratto fra il JSON del server e le chiavi che la pagina legge
+# --------------------------------------------------------------------------------------
+
+
+def _ricetta_di_prova():
+    """Una ricetta vera, costruita dalla pipeline invece che scritta a mano: le chiavi
+    devono essere quelle che il server produce davvero, non quelle che ricordiamo."""
+    from reel2recipe.recipe import Source, from_draft
+
+    return from_draft(
+        {"titolo": "Torta di mele", "porzioni": "6 persone",
+         "ingredienti": [{"nome": "farina 00", "quantita_raw": "1", "unita_raw": "cup",
+                          "gruppo": "Per l'impasto"}],
+         "procedimento": ["Inforna a 180 °C."], "categorie": ["Dolci"],
+         "tempo_preparazione_min": 20, "tempo_cottura_min": 45, "lacune": []},
+        source=Source.now(url="https://x/y", author="nonna", platform="instagram"),
+        images=["Zm90bw=="],
+    )
+
+
+def test_ogni_chiave_letta_dalla_pagina_esiste_nel_json_del_server():
+    """Il guard che avrebbe intercettato in un colpo solo la rinomina dei campi di `Recipe`.
+
+    `app.js` legge il JSON per attributo: `ricetta.titolo` su un oggetto che non ha più quel
+    campo non solleva niente, restituisce `undefined`, e la scheda si disegna lo stesso — con
+    il titolo vuoto. È la stessa famiglia di difetto muto dei guard qui sopra, e su un
+    frontend senza toolchain non c'è nient'altro che possa accorgersene.
+
+    Il confronto è deliberatamente **strutturale e non esaustivo**: si guardano solo gli
+    accessi `ricetta.X`, che sono quelli sul primo livello del JSON. Gli accessi annidati
+    (`ing.riga`, `i.gruppo`) restano fuori perché le loro chiavi sono italiane per scelta e
+    non seguono i nomi Python.
+    """
+    ricetta = _ricetta_di_prova().to_dict()
+    # `id` lo aggiunge l'API dopo il salvataggio, non `to_dict()`.
+    disponibili = set(ricetta) | {"id"}
+
+    lette = set(re.findall(r"\bricetta(?:Corrente)?\.(\w+)", MODULI["app.js"]))
+    assert lette, "nessun accesso a `ricetta.` in app.js: il guard si è scollegato"
+
+    mancanti = sorted(lette - disponibili)
+    assert not mancanti, (
+        f"app.js legge chiavi che il server non produce: {mancanti}. "
+        f"Il server ne produce: {sorted(disponibili)}"
+    )
+
+
+def test_ogni_chiave_della_scheda_libreria_esiste_nell_elenco(tmp_path):
+    """Lo stesso per le carte della libreria, che vengono da `Library.list_` e non da
+    `to_dict()`: è una seconda forma, con chiavi sue, e quindi una seconda strada per
+    divergere in silenzio dal frontend."""
+    from reel2recipe.store import Library
+
+    with Library(tmp_path / "guard.db") as libreria:
+        libreria.save(_ricetta_di_prova())
+        disponibili = set(libreria.list_()[0])
+
+    # Le carte si disegnano dentro `voci.map((v) => …)`: gli accessi sono tutti su `v`.
+    lette = set(re.findall(r"\bv\.(\w+)", MODULI["app.js"]))
+    assert lette, "nessun accesso a `v.` in app.js: il guard si è scollegato"
+
+    mancanti = sorted(lette - disponibili)
+    assert not mancanti, (
+        f"app.js legge dalle carte chiavi che `Library.list_` non produce: {mancanti}. "
+        f"L'elenco ne produce: {sorted(disponibili)}"
+    )

@@ -1,6 +1,6 @@
 """pipeline.py — la catena completa, da un link a una ricetta.
 
-    URL o file  →  acquire  →  audio  →  asr  →  extract  →  recipe  →  Ricetta
+    URL o file  →  acquire  →  audio  →  asr  →  extract  →  recipe  →  Recipe
 
 Vive qui e non nella CLI perché la usano in due: il comando da terminale e l'interfaccia
 web. Una sola implementazione, un solo posto dove correggere le cose.
@@ -22,7 +22,7 @@ from pathlib import Path
 
 from . import acquire, asr, audio, extract
 from .paths import media_folder
-from .recipe import Fonte, Ricetta, da_bozza
+from .recipe import Source, Recipe, from_draft
 from .units import Catalogue, Language, System, Tables, code_of, load_tables, text_from
 
 Avanzamento = Callable[[str, str], None]   # (fase, messaggio)
@@ -99,7 +99,7 @@ def _silenzio(fase: str, messaggio: str) -> None:
 class Esito:
     """Il risultato di una lavorazione, con la traccia di come ci si è arrivati."""
 
-    ricetta: Ricetta | None = None
+    ricetta: Recipe | None = None
     media: acquire.Media | None = None
     trascrizione: asr.Transcript | None = None
     modello: str | None = None
@@ -195,7 +195,7 @@ def lavora(
     lingua: str = Language.IT,
     sistema: str = System.METRIC,
 ) -> Esito:
-    """Porta un `Media` già acquisito fino alla `Ricetta` normalizzata."""
+    """Porta un `Media` già acquisito fino alla `Recipe` normalizzata."""
     avvertenze: list[str] = []
     t = tabelle or load_tables()
 
@@ -233,19 +233,19 @@ def lavora(
         raise NonEUnaRicetta(testo(lingua, "non_una_ricetta", etichetta=media.label()))
 
     su_avanzamento("conversione", testo(lingua, "conversione"))
-    ricetta = da_bozza(
+    ricetta = from_draft(
         esito_estrazione.bozza,
-        fonte=Fonte.adesso(
+        source=Source.now(
             url=media.url,
-            autore=media.author,
-            piattaforma=media.platform,
-            titolo_originale=media.title,
+            author=media.author,
+            platform=media.platform,
+            original_title=media.title,
         ),
-        immagini=_copertina(media),
-        trascrizione=testo_trascrizione or None,
-        tabelle=t,
-        lingua=lingua,
-        sistema=sistema,
+        images=_copertina(media),
+        transcript=testo_trascrizione or None,
+        tables=t,
+        language=lingua,
+        system=sistema,
     )
 
     if not media.caption.strip():
@@ -253,7 +253,7 @@ def lavora(
     if not testo_trascrizione.strip():
         avvertenze.append(testo(lingua, "solo_didascalia"))
 
-    su_avanzamento("fatto", testo(lingua, "pronta", titolo=ricetta.titolo))
+    su_avanzamento("fatto", testo(lingua, "pronta", titolo=ricetta.title))
     return Esito(
         ricetta=ricetta,
         media=media,

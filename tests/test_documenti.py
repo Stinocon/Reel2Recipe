@@ -18,7 +18,7 @@ from reel2recipe.documenti import (
     scrivi_pdf,
     verso_markdown,
 )
-from reel2recipe.recipe import Fonte, Ricetta, da_bozza, percorso_libero
+from reel2recipe.recipe import Source, Recipe, from_draft, free_path
 
 BOZZA = {
     "titolo": "Tiramisù al pistacchio",
@@ -38,15 +38,15 @@ BOZZA = {
 
 
 @pytest.fixture
-def ricetta() -> Ricetta:
-    return da_bozza(BOZZA, fonte=Fonte.adesso(
-        url="https://www.instagram.com/reel/ABC123/", autore="cucina_test",
+def ricetta() -> Recipe:
+    return from_draft(BOZZA, source=Source.now(
+        url="https://www.instagram.com/reel/ABC123/", author="cucina_test",
     ))
 
 
 @pytest.fixture
-def semplice() -> Ricetta:
-    return da_bozza(
+def semplice() -> Recipe:
+    return from_draft(
         {"titolo": "Pasta al burro",
          "ingredienti": [{"quantita_raw": "100", "unita_raw": "g", "nome": "burro"}],
          "procedimento": ["Sciogli il burro."], "confidenza": {}, "lacune": []},
@@ -176,16 +176,16 @@ def test_xml_sicuro_protegge_i_paragrafi():
 
 
 def test_percorso_libero_non_calpesta_un_export_precedente(tmp_path):
-    primo = percorso_libero(tmp_path, "ricetta", ".md")
+    primo = free_path(tmp_path, "ricetta", ".md")
     primo.write_text("primo", encoding="utf-8")
-    secondo = percorso_libero(tmp_path, "ricetta", ".md")
+    secondo = free_path(tmp_path, "ricetta", ".md")
     assert secondo.name == "ricetta-2.md"
     assert primo.read_text(encoding="utf-8") == "primo"
 
 
 def test_nome_file_e_leggibile_e_sicuro():
-    assert da_bozza({"titolo": "Tiramisù al pistacchio!", "ingredienti": [],
-                     "procedimento": [], "confidenza": {}, "lacune": []}).nome_file() \
+    assert from_draft({"titolo": "Tiramisù al pistacchio!", "ingredienti": [],
+                     "procedimento": [], "confidenza": {}, "lacune": []}).file_name() \
         == "tiramisu-al-pistacchio"
 
 
@@ -197,13 +197,13 @@ def test_export_in_inglese_traduce_l_involucro(tmp_path):
     le intestazioni.
     """
     from reel2recipe.units import Language, System
-    r = da_bozza(
+    r = from_draft(
         {"titolo": "Pancakes",
          "ingredienti": [{"quantita_raw": "1", "unita_raw": "cup", "nome": "flour"}],
          "procedimento": ["Mix everything."], "confidenza": {},
          "lacune": ["the reel did not say how many eggs"]},
-        fonte=Fonte.adesso(url="https://x/y", autore="baker"),
-        lingua=Language.EN, sistema=System.IMPERIAL,
+        source=Source.now(url="https://x/y", author="baker"),
+        language=Language.EN, system=System.IMPERIAL,
     )
     md = verso_markdown(r)
     assert "## Ingredients" in md and "## Method" in md

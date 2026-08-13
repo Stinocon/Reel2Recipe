@@ -30,50 +30,70 @@ is mandatory.
 3. `./check.sh` green **before** moving to the next module. Never leave a half-renamed tree.
 4. Follow the order below, and update it when working on it teaches you something.
 
-### Order — revised after the first four modules
+### Order — revised after the first four modules, and again after the two hard ones
 
-The first version of this list said "leaves first, core last", and that is right for *risk*
-but wrong for *churn*: every module that touches `Recipe` has to be opened twice, once for
-its own identifiers and again when `recipe.py`'s fields are renamed. Converting `units.py`
-and `recipe.py` **before** their consumers avoids the second pass.
+The first version of this list said "leaves first, core last", which is right for *risk* and
+wrong for *churn*: every module that touches `Recipe` would have been opened twice, once for
+its own identifiers and again when `recipe.py`'s fields moved. Doing `units.py` and
+`recipe.py` **before** their consumers avoided that second pass, and it worked — the
+consumers came out of those two commits already updated as callers.
 
-The two are not swapped blindly, though. `units.py` is the conversion engine — the most
-delicate code in the project (`AGENTS.md §3`) — and it is 1270 lines. It wants a session
-that starts on it, not the tail of one that has been doing something else all day.
+The one prediction that did not survive is the estimate of where the difficulty sits.
+`units.py` was billed as the dangerous one because it is the conversion engine and 1270 lines;
+it was in fact mechanical, and a 131k-case differential run against the old module found zero
+differences. `recipe.py` is a third of the size and was the one that drew blood, because its
+field names are also the JSON keys on disk and the *format boundary* runs through the middle
+of it. **Size predicts effort; contact with stored data predicts risk.** They are not the same
+axis, and the second one is what to plan around.
 
 1. **Done:** `asr.py` (the reference for how prose is handled), `percorsi.py` → `paths.py`,
-   `audio.py`, `acquire.py` — all leaves — `store.py`, whose SQL schema and listing keys
-   stay Italian as *format* (the reason is in its docstring), and `units.py`, the engine.
-2. **Next, on a fresh session:** `recipe.py`. Everything downstream depends on the names it
-   settles, and it is where the compatibility net for `from_dict` goes in, in the same commit
-   as the field renames.
-3. **Then, once each:** `mela.py`, `documenti.py` → `documents.py`, `extract.py`,
+   `audio.py`, `acquire.py` — all leaves — `store.py`, whose SQL schema stays Italian as
+   *format* (the reason is in its docstring), `units.py`, the engine, and `recipe.py`, the
+   model — the last together with `web/app.js` and `Library.list_`'s output keys, which read
+   its fields and could not be left a commit behind.
+2. **Next, once each:** `mela.py`, `documenti.py` → `documents.py`, `extract.py`,
    `pipeline.py`, `api.py`, `cli.py` (internals only — its public surface is already
-   English). Every one of these reads `Recipe`'s fields, which is why they come after it and
-   not before: converting one now buys a second pass over the same file for nothing.
-4. **Last:** `web/app.js` in the same commit as the `Recipe` field renames it reads, then
-   the `data/*.yaml` keys with their loader, then `docs/`.
+   English). All of these were updated as *callers* when `units.py` and `recipe.py` moved;
+   what is left is their own identifiers and prose.
+3. **Last:** the `data/*.yaml` keys with their loader, then the test modules' own prose (see
+   below), then `docs/`.
 
-### What `units.py` confirmed, and what `recipe.py` still owes
+### What the two hard modules taught
 
-The aborted attempt predicted three things. Two are spent — the `MESSAGES` keys and the three
-colliding `note`s were both mapped up front and cost nothing. The third is the one that
-matters for the module that comes next, and it is now **verified rather than inferred**:
+The aborted attempt at `units.py` predicted three things. Two were spent immediately — the
+`MESSAGES` keys and the three colliding `note`s were mapped up front and cost nothing. The
+third turned out to be the axis the whole `recipe.py` step turned on, and it held exactly:
 
 **The JSON keys and the Python attributes are decoupled in one half and welded in the other.**
 `Recipe.to_dict()` builds the ingredient and quantity dictionaries with **string literals**
 (`"nome"`, `"quantita"`, `"valore"`), so `Quantity` and `Ingredient` were renamed in full
-without touching a single stored recipe — a round-trip over `to_dict`/`from_dict` after the
-rename still produces the Italian keys, byte for byte. But the top level starts from
-`asdict(self)`, so **`Recipe`'s own fields map straight onto JSON keys** — renaming `titolo`
-really does rename it on disk. The compatibility net in `from_dict` is needed for the top
-level only; the nested objects needed nothing, and got nothing.
+without touching a single stored recipe. But the top level starts from `asdict(self)`, so
+**`Recipe`'s own fields map straight onto JSON keys** — renaming `titolo` really does rename it
+on disk. So the net went in exactly where it was needed and nowhere else: `stored_field` reads
+both spellings at the top level, the nested objects got nothing, and the split is now covered
+by three tests in `tests/test_store.py` built on a hand-written pre-migration recipe.
 
-One thing the migration of `units.py` added to the method: **rewriting a module is also the
-closest reading it will ever get.** The pass turned up a line in `_key` that claimed to
-normalise apostrophes and replaced the ASCII one with itself — with a real consequence on the
-output, since the curly apostrophe is what iOS keyboards and Instagram captions write. It went
-into its own commit *before* the rename, so that the translation commit changed no behaviour.
+Two things the field rename cost that the module rename did not, both worth knowing before
+`extract.py`:
+
+**A blanket regex over identifiers will hit prose and SQL, and the tests will not tell you.**
+`\bRicetta\b → Recipe` silently rewrote four user-facing Italian strings — `"Ricetta non
+trovata."`, the `"Fonte"` heading of every exported document, `"Ricetta di {autore}"` — and
+`\.titolo\b → .title` rewrote the column list of a `SELECT`. The suite stayed green for three
+of the four, because no test asserted on those strings. What caught them was reading the diff.
+Budget for that reading; it is not optional on a module whose identifiers are ordinary words.
+
+**A frontend with no toolchain needs a guard, not a review.** `app.js` reads the JSON by
+attribute, so `ricetta.titolo` against a renamed payload yields `undefined` and the card draws
+itself anyway, with an empty title — no error, nowhere. `tests/test_web.py` now compares the
+keys `app.js` reads against the keys `to_dict()` and `Library.list_` actually produce. Both
+guards were checked by breaking them on purpose, per the rule already in that file: a guard
+that has stopped firing is worse than no guard.
+
+And the method gained one rule from `units.py`: **rewriting a module is also the closest
+reading it will ever get.** That pass turned up a line in `_key` that claimed to normalise
+apostrophes and replaced the ASCII one with itself, with a real consequence on the output. It
+went into its own commit *before* the rename, so the translation commit changed no behaviour.
 Keep that split: a rename that also fixes something is a rename nobody can review.
 
 `extract.py` carries an obligation the others do not: it holds the system prompts and the
@@ -90,23 +110,43 @@ destructive migration this migration is avoiding.
 
 | stays as it is | where it lives |
 |---|---|
-| `"metrico"`, `"imperiale"` | `Sistema` values, `data/vaghe.yaml` and `unita.yaml` keys, stored recipes |
-| `"assente"`, `"dichiarato"`, `"convertito:unita"`, `"convertito:densita"`, `"conteggio"`, `"stimato:vaghe"`, `"indeterminato"` | `Provenienza` values, stored recipes, `web/app.js` |
+| `"metrico"`, `"imperiale"` | `System` values, `data/vaghe.yaml` and `unita.yaml` keys, stored recipes |
+| `"assente"`, `"dichiarato"`, `"convertito:unita"`, `"convertito:densita"`, `"conteggio"`, `"stimato:vaghe"`, `"indeterminato"` | `Provenance` values, stored recipes, `web/app.js` |
 | `quantita_raw`, `unita_raw` | the JSON schema the local model answers with (`extract.py`) — changing it means re-running the model gate |
 | `unita.yaml`, `densita.yaml`, `vaghe.yaml`, `ricette.db` | file names |
 | the keys inside `data/*.yaml` | renamed in their own step, together with their loader |
 | the SQL table and column names in `store.py` | written inside every database on disk; renaming them means `ALTER TABLE` over live data |
+| the **nested** keys of an ingredient and its quantity — `nome`, `note`, `gruppo`, `lacuna`, `riga`, `quantita`, and inside it `valore`, `valore_max`, `unita`, `provenienza`, `testo_originale`, `nota`, `sistema`, `incerta` | inside every stored recipe and read by `web/app.js`; `to_dict()` writes them as string literals, which is precisely what let `Ingredient` and `Quantity` be renamed for free |
+| the keys of the *draft* read by `from_draft` — `titolo`, `ingredienti`, `procedimento`, `porzioni`, `categorie`, `lacune`, `confidenza`, `descrizione`, `tempo_*_min` | the same JSON schema as `quantita_raw` above: it is `extract.py`'s output format, and it moves when `extract.py` does, with the model gate |
+
+One row that did **not** stay: the keys of the dictionary `Library.list_` returns. They looked
+like format and are not — nothing on disk is keyed that way, only `web/app.js` reads them — so
+they moved to English in the same commit as `Recipe`'s fields and the frontend. `store.py`'s
+docstring said so before the move; the SQL columns just above it are the part that is real
+format, and those did stay.
 
 The Python *names* around them change; the strings do not. Where a value is user-facing, add
 the English spelling as a synonym rather than replacing it — as the CLI does with `--porta`
 and `--lingua`.
 
-## The compatibility net, before any field rename
+## The compatibility net — in place, and permanent
 
-`Recipe.from_dict` must read **both** spellings, for good. The library stores each recipe as
-a JSON blob with the field names of the day, so an Italian-keyed recipe saved months ago has
-to keep loading. Old rows are rewritten in English only when that recipe is next saved —
-lazy, non-destructive, and with no moment where the library is half-migrated.
+`Recipe.from_dict` reads **both** spellings, for good. The library stores each recipe as a JSON
+blob with the field names of the day, so an Italian-keyed recipe saved months ago has to keep
+loading. Old rows are rewritten in English only when that recipe is next saved — lazy,
+non-destructive, and with no moment where the library is half migrated.
+
+It is **not** a transitional courtesy to be deleted once "everyone has migrated": there is no
+everyone, the library is one user's, and a row written once may sit untouched for years.
+
+The map lives in `recipe.py` as `LEGACY_KEYS`, read through `stored_field(d, name)`, and it is
+deliberately the only copy — `store.py` also reads the stored blob directly, without going
+through `from_dict`, to build the library listing, and a second copy of the map would diverge
+at the first field anyone adds. That second path is the one that fails quietly: not an
+exception, just a library of cards with no servings, no times and no cover. `Source` needed the
+net too, and more sharply: it used to be rebuilt with `Source(**d)`, and that splat would raise
+`TypeError` on every pre-migration recipe — while opening the library, which is the one
+operation that must never fail.
 
 ## Vocabulary
 
@@ -134,6 +174,8 @@ Decided once, used everywhere. Add a row rather than inventing a synonym.
 | `Errore…` | `…Error` (`ErroreTrascrizione` → `TranscriptionError`) |
 
 ### Recipe fields — these are also JSON keys
+
+Migrated, with `LEGACY_KEYS` reading the left column for good.
 
 | Italian | English |
 |---|---|
@@ -198,6 +240,13 @@ Decided once, used everywhere. Add a row rather than inventing a synonym.
 | `etichette` | `labels` |
 | `predefinito` | `default` |
 | `disponibili` | `available` |
+| `nome_file` | `file_name` |
+| `percorso_libero` | `free_path` |
+| `da_bozza` | `from_draft` |
+| `adesso` (costruttore) | `now` |
+| `n_ingredienti` | `n_ingredients` (chiave dell'elenco) |
+| `copertina` | `cover` (chiave dell'elenco) |
+| `creata_il` | `created_at` (chiave dell'elenco; la colonna SQL resta) |
 | `sigla` | `code_of` |
 | `testo_da` | `text_from` |
 | `conteggio` | `count` |
