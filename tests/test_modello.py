@@ -50,7 +50,7 @@ SENZA_DOSE = ("cipolla", "carote", "cavolo", "soia", "mirin", "dashi", "udon")
 
 
 def _senza_ollama() -> bool:
-    return not extract.ollama_attivo()
+    return not extract.ollama_up()
 
 
 pytestmark = [
@@ -65,12 +65,12 @@ pytestmark = [
 @pytest.fixture(scope="module")
 def bozza() -> dict:
     """Una sola estrazione per tutto il modulo: è la parte lenta."""
-    return extract.estrai_bozza(
-        didascalia=DIDASCALIA,
+    return extract.extract_draft(
+        caption=DIDASCALIA,
         transcript="",
-        titolo="Yaki Udon",
-        modello=os.environ.get("R2R_MODELLO"),
-    ).bozza
+        title="Yaki Udon",
+        model=os.environ.get("R2R_MODELLO"),
+    ).draft
 
 
 def _ingredienti_senza_dose(bozza: dict) -> list[dict]:
@@ -146,10 +146,10 @@ METHOD: Fry the pancetta, mix the eggs with pecorino, combine off the heat.
 
 @pytest.fixture(scope="module")
 def bozza_it_da_en() -> dict:
-    return extract.estrai_bozza(
-        didascalia=DIDASCALIA_EN, transcript="", titolo="Carbonara",
-        modello=os.environ.get("R2R_MODELLO"), language="it",
-    ).bozza
+    return extract.extract_draft(
+        caption=DIDASCALIA_EN, transcript="", title="Carbonara",
+        model=os.environ.get("R2R_MODELLO"), language="it",
+    ).draft
 
 
 def test_traduce_verso_l_italiano(bozza_it_da_en):
@@ -195,10 +195,10 @@ def ricetta_ambigua():
     """Una sola estrazione, portata fino in fondo alla catena: è il risultato che conta."""
     from reel2recipe.recipe import Source, from_draft
 
-    bozza = extract.estrai_bozza(
-        didascalia=DIDASCALIA_AMBIGUA, transcript="", titolo="Torta di mele",
-        modello=os.environ.get("R2R_MODELLO"),
-    ).bozza
+    bozza = extract.extract_draft(
+        caption=DIDASCALIA_AMBIGUA, transcript="", title="Torta di mele",
+        model=os.environ.get("R2R_MODELLO"),
+    ).draft
     return bozza, from_draft(bozza, source=Source.now(url=None, author="test"))
 
 
