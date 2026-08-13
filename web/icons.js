@@ -1,4 +1,4 @@
-// icone.js — le icone dell'interfaccia, incorporate.
+// icons.js — the interface icons, embedded.
 //
 // Sono le Material Symbols di Google (Outlined, 24 px), incluse qui come dati di tracciato
 // invece di essere caricate da un CDN: l'interfaccia deve funzionare **senza rete**, come
@@ -9,10 +9,10 @@
 // del repository: incorporarle non cambia la loro licenza.
 //
 // I nomi sono in italiano come il resto del codice; il commento sopra ogni voce riporta il
-// nome originale, per poter ritrovare l'icona nel catalogo (fonts.google.com/icons).
+// name originale, per poter ritrovare l'icon nel catalogo (fonts.google.com/icons).
 // Tutte condividono viewBox "0 -960 960 960", che è la convenzione delle Material Symbols.
 
-const TRACCIATI_ICONE = {
+const ICON_PATHS = {
   // skillet
   padella: 'M177-560q14-36 4.5-64T149-680q-33-40-43.5-75.5T102-840h78q-8 38-2.5 62t28.5 52q38 46 48.5 81.5t.5 84.5h-78Zm160 0q14-36 5-64t-32-56q-33-40-44-75.5t-4-84.5h78q-8 38-2.5 62t28.5 52q38 46 48.5 81.5t.5 84.5h-78Zm160 0q14-36 5-64t-32-56q-33-40-44-75.5t-4-84.5h78q-8 38-2.5 62t28.5 52q38 46 48.5 81.5t.5 84.5h-78ZM200-160q-50 0-85-35t-35-85v-200h561q5-34 27-59.5t54-36.5l185-62 25 76-185 62q-12 4-19.5 14.5T720-462v182q0 50-35 85t-85 35H200Zm0-80h400q17 0 28.5-11.5T640-280v-120H160v120q0 17 11.5 28.5T200-240Zm200-80Z',
   // download
@@ -57,21 +57,21 @@ const TRACCIATI_ICONE = {
   chiudi: 'm256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z',
 };
 
-// Un'icona come stringa SVG. `currentColor` fa sì che segua il colore del testo che la
+// Un'icon come stringa SVG. `currentColor` fa sì che segua il colore del testo che la
 // circonda, così non serve una variante per ogni contesto (chiaro, scuro, dentro un
 // bottone colorato). aria-hidden perché sono decorative: il significato sta nel testo
 // accanto, e uno screen reader che le leggesse aggiungerebbe solo rumore.
-export function icona(nome, dimensione = 20) {
-  const d = TRACCIATI_ICONE[nome];
+export function icon(name, size = 20) {
+  const d = ICON_PATHS[name];
   if (!d) return '';
-  return `<svg class="ic" width="${dimensione}" height="${dimensione}" viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true"><path d="${d}"/></svg>`;
+  return `<svg class="ic" width="${size}" height="${size}" viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true"><path d="${d}"/></svg>`;
 }
 
-// Riempie gli elementi statici di index.html marcati `data-icona="nome"`, con
-// `data-icona-dim` opzionale. Serve a non duplicare i tracciati fra HTML e JS: il markup
-// dichiara QUALE icona vuole, i dati stanno in un posto solo.
-export function riempiIcone(radice = document) {
-  for (const el of radice.querySelectorAll('[data-icona]')) {
-    el.innerHTML = icona(el.dataset.icona, Number(el.dataset.iconaDim) || 20);
+// Riempie gli elementi statici di index.html marcati `data-icon="name"`, con
+// `data-icon-size` opzionale. Serve a non duplicare i tracciati fra HTML e JS: il markup
+// dichiara QUALE icon vuole, i dati stanno in un posto solo.
+export function fillIcons(root = document) {
+  for (const el of root.querySelectorAll('[data-icon]')) {
+    el.innerHTML = icon(el.dataset.icon, Number(el.dataset.iconSize) || 20);
   }
 }

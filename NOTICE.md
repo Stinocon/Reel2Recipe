@@ -13,14 +13,14 @@ Le due categorie sotto sono distinte, e la differenza conta legalmente quanto pr
 
 | Cosa | Dove | Autore | Licenza |
 |---|---|---|---|
-| **Material Symbols**, tracciati delle icone (Outlined, 24 px, `viewBox 0 -960 960 960`), incorporati come dati di percorso SVG | `web/icone.js` (`TRACCIATI_ICONE`), la favicon in `web/index.html`, il marcatore delle lacune in `web/style.css` | Google | [Apache-2.0](https://github.com/google/material-design-icons/blob/master/LICENSE) |
+| **Material Symbols**, tracciati delle icone (Outlined, 24 px, `viewBox 0 -960 960 960`), incorporati come dati di percorso SVG | `web/icons.js` (`ICON_PATHS`), la favicon in `web/index.html`, il marcatore delle lacune in `web/style.css` | Google | [Apache-2.0](https://github.com/google/material-design-icons/blob/master/LICENSE) |
 
 Le icone sono **incorporate anziché caricate da un CDN** perché l'interfaccia deve funzionare
 senza rete, come tutto il resto del prodotto: nessuna richiesta a Google, né la prima volta né
 dopo. Incorporarle non cambia la loro licenza — l'attribuzione qui sopra viaggia con ogni
 copia di questo repository.
 
-Il nome originale di ogni icona è riportato nel commento sopra la sua voce in `web/icone.js`,
+Il nome originale di ogni icona è riportato nel commento sopra la sua voce in `web/icons.js`,
 così è ritrovabile nel catalogo su [fonts.google.com/icons](https://fonts.google.com/icons).
 
 ## 2. Strumenti che Reel2Recipe usa ma **non** include

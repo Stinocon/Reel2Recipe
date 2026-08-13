@@ -16,10 +16,10 @@
 
   <header class="intestazione">
     <div class="marchio">
-      <span class="marchio-icona" data-icona="padella" data-icona-dim="30"></span>
+      <span class="marchio-icona" data-icon="padella" data-icon-size="30"></span>
       <div>
         <h1>Reel2Recipe</h1>
-        <p class="sottotitolo" data-i18n="sottotitolo">Dai reel di cucina al tuo ricettario. Tutto sul tuo computer.</p>
+        <p class="sottotitolo" data-i18n="subtitle">Dai reel di cucina al tuo ricettario. Tutto sul tuo computer.</p>
       </div>
     </div>
     <div class="strumenti-testata">
@@ -32,9 +32,9 @@
         <option value="it">Italiano</option>
         <option value="en">English</option>
       </select>
-      <div class="stato-ambiente" id="stato-ambiente" data-i18n-title="stato_titolo">
+      <div class="stato-ambiente" id="stato-ambiente" data-i18n-title="status_title">
         <span class="pallino" id="pallino-stato"></span>
-        <span id="testo-stato" data-i18n="stato_verifica">verifica…</span>
+        <span id="testo-stato" data-i18n="status_checking">verifica…</span>
       </div>
     </div>
   </header>
@@ -53,7 +53,7 @@
         />
         <button id="btn-cook" class="btn-cook">
           <span class="btn-cook-testo" data-i18n="cook">Cook</span>
-          <span class="btn-cook-icona" data-icona="padella"></span>
+          <span class="btn-cook-icona" data-icon="padella"></span>
         </button>
       </div>
 
@@ -62,14 +62,14 @@
              l'input nascosto, e riscriverne il contenuto lo cancellerebbe. -->
         <label class="link-file" for="input-file">
           <input type="file" id="input-file" accept="video/*,audio/*" hidden />
-          <span data-i18n-html="trascina">oppure trascina qui un video, o <span class="sottolineato">scegli un file</span></span>
+          <span data-i18n-html="drop_hint">oppure trascina qui un video, o <span class="sottolineato">scegli un file</span></span>
         </label>
-        <button class="link-opzioni" id="btn-opzioni" type="button" data-i18n="opzioni_apri">Opzioni ▾</button>
+        <button class="link-opzioni" id="btn-opzioni" type="button" data-i18n="options_open">Opzioni ▾</button>
       </div>
 
       <div class="opzioni" id="opzioni" hidden>
         <label>
-          <span data-i18n="lbl_trascrizione">Trascrizione</span>
+          <span data-i18n="lbl_transcription">Trascrizione</span>
           <select id="opt-asr">
             <option value="auto" data-i18n="asr_auto">Automatica (consigliata)</option>
             <option value="mlx" data-i18n="asr_mlx">Accelerata (Mac Apple Silicon)</option>
@@ -77,31 +77,31 @@
           </select>
         </label>
         <label>
-          <span data-i18n="lbl_lingua_parlato">Lingua parlata nel reel</span>
+          <span data-i18n="lbl_spoken_language">Lingua parlata nel reel</span>
           <select id="opt-lingua-parlato">
-            <option value="" data-i18n="parlato_auto">Riconoscila da sé</option>
+            <option value="" data-i18n="spoken_auto">Riconoscila da sé</option>
             <option value="it">Italiano</option>
             <option value="en">English</option>
           </select>
         </label>
         <label>
-          <span data-i18n="lbl_modello">Modello di linguaggio</span>
-          <select id="opt-modello"><option value="" data-i18n="modello_migliore">Il migliore installato</option></select>
+          <span data-i18n="lbl_model">Modello di linguaggio</span>
+          <select id="opt-modello"><option value="" data-i18n="model_best">Il migliore installato</option></select>
         </label>
         <label>
-          <span data-i18n="lbl_lingua_ricetta">Lingua della ricetta</span>
+          <span data-i18n="lbl_recipe_language">Lingua della ricetta</span>
           <select id="opt-lingua">
-            <option value="" data-i18n="lingua_come_interfaccia">Come l'interfaccia</option>
+            <option value="" data-i18n="language_as_interface">Come l'interfaccia</option>
             <option value="it">Italiano</option>
             <option value="en">English</option>
           </select>
         </label>
         <label>
-          <span data-i18n="lbl_misure">Misure</span>
+          <span data-i18n="lbl_measures">Misure</span>
           <select id="opt-sistema">
-            <option value="" data-i18n="misure_come_lingua">Come la lingua</option>
-            <option value="metrico" data-i18n="misure_metriche">Metriche (g, ml)</option>
-            <option value="imperiale" data-i18n="misure_imperiali">Imperiali (cup, oz)</option>
+            <option value="" data-i18n="measures_as_language">Come la lingua</option>
+            <option value="metrico" data-i18n="measures_metric">Metriche (g, ml)</option>
+            <option value="imperiale" data-i18n="measures_imperial">Imperiali (cup, oz)</option>
           </select>
         </label>
         <label class="opt-check">
@@ -116,14 +116,14 @@
     <!-- ---------- Zona di rilascio file ---------- -->
     <div class="drop-overlay" id="drop-overlay" hidden>
       <div class="drop-messaggio">
-        <span data-icona="carica" data-icona-dim="40"></span><br /><span data-i18n="rilascia_qui">Rilascia qui il video del reel</span>
+        <span data-icon="carica" data-icon-size="40"></span><br /><span data-i18n="release_here">Rilascia qui il video del reel</span>
       </div>
     </div>
 
     <!-- ---------- Avanzamento ---------- -->
     <section class="pannello-avanzamento" id="pannello-avanzamento" hidden>
       <div class="fasi" id="fasi"></div>
-      <button class="btn-annulla" id="btn-annulla" hidden data-i18n="annulla">Annulla</button>
+      <button class="btn-annulla" id="btn-annulla" hidden data-i18n="cancel">Annulla</button>
     </section>
 
     <!-- ---------- Scheda ricetta ---------- -->
@@ -132,35 +132,35 @@
     <!-- ---------- Libreria ---------- -->
     <section class="libreria" id="libreria">
       <div class="libreria-testata">
-        <h2 data-i18n="libreria_titolo">Il tuo ricettario</h2>
+        <h2 data-i18n="library_title">Il tuo ricettario</h2>
         <div class="libreria-azioni">
-          <input type="search" id="input-cerca" class="cerca" data-i18n-placeholder="cerca_placeholder" />
-          <button class="btn-secondario" id="btn-export-tutte" data-i18n="esporta_tutto">Esporta tutto per Mela</button>
+          <input type="search" id="input-cerca" class="cerca" data-i18n-placeholder="search_placeholder" />
+          <button class="btn-secondario" id="btn-export-tutte" data-i18n="export_all">Esporta tutto per Mela</button>
         </div>
       </div>
       <div class="griglia-ricette" id="griglia-ricette"></div>
-      <p class="libreria-vuota" id="libreria-vuota" hidden data-i18n="libreria_vuota">
+      <p class="libreria-vuota" id="libreria-vuota" hidden data-i18n="library_empty">
         Il ricettario è vuoto. Incolla il link di un reel qui sopra e premi Cook per iniziare.
       </p>
     </section>
   </main>
 
   <footer class="pie-pagina">
-    <p data-i18n-html="pie_locale">
+    <p data-i18n-html="footer_local">
       Interamente locale · nessuna IA online · nessun dato lascia il computer ·
       esporta in <strong>Mela</strong>, PDF e Markdown
     </p>
-    <p class="pie-avvertenza" data-i18n-html="pie_avvertenza">
+    <p class="pie-avvertenza" data-i18n-html="footer_warning">
       Le quantità convertite vengono da tabelle verificate, ma l'estrazione è automatica:
       <strong>controlla la ricetta prima di cucinarla.</strong>
       Le lacune sono sempre dichiarate, mai riempite a caso.
     </p>
     <p class="pie-collegamenti">
-      <a href="https://github.com/Stinocon/Reel2Recipe" target="_blank" rel="noopener noreferrer" data-i18n="pie_codice">Codice sorgente</a>
+      <a href="https://github.com/Stinocon/Reel2Recipe" target="_blank" rel="noopener noreferrer" data-i18n="footer_code">Codice sorgente</a>
       ·
-      <a href="https://github.com/Stinocon/Reel2Recipe/blob/main/docs/condizioni-uso.md" target="_blank" rel="noopener noreferrer" data-i18n="pie_condizioni">Condizioni d'uso</a>
+      <a href="https://github.com/Stinocon/Reel2Recipe/blob/main/docs/condizioni-uso.md" target="_blank" rel="noopener noreferrer" data-i18n="footer_terms">Condizioni d'uso</a>
       ·
-      <a href="https://github.com/Stinocon/Reel2Recipe/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" data-i18n="pie_licenza">Licenza MIT</a>
+      <a href="https://github.com/Stinocon/Reel2Recipe/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" data-i18n="footer_licence">Licenza MIT</a>
     </p>
   </footer>
 

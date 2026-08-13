@@ -42,7 +42,7 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* Le icone dell'interfaccia (Material Symbols incorporate, v. icone.js e NOTICE.md).
+/* Le icone dell'interfaccia (Material Symbols incorporate, v. icons.js e NOTICE.md).
    `currentColor` nel loro fill fa il resto: seguono il colore del testo che le circonda,
    quindi non serve una variante per ogni contesto. `display: block` toglie lo spazio che
    il browser riserva sotto un elemento inline, che le disallineerebbe dal testo. */

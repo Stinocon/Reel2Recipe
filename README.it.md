@@ -335,7 +335,7 @@ src/reel2recipe/     il codice
 data/                le tabelle di conversione (leggibili e modificabili)
 web/                 l'interfaccia (HTML/CSS/JS, senza build)
   i18n.js            le parole dell'interfaccia, in italiano e in inglese
-  icone.js           le icone SVG, incorporate (nessun CDN)
+  icons.js           le icone SVG, incorporate (nessun CDN)
 tools/               script di supporto (avvio di Ollama e dell'interfaccia, guard di confine)
 docs/                documentazione, in italiano (architettura, aspetti legali)
 tests/               i test
