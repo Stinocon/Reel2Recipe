@@ -343,12 +343,38 @@ web/                 the interface (HTML/CSS/JS, no build step)
   i18n.js            the interface's words, in Italian and English
   icons.js           the SVG icons, embedded (no CDN)
 tools/               support scripts (starting Ollama and the interface, boundary guards)
-docs/                documentation, in Italian (architecture, legal matters)
+docs/                documentation: architecture in English, the two legal notes in Italian
 tests/               the tests
 workspace/           your data — never shared (in .gitignore)
 ```
 
 Technical documentation: [`docs/architecture.md`](docs/architecture.md).
+
+### If you are reading the code
+
+**The codebase is in English** — identifiers, comments, tests, the build scripts and the
+architecture document. The Italian you will still meet is deliberate, and it falls into four
+groups:
+
+- **Format that already exists on disk.** The SQL column names in `store.py`, the nested keys
+  of a stored recipe (`nome`, `quantita`, `provenienza`), the values of `Provenance` and
+  `System` (`dichiarato`, `metrico`). Renaming them would mean migrating every user's library.
+  `Recipe.from_dict` reads both spellings for exactly this reason.
+- **The contract with the local model.** `extract.py`'s system prompts, its JSON schema and the
+  delimiters that fence off untrusted input. They were tuned against a real model on real
+  reels, and they move only together with a re-run of the model gate.
+- **Kitchen vocabulary, which is data.** Unit names (`cucchiaio`), ingredient names
+  (`farina 00`) and the eyeball measures (`q.b.`) in `data/*.yaml`. These are what the model
+  writes and what the lookup matches against; the English aliases sit next to them
+  (`all-purpose flour`, `a pinch`). The same goes for the patterns in
+  `tools/check-injection.sh`, which detect prompt-injection attempts written in Italian.
+- **The external surface, kept for compatibility.** The URL paths, the export's `?formato=`,
+  and the CLI's Italian option aliases (`--porta`, `--lingua`, `elimina`) — the Home Assistant
+  add-on's start-up line depends on the last of these.
+
+[`docs/naming.md`](docs/naming.md) is the map: what moved, what did not, and why. It also
+records the four defects the migration produced and the guards added to catch their kind —
+worth ten minutes before a large rename in this repo.
 
 ---
 
