@@ -11,7 +11,7 @@ Home Assistant — finding nobody listening on the Ingress — answered "502 Bad
 the add-on's log:
 
     r2r: error: unrecognized arguments: --ollama http://127.0.0.1:11434
-    WARNING: L'interfaccia si è fermata (codice 2). Fermo l'addon.
+    WARNING: The interface stopped (code 2). Halting the add-on.
 
 These tests hold that line still.
 """
@@ -28,7 +28,7 @@ ADDON_INVOCATION = [
     "--ollama", "http://127.0.0.1:11434",
     "serve",
     "--host", "0.0.0.0",
-    "--porta", "8500",
+    "--port", "8500",
 ]
 
 
@@ -132,9 +132,12 @@ def test_batch_accepts_the_same_option():
     (["serve", "--porta", "9000"], ["serve", "--port", "9000"], "port"),
 ])
 def test_the_italian_names_stay_accepted(old, new, value):
-    """The option names have moved to English, but the old ones have to keep working:
-    `--porta` appears in the line the add-on starts the server with, and that line lives in
-    another repository which would notice nothing until the 502."""
+    """The option names have moved to English, but the old ones have to keep working.
+
+    The add-on's start-up line uses `--port` now, so this is no longer the thing standing
+    between a rename and a 502 — `ADDON_INVOCATION` above is. What is left is a promise to
+    anybody with the Italian spelling in a script or in their shell history, and it costs one
+    `aliases=` per option to keep."""
     assert getattr(_parser().parse_args(old), value) == \
            getattr(_parser().parse_args(new), value)
 

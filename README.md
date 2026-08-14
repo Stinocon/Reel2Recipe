@@ -369,9 +369,10 @@ groups:
   (`all-purpose flour`, `a pinch`). The same goes for the patterns in
   `tools/check-injection.sh`, which detect prompt-injection attempts written in Italian.
 - **The CLI's Italian option aliases**, kept as *synonyms* rather than as the only spelling
-  (`--porta`, `--lingua`, `elimina`) — the Home Assistant add-on's start-up line depends on
-  them. The URL paths and query parameters used to be in this group and are not any more: the
-  only client is `web/app.js`, which ships in the same commit.
+  (`--porta`, `--lingua`, `elimina`), for anybody who has them in a script or in their shell
+  history. The URL paths and query parameters used to be in this group and are not any more:
+  the only client is `web/app.js`, which ships in the same commit. Nor does the add-on depend
+  on them any longer — its start-up line uses `--port`.
 
 [`docs/naming.md`](docs/naming.md) is the map: what moved, what did not, and why. It also
 records the four defects the migration produced and the guards added to catch their kind —
