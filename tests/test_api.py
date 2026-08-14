@@ -181,16 +181,16 @@ def test_an_explicitly_asked_system_wins():
 
 
 def test_translated_errors(client):
-    """`lingua_ui` and not `language`: on `/api/cook` the latter already exists and means
+    """`ui_language` and not `language`: on `/api/cook` the latter already exists and means
     something else — which language to produce the recipe in. Calling them the same would have
     tied the buttons' language to the content's without anybody deciding it."""
-    assert client.get("/api/export?lingua_ui=en").json()["detail"] == "The library is empty."
-    assert client.get("/api/export?lingua_ui=it").json()["detail"] == "Libreria vuota."
-    assert client.get("/api/ricette/999?lingua_ui=en").json()["detail"] == "Recipe not found."
+    assert client.get("/api/export?ui_language=en").json()["detail"] == "The library is empty."
+    assert client.get("/api/export?ui_language=it").json()["detail"] == "Libreria vuota."
+    assert client.get("/api/recipes/999?ui_language=en").json()["detail"] == "Recipe not found."
 
 
 def test_errors_in_italian_when_nothing_is_stated(client):
-    """Without `lingua_ui` it falls back to Italian, the language the project is written in: a
+    """Without `ui_language` it falls back to Italian, the language the project is written in: a
     fallback has to be a real language, not a raw key."""
     assert client.get("/api/export").json()["detail"] == "Libreria vuota."
 
@@ -198,7 +198,7 @@ def test_errors_in_italian_when_nothing_is_stated(client):
 def test_an_unknown_language_does_not_make_the_message_vanish(client):
     """That is exactly what the fallback is for: better an Italian sentence inside output in
     another language than a `KeyError` in front of the user."""
-    assert client.get("/api/export?lingua_ui=de").json()["detail"] == "Libreria vuota."
+    assert client.get("/api/export?ui_language=de").json()["detail"] == "Libreria vuota."
 
 
 # --------------------------------------------------------------------------------------
@@ -206,12 +206,12 @@ def test_an_unknown_language_does_not_make_the_message_vanish(client):
 # --------------------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("formato, media_type, extension", [
+@pytest.mark.parametrize("fmt, media_type, extension", [
     ("mela", "application/json", ".melarecipe"),
     ("markdown", "text/markdown", ".md"),
     ("pdf", "application/pdf", ".pdf"),
 ])
-def test_the_export_honours_the_format_asked_for(client, formato, media_type, extension):
+def test_the_export_honours_the_format_asked_for(client, fmt, media_type, extension):
     """The query parameter has to actually reach the code that picks the format.
 
     No test covered it, and during the migration the parameter was renamed from `formato` to
@@ -220,12 +220,16 @@ def test_the_export_honours_the_format_asked_for(client, formato, media_type, ex
     the default and returned a `.melarecipe` labelled with the format that had been asked for.
     No error, a wrong file, and you only see it on opening it. Found by running the product,
     not the suite.
+
+    The query name is now `?format=` and, since it cannot be the Python parameter's name
+    without shadowing the builtin, it is pinned by an explicit `Query(alias="format")` rather
+    than by the spelling of a signature — which is the part that moved last time.
     """
-    if formato == "pdf":
+    if fmt == "pdf":
         pytest.importorskip("reportlab")
 
-    id = client.post("/api/ricette", json=_minimal_recipe()).json()["id"]
-    response = client.get(f"/api/ricette/{id}/export?formato={formato}")
+    id = client.post("/api/recipes", json=_minimal_recipe()).json()["id"]
+    response = client.get(f"/api/recipes/{id}/export?format={fmt}")
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith(media_type)
@@ -235,7 +239,7 @@ def test_the_export_honours_the_format_asked_for(client, formato, media_type, ex
 def test_an_unknown_format_does_not_become_a_mela(client):
     """The other way round: a format that does not exist has to say so, not fall back
     silently."""
-    id = client.post("/api/ricette", json=_minimal_recipe()).json()["id"]
-    response = client.get(f"/api/ricette/{id}/export?formato=sbagliato")
+    id = client.post("/api/recipes", json=_minimal_recipe()).json()["id"]
+    response = client.get(f"/api/recipes/{id}/export?format=wrong")
     assert response.status_code == 400
-    assert "sbagliato" in response.json()["detail"]
+    assert "wrong" in response.json()["detail"]

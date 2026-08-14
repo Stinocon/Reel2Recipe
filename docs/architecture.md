@@ -203,7 +203,7 @@ written by the page, the progress lines and the errors are written by Python and
 round trip before it could draw itself, with a flash of untranslated text on every load.
 
 The two sides follow different axes, though, and the difference is deliberate. The **page**
-follows the interface's language, which travels on every call as `lingua_ui` — a name distinct
+follows the interface's language, which travels on every call as `ui_language` — a name distinct
 from `language`, which on `/api/cook` already means something else: which language to *produce
 the recipe in*. The **progress and the warnings** follow the recipe's language instead, because
 they end up next to the `gaps`, which are saved inside the recipe in its language; letting them
@@ -220,7 +220,7 @@ was added the day something got past the suite, and each was verified by breakin
 
 The API calls start from the page's base (`document.baseURI`) and not from the site's root.
 Locally it is the same thing; under Home Assistant's Ingress it is not, because there the page
-lives behind a token prefix and an absolute `/api/stato` would land on Home Assistant's API
+lives behind a token prefix and an absolute `/api/status` would land on Home Assistant's API
 instead of ours. One line of difference, a failure that otherwise shows up only in production.
 
 ### 8. SQLite with full-text search for the library
@@ -246,7 +246,7 @@ frontend. The full reasoning is in [`naming.md`](naming.md).
 ### 9. Manual review is part of the flow, not a fallback
 
 The LLM proposes, the user corrects, and **only then** does it export. The interface allows the
-recipe to be edited before saving or exporting it; the API exposes `PUT /api/ricette/{id}` for
+recipe to be edited before saving or exporting it; the API exposes `PUT /api/recipes/{id}` for
 the same purpose. A local model of 7–14 billion parameters is wrong more often than a frontier
 one: giving the user the last word is not a patch, it is the right way to use a tool that
 assists without claiming to be infallible.

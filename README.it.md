@@ -353,9 +353,10 @@ architettura. L'italiano che resta è deliberato e sta in quattro gruppi: il **f
 scritto sul disco** (colonne SQL, chiavi annidate delle ricette salvate, valori di
 `Provenance` e `System`), il **contratto col modello locale** (prompt, schema e delimitatori
 di `extract.py`), il **vocabolario di cucina**, che è dato (`cucchiaio`, `farina 00`, `q.b.`,
-e i pattern che rilevano le injection scritte in italiano), e la **superficie esterna**
-tenuta per compatibilità (le URL, il `?formato=` dell'export, gli alias `--porta`, `--lingua`,
-`elimina`, da cui dipende la riga di avvio dell'add-on).
+e i pattern che rilevano le injection scritte in italiano), e gli **alias italiani della
+CLI**, tenuti come *sinonimi* e non come unica grafia (`--porta`, `--lingua`, `elimina`, da cui
+dipende la riga di avvio dell'add-on). Le URL e i parametri di query stavano in quest'ultimo
+gruppo e non ci stanno più: l'unico client è `web/app.js`, che viaggia nello stesso commit.
 
 [`docs/naming.md`](docs/naming.md) è la mappa: cosa si è spostato, cosa no, e perché.
 

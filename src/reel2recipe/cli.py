@@ -41,7 +41,7 @@ def _cli_progress(stage: str, message: str) -> None:
 
 
 # --------------------------------------------------------------------------------------
-# Comandi
+# Commands
 # --------------------------------------------------------------------------------------
 
 
@@ -204,7 +204,7 @@ def list_command(args) -> int:
         print(f"{_c(str(v['id']).rjust(4), '1')}  {v['title']}{mark}")
         if details:
             print(dim(f"      {details}"))
-    print(dim(f"\n{len(entries)} ricett{'a' if len(entries) == 1 else 'e'}."))
+    print(dim(f"\n{len(entries)} recipe{'' if len(entries) == 1 else 's'}."))
     return 0
 
 
@@ -292,7 +292,7 @@ def export_command(args) -> int:
                     if formato == "mela":
                         # Only Mela has a format for several recipes at once: a zip that imports
                         # in one go. Markdown and PDF are one file per recipe.
-                        path = write_melarecipes(recipes, destination / "libreria")
+                        path = write_melarecipes(recipes, destination / "library")
                         print(ok(f"✓ {len(recipes)} recipes in {path}"))
                     else:
                         for recipe in recipes:
@@ -456,7 +456,7 @@ def _parser() -> argparse.ArgumentParser:
     s = sub.add_parser("serve", help="start the web interface")
     s.add_argument("--host", default="127.0.0.1")
     # 8500 and not 8000: uvicorn's default port is almost always already taken by
-    # qualcos'altro sulla macchina di sviluppo.
+    # something else on a development machine.
     s.add_argument("--port", "--porta", dest="port", type=int, default=8500)
     s.set_defaults(func=serve_command)
 

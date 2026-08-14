@@ -37,20 +37,20 @@ let currentModel = '';
 // Utilities
 // ---------------------------------------------------------------------------
 
-function toast(message, errore = false) {
+function toast(message, isError = false) {
   // `element` and not `t`: `t` is now the imported translation function, and a local
   // variable by that name would make it invisible inside this function. It would not be
   // needed today, but the first line that did need it would fail in an unreadable way.
   const element = $('#toast');
   element.textContent = message;
-  element.classList.toggle('errore', errore);
+  element.classList.toggle('errore', isError);
   element.hidden = false;
   clearTimeout(element._timer);
   element._timer = setTimeout(() => (element.hidden = true), 3200);
 }
 
 // Under Home Assistant's Ingress the page is not served from the root but from behind a
-// token prefix (/api/hassio_ingress/<token>/). An absolute path like `/api/stato` would leave
+// token prefix (/api/hassio_ingress/<token>/). An absolute path like `/api/status` would leave
 // the prefix and land on Home Assistant's API, not ours. Every call therefore starts from the
 // page's base, which locally is simply `/`. `new URL('.', …)` and not a hand-made cut of the
 // last segment: that one trips over a query string, which would end up inside the prefix of
@@ -65,17 +65,17 @@ const BASE = new URL('.', document.baseURI).href;
 const address = (path) => BASE + path.replace(/^\//, '');
 
 // The interface's language travels with every call, so the server's errors arrive in the
-// right language too. It is called `lingua_ui` and not `language` on purpose: `/api/cook`
+// right language too. It is called `ui_language` and not `language` on purpose: `/api/cook`
 // already has a `language` meaning something else — which language to produce the recipe in.
 // Endpoints with no use for it ignore it.
 function withUILanguage(path) {
   const url = new URL(address(path));
-  url.searchParams.set('lingua_ui', currentLanguage());
+  url.searchParams.set('ui_language', currentLanguage());
   return url.href;
 }
 
-async function api(path, opzioni = {}) {
-  const response = await fetch(withUILanguage(path), opzioni);
+async function api(path, options = {}) {
+  const response = await fetch(withUILanguage(path), options);
   if (!response.ok) {
     let detail = t('http_error', { status: response.status });
     try { detail = (await response.json()).detail || detail; } catch {}
@@ -90,7 +90,7 @@ async function api(path, opzioni = {}) {
 
 async function refreshStatus() {
   try {
-    const s = await api('/api/stato');
+    const s = await api('/api/status');
     const dot = $('#pallino-stato');
     const label = $('#testo-stato');
 
@@ -102,7 +102,7 @@ async function refreshStatus() {
 
     if (!s.ready) {
       dot.className = 'pallino ko';
-      label.textContent = t(s.ollama_up ? 'stato_nessun_modello' : 'stato_ollama_spento');
+      label.textContent = t(s.ollama_up ? 'status_no_model' : 'status_ollama_down');
       // The message does not assume it is running on a development machine: inside the Home
       // Assistant add-on there is no shell to type `ollama pull` into, and the add-on
       // downloads the model itself — saying "run" there is advice that cannot be followed.
@@ -157,8 +157,8 @@ function chosenOptions() {
 // only fallback rule.
 function optionsQuery() {
   const q = new URLSearchParams();
-  for (const [key, valore] of Object.entries(chosenOptions())) {
-    if (valore !== null && valore !== '') q.set(key, valore);
+  for (const [key, value] of Object.entries(chosenOptions())) {
+    if (value !== null && value !== '') q.set(key, value);
   }
   return q.toString();
 }
@@ -196,7 +196,7 @@ async function cookFromFile(file) {
 }
 
 function followJob(job) {
-  const source = new EventSource(withUILanguage(`/api/cook/${job}/eventi`));
+  const source = new EventSource(withUILanguage(`/api/cook/${job}/events`));
   source.onmessage = (ev) => {
     const payload = JSON.parse(ev.data);
     if (payload.kind === "progress") {
@@ -275,10 +275,10 @@ function endUI() {
 // The recipe card
 // ---------------------------------------------------------------------------
 
-function showRecipe(recipe, warnings = [], modello = '', scorri = true) {
+function showRecipe(recipe, warnings = [], model = '', scroll = true) {
   currentRecipe = recipe;
   currentWarnings = warnings;
-  currentModel = modello;
+  currentModel = model;
   const card = $('#scheda-ricetta');
 
   // The card's headings follow the language **of the recipe**, not of the page: the same
@@ -300,7 +300,7 @@ function showRecipe(recipe, warnings = [], modello = '', scorri = true) {
     ${cover}
     <div class="scheda-corpo">
       <h2 class="scheda-titolo">${esc(recipe.title)}</h2>
-      <div class="scheda-meta">${meta.join('')}${modello ? `<span class="badge-fonte">${icon('modello', 16)} ${esc(modello)}</span>` : ''}</div>
+      <div class="scheda-meta">${meta.join('')}${model ? `<span class="badge-fonte">${icon('modello', 16)} ${esc(model)}</span>` : ''}</div>
       ${warnings?.length ? `<div class="avviso-incertezze"><strong>${esc(t('card_note', {}, lr))}</strong> ${warnings.map(esc).join(' ')}</div>` : ''}
       <h3 class="sezione-titolo">${esc(t('card_ingredients', {}, lr))}</h3>
       ${renderIngredients(recipe, lr)}
@@ -362,7 +362,7 @@ function renderGaps(recipe, lr) {
 
 async function saveCurrentRecipe() {
   try {
-    const { id } = await api('/api/ricette', {
+    const { id } = await api('/api/recipes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(currentRecipe),
@@ -379,7 +379,7 @@ async function deleteCurrentRecipe() {
   // undone. The title in the message stops the wrong recipe being deleted.
   if (!confirm(t('confirm_delete', { title: currentRecipe.title }))) return;
   try {
-    await api(`/api/ricette/${currentRecipe.id}`, { method: 'DELETE' });
+    await api(`/api/recipes/${currentRecipe.id}`, { method: 'DELETE' });
     $('#scheda-ricetta').hidden = true;
     currentRecipe = null;
     toast(t('toast_deleted'));
@@ -387,11 +387,11 @@ async function deleteCurrentRecipe() {
   } catch (e) { toast(e.message, true); }
 }
 
-async function exportCurrentRecipe(formato = 'mela') {
+async function exportCurrentRecipe(format = 'mela') {
   // A recipe is downloaded only once it is in the recipe book: the export starts from the
   // database, not from what is on screen.
   if (!currentRecipe.id) await saveCurrentRecipe();
-  window.location.href = address(`/api/ricette/${currentRecipe.id}/export?formato=${formato}`);
+  window.location.href = address(`/api/recipes/${currentRecipe.id}/export?format=${format}`);
 }
 
 function openEditor(recipe) {
@@ -464,7 +464,7 @@ function applyEdits(recipe) {
 
 async function loadLibrary(search = '') {
   try {
-    const entries = await api('/api/ricette' + (search ? `?search=${encodeURIComponent(search)}` : ''));
+    const entries = await api('/api/recipes' + (search ? `?search=${encodeURIComponent(search)}` : ''));
     const grid = $('#griglia-ricette');
     $('#libreria-vuota').hidden = entries.length > 0;
     $('#libreria-vuota').textContent = search
@@ -497,7 +497,7 @@ async function loadLibrary(search = '') {
 
 async function openFromLibrary(id) {
   try {
-    const recipe = await api(`/api/ricette/${id}`);
+    const recipe = await api(`/api/recipes/${id}`);
     showRecipe(recipe, [], '');
   } catch (e) { toast(e.message, true); }
 }
@@ -536,7 +536,7 @@ function wireUp() {
   $('#btn-opzioni').onclick = () => {
     const o = $('#opzioni');
     o.hidden = !o.hidden;
-    $('#btn-opzioni').textContent = t(o.hidden ? 'opzioni_apri' : 'opzioni_chiudi');
+    $('#btn-opzioni').textContent = t(o.hidden ? 'options_open' : 'options_close');
   };
 
   $('#input-file').onchange = (e) => { if (e.target.files[0]) cookFromFile(e.target.files[0]); };
@@ -572,7 +572,7 @@ wireUp();
 // recipe card is rebuilt only if one is on screen, and its headings stay in the recipe's
 // language: what changes is the buttons around it.
 onLanguageChange(() => {
-  $('#btn-opzioni').textContent = t($('#opzioni').hidden ? 'opzioni_apri' : 'opzioni_chiudi');
+  $('#btn-opzioni').textContent = t($('#opzioni').hidden ? 'options_open' : 'options_close');
   refreshStatus();
   loadLibrary($('#input-cerca').value.trim());
   if (currentRecipe && !$('#scheda-ricetta').hidden) {
