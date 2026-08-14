@@ -403,6 +403,55 @@ def test_every_custom_property_resolves():
     )
 
 
+def test_the_frontend_knows_every_stage_the_pipeline_emits():
+    """`app.js`'s STAGES table is a contract with `pipeline.STAGES`, and it said so in a
+    comment while nothing checked it.
+
+    A stage the server emits and the page does not know draws no row: the bar simply skips it,
+    and the user watches a step happen with nothing to show for it. The other direction is a
+    dead row that never lights up. Adding the translation stage is what made this worth
+    holding — it was the first new stage in a while, and it had to be added in three places at
+    once (`pipeline.STAGES`, the two Python catalogues, `app.js` and `i18n.js`).
+    """
+    from reel2recipe.pipeline import STAGES
+
+    declared = re.findall(r"^  (\w+): \{ icon", MODULES["app.js"], re.M)
+    assert declared, "no stage found in app.js: the guard has come unplugged"
+
+    assert set(declared) == set(STAGES), (
+        f"the page and the pipeline disagree about the stages. "
+        f"Only in pipeline.py: {sorted(set(STAGES) - set(declared))}. "
+        f"Only in app.js: {sorted(set(declared) - set(STAGES))}"
+    )
+
+
+def test_every_icon_asked_for_exists_in_the_catalogue():
+    """An icon name with no entry draws nothing, and nothing is what you see.
+
+    `icons.js` is looked up by key; a key that is not there yields no path data and the
+    element renders empty. No error, no console warning — the same silence as a misspelt class.
+
+    This guard exists because the rename of the icon names missed a whole shape. It caught
+    `icon('scarica')` and the `data-icon` attributes, and walked straight past
+    `{ icon: 'scarica', key: 'stage_acquisition' }` in the STAGES table — so **five of the six
+    icons on the progress bar were broken**, which is the one part of the interface the user
+    watches while waiting. So this looks at every form a name can take, not the one that was
+    convenient to grep for.
+    """
+    icons = MODULES["icons.js"]
+    defined = set(re.findall(r"^  ([a-z][\w-]*): '", icons, re.M))
+    used = (set(re.findall(r"\bicon\(\s*'([\w-]+)'", MODULES["app.js"]))
+            | set(re.findall(r"\bicon:\s*'([\w-]+)'", MODULES["app.js"]))
+            | set(re.findall(r'data-icon="([\w-]+)"', INDEX)))
+
+    assert defined, "no icon defined: the guard has come unplugged"
+    assert len(used) > 10, "the guard is reading almost no icon names: it has come unplugged"
+    assert not (used - defined), (
+        f"icons asked for and absent from the catalogue: {sorted(used - defined)}. "
+        f"The catalogue holds: {sorted(defined)}"
+    )
+
+
 def test_every_used_class_has_a_rule_in_the_stylesheet():
     """A misspelt class raises nothing: the element draws itself unstyled.
 

@@ -20,6 +20,9 @@ that holds.
                  extract  (local LLM through Ollama, output constrained to a JSON schema)
                      │
                      ▼   RecipeDraft — RAW quantities, never converted by the model
+               translate  (second LLM call, ONLY when the material is not already in the
+                     │     requested language — and the amounts are not in its payload)
+                     ▼   RecipeDraft, its words in the requested language
                   units    ← data/unita.yaml + densita.yaml + vaghe.yaml (language × system)
                      │
                      ▼   Recipe — metric quantities + provenance + gaps
@@ -52,6 +55,20 @@ remembering rather than calculating. So:
 Every quantity carries its **provenance** (`declared`, `converted:density`,
 `estimated:vague`, `indeterminate`, …), which the interface and the exports use to tell data
 from an estimate at a glance.
+
+**The same rule, one level up: the model handles words, the code handles numbers.** When a
+recipe has to come out in a language the material is not in, the translation is a **second
+call** whose payload contains the text and nothing else — `quantity_raw` and `unit_raw` are
+not in it. An amount cannot be reworded, rounded or converted on its way through a call it
+never enters. It is the difference between asking the model to leave the numbers alone and
+not giving it the numbers, and only the second one is a guarantee.
+
+Whether that call happens at all is decided **in code**, from the material: `language_of()`
+counts function words — `della`, `con`, `the`, `with`, the ones that cannot belong to the
+other language — and if the material is already in the language that was asked for, there is
+no translation step and no second call. The content words are deliberately not counted:
+`pasta`, `pancetta`, `pesto` and half a kitchen's vocabulary are the same in both, and
+counting those would call an English recipe Italian on the strength of its ingredients.
 
 **The golden rule: invent nothing.** It holds for the model and for the code, and not only for
 quantities. If a weight, a time or a step cannot be deduced from the material, it is not filled
@@ -139,6 +156,17 @@ prompt and schema. Now `tests/test_modello.py` covers them, with **synthetic** c
 reproduce the patterns without bringing third-party material into the repo. This is not theory:
 the fourth variant — "q.b." landing in the `note` — was found by that suite on its first run,
 not by a reel.
+
+**A gate answers yes or no; some questions need a number.** `tools/benchmark-translation.py`
+runs the same synthetic captions through every language combination and prints how many terms
+changed language, whether the groups survived, and whether the amounts stayed put. It is not on
+`check.sh`'s path — it does not pass or fail — and it is what to run before and after touching
+the prompts, the translation pass or the default model.
+
+Its own history is the argument for it. Its first version scored 100% in both directions and so
+measured a problem that was not there: it used rich prose, and the failure only appears on
+**list-shaped** captions. Adding one such caption turned "the translation is unreliable" into
+0%, which is a thing that can be fixed and then shown fixed.
 
 ### 3. When the prompt and the schema contradict each other, the schema wins
 

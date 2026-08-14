@@ -72,6 +72,7 @@ const TEXTS = {
     stage_audio: 'Estrazione audio',
     stage_transcription: 'Trascrizione del parlato',
     stage_extraction: 'Ricostruzione della ricetta',
+    stage_translation: 'Traduzione dei testi',
     stage_conversion: 'Conversione delle quantità',
     stage_done: 'Pronta',
 
@@ -185,6 +186,7 @@ const TEXTS = {
     stage_audio: 'Extracting the audio',
     stage_transcription: 'Transcribing the speech',
     stage_extraction: 'Reconstructing the recipe',
+    stage_translation: 'Translating the text',
     stage_conversion: 'Converting the amounts',
     stage_done: 'Ready',
 

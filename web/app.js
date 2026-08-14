@@ -17,12 +17,16 @@ const $$ = (sel) => document.querySelectorAll(sel);
 // Each stage with its icon: the name says what is happening, the icon makes it recognisable
 // at a glance while the bar advances. The keys are the protocol with `pipeline.STAGES`.
 const STAGES = {
-  acquisition: { icon: 'scarica', key: 'stage_acquisition' },
+  acquisition: { icon: 'download', key: 'stage_acquisition' },
   audio: { icon: 'video', key: 'stage_audio' },
-  transcription: { icon: 'microfono', key: 'stage_transcription' },
-  extraction: { icon: 'modello', key: 'stage_extraction' },
-  conversion: { icon: 'bilancia', key: 'stage_conversion' },
-  done: { icon: 'fatto', key: 'stage_done' },
+  transcription: { icon: 'microphone', key: 'stage_transcription' },
+  extraction: { icon: 'model', key: 'stage_extraction' },
+  // The same icon as extraction, deliberately: it is the same local model doing the
+  // work, one call later. Adding a glyph would have meant inventing path data, and a
+  // misremembered path draws a wrong shape rather than failing.
+  translation: { icon: 'model', key: 'stage_translation' },
+  conversion: { icon: 'scales', key: 'stage_conversion' },
+  done: { icon: 'done', key: 'stage_done' },
 };
 
 const ESTIMATE_PROVENANCES = new Set(['estimated:vague', 'indeterminate', 'absent']);

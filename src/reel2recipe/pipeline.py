@@ -44,6 +44,7 @@ TEXTS: Catalogue = {
         "transcribing": "Trascrizione del parlato in corso…",
         "transcribed": "Trascritti {characters} caratteri ({backend}).",
         "reconstructing": "Il modello locale sta ricostruendo la ricetta…",
+        "translating": "Traduzione dei testi nella lingua della ricetta…",
         "author_comments": ("Trovati {how_many} commenti dell'autore: spesso contengono le "
                             "dosi mancanti."),
         "converting": "Conversione delle quantità con le tabelle…",
@@ -69,6 +70,7 @@ TEXTS: Catalogue = {
         "transcribing": "Transcribing the speech…",
         "transcribed": "Transcribed {characters} characters ({backend}).",
         "reconstructing": "The local model is reconstructing the recipe…",
+        "translating": "Translating the text into the recipe’s language…",
         "author_comments": ("Found {how_many} comments by the author: they often hold the "
                             "missing amounts."),
         "converting": "Converting the amounts with the tables…",
@@ -183,7 +185,8 @@ def _cover(media: acquire.Media) -> list[str]:
 # `web/app.js`, which matches them to draw the Cook bar: nothing on disk is keyed this way, so
 # they moved to English together with the frontend that reads them, exactly like the keys of
 # `Library.list_`. `cli.py` ignores the name and only prints the message.
-STAGES = ("acquisition", "audio", "transcription", "extraction", "conversion", "done")
+STAGES = ("acquisition", "audio", "transcription", "extraction", "translation",
+          "conversion", "done")
 
 
 def process(
@@ -239,9 +242,21 @@ def process(
     if not extraction.is_a_recipe:
         raise NotARecipe(text(language, "not_a_recipe", label=media.label()))
 
+    # The translation pass, and only when it is actually needed. The decision is made in code
+    # from the **material**, not by asking the model whether it followed its own instruction:
+    # an Italian reel asked for in Italian never reaches this line, which is the common case
+    # and the one that must not get slower.
+    draft = extraction.draft
+    if extract.needs_translation(f"{media.caption or ''}\n{transcript_text or ''}",
+                                 draft, code_of(language)):
+        on_progress("translation", text(language, "translating"))
+        draft = extract.translate_draft(
+            draft, language=code_of(language), model=llm_model, url=ollama_url,
+        )
+
     on_progress("conversion", text(language, "converting"))
     recipe = from_draft(
-        extraction.draft,
+        draft,
         source=Source.now(
             url=media.url,
             author=media.author,

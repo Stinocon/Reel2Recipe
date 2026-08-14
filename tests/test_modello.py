@@ -161,9 +161,12 @@ def test_it_recognises_the_groups_written_with_a_colon(draft):
 # The model's output language
 # ----------------------------------------------------------------------------------
 
-# Material in English, to check the translation towards Italian — the reliable direction. The
-# opposite direction (long IT input → EN output) is a known limit of qwen2.5:14b, which stays
-# anchored to Italian: that is the model's reliability, not the code's, and it is not gated.
+# Both directions are gated now. The one towards English used to be described here as "a known
+# limit of qwen2.5:14b, not the code's problem, not gated" — and that was half right. The model
+# does stay anchored to Italian, but only when it is asked to understand and translate in the
+# same call: on the list-shaped caption at the top of this file it translated **nothing**, and
+# on a richer one it translated everything. Once the translation became a pass of its own the
+# limit largely went away, which makes it the code's problem after all, and gateable.
 CAPTION_EN = """\
 Quick Carbonara!
 INGREDIENTS:
@@ -190,6 +193,63 @@ def test_it_translates_towards_italian(italian_draft_from_english):
                      for i in (italian_draft_from_english.get("ingredients") or []))
     # At least one clearly translated term: "eggs" -> "uova", "black pepper" -> "pepe".
     assert "uova" in names or "pepe" in names, f"names not translated into Italian: {names}"
+
+
+@pytest.fixture(scope="module")
+def english_recipe_from_the_italian_list() -> dict:
+    """The whole pipeline decision, not just the extraction: extract, then translate if the
+    material is not already in the language asked for — exactly what `pipeline.py` does."""
+    draft = extract.extract_draft(
+        caption=CAPTION, transcript="", title="Yaki Udon",
+        model=os.environ.get("R2R_MODELLO"), language="en",
+    ).draft
+    if extract.needs_translation(CAPTION, draft, "en"):
+        draft = extract.translate_draft(draft, language="en",
+                                        model=os.environ.get("R2R_MODELLO"))
+    return draft
+
+
+def test_it_translates_towards_english_on_a_list_shaped_caption(
+    english_recipe_from_the_italian_list,
+):
+    """The regression this gate exists for, and the harder direction.
+
+    `CAPTION` is short, list-shaped, and most of its ingredients carry no amount. Asked for in
+    English from a single call, qwen2.5:14b returned it entirely in Italian — names, group
+    headings and method alike, reproducibly. Not a degradation: nothing at all.
+
+    Measured before and after the split into two passes, on this same caption: 0% of the terms
+    translated, then 5 of 6. The one that still misses is a *mistranslation* and not a language
+    failure ("cavolo cappuccio" comes back as a different vegetable), which is the model's
+    knowledge and belongs in the honesty note in the README, not here.
+    """
+    draft = english_recipe_from_the_italian_list
+    names = " ".join((i.get("name") or "").lower() for i in (draft.get("ingredients") or []))
+    groups = " ".join((i.get("group") or "").lower() for i in (draft.get("ingredients") or []))
+    method = " ".join(str(s).lower() for s in (draft.get("method") or []))
+
+    assert "pork" in names, f"the names are still Italian: {names}"
+    assert "onion" in names or "carrot" in names, f"the names are still Italian: {names}"
+    assert "vegetable" in groups or "sauce" in groups, f"the groups are still Italian: {groups}"
+    # The method is the field that used to give it away most plainly.
+    assert " le " not in f" {method} " and " il " not in f" {method} ", (
+        f"the method is still Italian: {method}"
+    )
+
+
+def test_translating_leaves_the_stated_amount_alone(english_recipe_from_the_italian_list):
+    """The axis that must not move. The pork's 80 g are the only stated amount in `CAPTION`,
+    and they have to survive a translation untouched — which is why `quantity_raw` is not in
+    the translation call's payload at all (`tests/test_translation.py` holds that structurally;
+    this one holds the outcome against the real model)."""
+    draft = english_recipe_from_the_italian_list
+    pork = [i for i in _reading_something(draft)
+            if "pork" in (i.get("name") or "").lower() or "maiale" in (i.get("name") or "").lower()]
+    assert pork, "the pork has vanished from the extraction"
+
+    raw = f"{pork[0].get('quantity_raw') or ''} {pork[0].get('unit_raw') or ''}".lower()
+    assert "80" in raw, f"the stated amount did not survive the translation: {raw!r}"
+    assert not any(u in raw for u in ("oz", "cup", "lb")), f"the amount was converted: {raw!r}"
 
 
 # ----------------------------------------------------------------------------------

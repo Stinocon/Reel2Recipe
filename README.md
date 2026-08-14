@@ -47,7 +47,8 @@ The three are separate axes, described under
 [Language and measurement system](#language-and-measurement-system). Be aware of one honest
 limitation before you rely on it: translating **ingredient names** is the least reliable part
 of the whole chain — see [the note on limits](#honesty-about-the-limits). The numbers stay
-right; it is the words that slip.
+right; it is the words that slip, and where the model is unsure it now leaves the original
+word rather than guessing a similar ingredient.
 
 > **A note on this documentation.** This README and the add-on's are kept in English and
 > Italian, as two copies that move together. Everything else exists in one language only,
@@ -207,18 +208,34 @@ time, and that is the weakest part — see the note below.
 
 #### Honesty about the limits
 
-> Translating names and the method is the least reliable part, and the only
-> non-deterministic step in the whole path. On an **already Italian** source the quality is
-> very good. On an **English** source ingredient names go wrong with some regularity:
-> `berries` became "fragole" (strawberries), `flax seeds` became "semi di lecithia" (not a
-> word), `a pinch` became "una pizzetta". A **bilingual** caption makes it worse, because the
-> model draws on both languages: an English-German post produced "dinkel fette". **Towards
-> English**, from an entirely Italian text, `qwen2.5:14b` tends to stay anchored to Italian:
-> it translates the title but not always the list.
+> Translation is the only non-deterministic step in the whole path, and it is the least
+> reliable part. It got substantially better once it stopped being an instruction inside the
+> extraction call and became **a call of its own** — but "better" is not "solved", and what is
+> left is worth knowing before you rely on it.
+>
+> **What was fixed.** Asked to understand a reel and render it in another language in one go,
+> the model treated the language as all-or-nothing: on a caption written as prose it
+> translated everything, on a short **list-shaped** one it translated *nothing* — not the
+> names, not the group headings, not the method. Measured on such a caption: **0%** of the
+> terms translated. Split into two passes, the same caption scores **5 out of 6**, and the
+> group headings come through at 100%. Run `uv run python tools/benchmark-translation.py` to
+> see the numbers for yourself.
+>
+> **What is left, and it is the part to watch.** The model sometimes **substitutes** an
+> ingredient instead of translating it: `maiale` came back as "bacon", `cavolo cappuccio` as
+> "chinese broccoli". That is worse than leaving a word in Italian, because a foreign word is
+> visibly foreign while a confidently wrong ingredient is not — you would buy the wrong thing.
+> The translation prompt now forbids substitution outright and tells the model to **keep the
+> original word when it is unsure**, which is why you will occasionally see an Italian
+> ingredient inside an English recipe. That is the intended behaviour, not a failure.
+>
+> A **bilingual** caption is still the hardest case, because the model draws on both
+> languages: an English-German post produced "dinkel fette".
 >
 > In every one of these cases **the amounts stay correct**: the words slip, the numbers do
-> not. It is the reason conversion is not entrusted to the model, and why reviewing before
-> export is part of the flow rather than a fallback.
+> not — and now structurally so, because `quantity_raw` and `unit_raw` are not in the
+> translation call's payload at all. It is the reason conversion is not entrusted to the
+> model, and why reviewing before export is part of the flow rather than a fallback.
 
 ### Private reels
 
