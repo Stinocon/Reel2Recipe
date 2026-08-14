@@ -471,7 +471,21 @@ ingredients:
   avena:
     it: avena
     en: oats
-    alias: [fiocchi d'avena, rolled oats, oat flakes]
+    alias: [fiocchi d'avena, rolled oats, oat flakes, oats or spelt flakes]
+  farro:
+    it: fiocchi di farro
+    en: spelt flakes
+    # Added from a real reel: "spelt flakes" came back as "chicchi di segale" — rye, a
+    # different grain. Before the two-pass split it was worse, "fette di dinkel", which is
+    # not a phrase in any language.
+    alias: [farro, spelt, dinkel, spelt grain, fiocchi di spelta]
+  proteine in polvere:
+    it: proteine in polvere
+    en: protein powder
+    # "sciroppo proteico" — syrup — from the same reel. A powder and a syrup are not the same
+    # ingredient, and the amount that goes with each is not the same either.
+    alias: [polvere proteica, whey, proteine, vanilla protein powder,
+            proteine in polvere alla vaniglia, protein powder vanilla]
   couscous:
     it: couscous
     en: couscous

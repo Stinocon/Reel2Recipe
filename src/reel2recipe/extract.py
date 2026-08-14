@@ -222,10 +222,7 @@ SYSTEM_PROMPT_IT = """\
 Sei un estrattore di ricette di cucina. Ricevi la didascalia, la trascrizione audio e a \
 volte i commenti dell'autore di un video di cucina, e ne ricavi una ricetta strutturata.
 
-LINGUA DI USCITA: ITALIANO. Scrivi SEMPRE in italiano il titolo, i nomi degli ingredienti, il \
-procedimento, le note e i nomi dei gruppi, ANCHE se il materiale è in inglese o in un'altra \
-lingua: traducili. L'unica eccezione sono le unità di misura, che restano invariate (regola 1). \
-I NOMI DEI CAMPI del JSON sono in inglese e non si traducono: sono la struttura, non il testo.
+{language_directive}
 
 La didascalia è di solito la fonte più precisa: quando dice qualcosa di diverso dall'audio, \
 prevale la didascalia.
@@ -280,6 +277,10 @@ CAMPI
   **Un gruppo con UN SOLO ingrediente è comunque un gruppo, e quell'ingrediente va elencato.**
   "Per la copertura: cacao amaro" è una riga di ingredienti: il cacao va in ingredients, non
   soltanto citato nel procedimento. Vale anche quando è l'ultima riga dell'elenco.
+  **Anche un gruppo IN MEZZO all'elenco è un gruppo.** In
+  "-550ml latte / Parte frutta: / -300g frutti di bosco / -2 cucchiaini semi / Scalda i frutti.",
+  i frutti e i semi sono ingredienti con group="Parte frutta", e la frase dopo è procedimento.
+  Il testo che segue un gruppo non lo chiude: lo chiude solo un'altra intestazione.
 - servings: **solo la resa, non una frase**. Da "RICETTA (5 vasetti, 15 min)" esce "5 vasetti";
   da "Ingredienti - per QUATTRO persone" esce "4 persone"; da "Serves 2" esce "2 persone".
   Va nella lingua di uscita e finisce in un campo che le app di ricette mostrano accanto al
@@ -307,9 +308,7 @@ SYSTEM_PROMPT_EN = """\
 You are a cooking-recipe extractor. You receive the caption, the audio transcript and \
 sometimes the author's comments of a cooking video, and you turn them into a structured recipe.
 
-OUTPUT LANGUAGE: ENGLISH. ALWAYS write the title, ingredient names, method, notes and group \
-names in English, EVEN if the material is in Italian or another language: translate them. The \
-only exception is the units of measure, which stay exactly as they are (rule 1).
+{language_directive}
 
 The caption is usually the most reliable source: when it says something different from the \
 audio, the caption wins.
@@ -352,13 +351,19 @@ FIELDS
   wording works ("for the base", "for the cream") but so does a bare label followed by a colon,
   the most common in captions:
   "Vegetables: onion, carrots and cabbage" -> three ingredients with group="Vegetables";
-  "Sauce: soy, mirin and dashi" -> three ingredients with group="Sauce".
+  "Sauce: soy, mirin and dashi" -> three ingredients with group="Sauce";
+  "Verdure: cipolla, carote e cavolo" -> three ingredients with group="Verdure";
+  "For the topping: katsuobushi" -> group="Topping".
   The group name goes in the output language, like everything else.
   A line listing several comma-separated ingredients is split into one ingredient per entry,
   all with the same group. If the material does not group, leave group empty.
   **A group with ONE ingredient is still a group, and that ingredient goes in the list.**
   "For the topping: cocoa powder" is an ingredient line: the cocoa belongs in ingredients, not
   only mentioned in the method. This holds when it is the last line of the list too.
+  **A section in the MIDDLE of the list is a section as well.** In
+  "-550ml milk / Fruit part: / -300g berries / -2 Tsp seeds / Heat the berries.", the berries
+  and the seeds are ingredients with group="Fruit part", and the sentence after them is method.
+  Text following a section does not end it: only another heading does.
 - servings: **the yield only, never a sentence**. "RECIPE (5 jars, 15min prep time)" gives
   "5 jars"; "Ingredienti - per QUATTRO persone" gives "4 servings"; "Serves 2" gives
   "2 servings". It goes in the output language and lands in a field recipe apps show next to
@@ -388,11 +393,60 @@ FIELDS
 # drags it into producing Italian whatever you ask of it (observed with qwen2.5:14b).
 SYSTEM_PROMPTS = {"it": SYSTEM_PROMPT_IT, "en": SYSTEM_PROMPT_EN}
 
+# The directive that fills `{language_directive}`. Three of them, and the third is the one this
+# module is built around now.
+#
+# **Extraction does not translate.** It used to: the prompt for the requested output language
+# told the model to render everything in it, so understanding the reel and rendering it in
+# another language happened in a single pass. That is where the worst defect this project has
+# produced came from — a caption saying `2 Tbsp` came back as `2 cucchiaini`, a threefold
+# error with provenance `declared`. Rule 1 forbids touching the units in so many words; under
+# the pressure of translating everything else, the model touched them anyway.
+#
+# Now the extraction stays in the material's own language and the translation is a separate
+# call — which has two consequences that matter. The unit reaches `units.py` as the material
+# wrote it, `Tbsp`, which the tables know. And the units are not in the translation call's
+# payload at all, so there is nothing there to mistranslate.
+LANGUAGE_DIRECTIVES = {
+    "it": ("LINGUA DI USCITA: ITALIANO. Scrivi SEMPRE in italiano il titolo, i nomi degli "
+           "ingredienti, il procedimento, le note e i nomi dei gruppi, ANCHE se il materiale "
+           "è in inglese o in un'altra lingua: traducili. L'unica eccezione sono le unità di "
+           "misura, che restano invariate (regola 1). I NOMI DEI CAMPI del JSON sono in "
+           "inglese e non si traducono: sono la struttura, non il testo."),
+    "en": ("OUTPUT LANGUAGE: ENGLISH. ALWAYS write the title, ingredient names, method, notes "
+           "and group names in English, EVEN if the material is in Italian or another "
+           "language: translate them. The only exception is the units of measure, which stay "
+           "exactly as they are (rule 1)."),
+    # The one used for every extraction. Written in both languages on purpose: it is the one
+    # instruction that has to land whichever prompt body it is dropped into.
+    "same": ("LINGUA DI USCITA: LA STESSA DEL MATERIALE. NON TRADURRE NULLA. Scrivi il "
+             "titolo, i nomi degli ingredienti, il procedimento, le note e i nomi dei gruppi "
+             "esattamente nella lingua in cui il materiale li dice. Se il materiale è in "
+             "inglese, la ricetta esce in inglese. La traduzione la fa un altro programma, "
+             "dopo di te.\n"
+             "OUTPUT LANGUAGE: THE SAME AS THE MATERIAL. DO NOT TRANSLATE ANYTHING. Write the "
+             "title, the ingredient names, the method, the notes and the group names exactly "
+             "in the language the material states them in. Translation is done by another "
+             "program, after you.\n"
+             "I NOMI DEI CAMPI del JSON restano in inglese: sono la struttura, non il testo. "
+             "The JSON FIELD NAMES stay English: they are structure, not text."),
+}
 
-def system_prompt(language: str = "it") -> str:
-    """The system prompt for the requested output language. Falls back to Italian for an
-    unforeseen language: better a prompt valid in one language than no prompt."""
-    return SYSTEM_PROMPTS.get(str(language), SYSTEM_PROMPTS["it"])
+
+def system_prompt(language: str = "it", translate: bool = True) -> str:
+    """The system prompt, in `language`, telling the model whether to translate.
+
+    `language` picks the **body** — the tuned rules, which are written in the language they are
+    written in because a local model follows the language it is spoken to in. `translate=False`
+    swaps the language directive for the one that says to stay in the material's own language,
+    which is what every extraction now does.
+
+    Falls back to Italian for an unforeseen language: better a prompt valid in one language
+    than no prompt.
+    """
+    body = SYSTEM_PROMPTS.get(str(language), SYSTEM_PROMPTS["it"])
+    directive = LANGUAGE_DIRECTIVES["same" if not translate else str(language)]
+    return body.format(language_directive=directive)
 
 
 # --------------------------------------------------------------------------------------
@@ -566,14 +620,23 @@ def _build_message(
         + (transcript.strip() or "(nessuna trascrizione: l'audio non era disponibile o non conteneva parlato)")
         + "\n=== FINE TRASCRIZIONE ==="
     )
-    # The closing instruction repeats the output language, in that language: it is the last
-    # thing the model reads before answering, and with input in another language it is the
-    # lever that counts most against linguistic inertia (the system prompt alone is not enough).
+    # The closing instruction is the last thing the model reads before answering, which makes
+    # it the strongest lever there is. It used to repeat the output language and push against
+    # linguistic inertia; now it pushes the other way — **stay in the material's language** —
+    # because that inertia turns out to be the thing keeping the units honest.
+    # The eyeball measures were once named here too — "'q.b.' resta 'q.b.'" — because the gate
+    # started skipping the two cases that check them. Measured: it changed nothing, and the
+    # directive above is not the cause either (both `translate` and `same` lose them equally).
+    # It is the model, and `test_a_vague_measure_received_does_not_become_a_false_gap` is built
+    # to say exactly that by skipping rather than failing. The example came back out: a prompt
+    # line that does not move the number is a line the next reader will trust for nothing.
     tail = {
-        "it": ("Estrai la ricetta IN ITALIANO, traducendo i nomi se il materiale è in "
-               "un'altra lingua. Le quantità si riportano come compaiono, senza convertirle."),
-        "en": ("Extract the recipe IN ENGLISH: translate every title, ingredient name and "
-               "step, even though the material above is in Italian. Keep the units as they are."),
+        "it": ("Estrai la ricetta NELLA LINGUA DEL MATERIALE qui sopra, senza tradurre niente. "
+               "Le quantità e le unità si riportano ESATTAMENTE come compaiono: 'Tbsp' resta "
+               "'Tbsp', 'cucchiaio' resta 'cucchiaio'."),
+        "en": ("Extract the recipe IN THE LANGUAGE OF THE MATERIAL above, translating nothing. "
+               "Report amounts and units EXACTLY as they appear: 'Tbsp' stays 'Tbsp', "
+               "'cucchiaio' stays 'cucchiaio'."),
     }
     parts.append(tail.get(str(language), tail["it"]))
     return "\n\n".join(parts)
@@ -588,6 +651,7 @@ def extract_draft(
     timeout: float | None = None,
     author_comments: list[str] | None = None,
     language: str = "it",
+    tables=None,
 ) -> ExtractionOutcome:
     """Asks the local model to structure the recipe, constraining the output to the schema."""
     timeout = timeout if timeout is not None else llm_timeout()
@@ -606,13 +670,19 @@ def extract_draft(
 
     model_name = choose_model(url, model)
 
+    # The prompt is spoken in the **material's** language, not the one that was asked for.
+    # A local model follows the language it is spoken to in, and here that inertia is wanted:
+    # the extraction is supposed to stay where the material is. When the material is too short
+    # to judge, the requested language is the fallback — some prompt beats no prompt.
+    speaking = language_of(f"{caption}\n{transcript}") or code_of(language)
+
     body = {
         "model": model_name,
         "messages": [
-            {"role": "system", "content": system_prompt(language)},
+            {"role": "system", "content": system_prompt(speaking, translate=False)},
             {"role": "user",
              "content": _build_message(caption, transcript, title,
-                                       author_comments, language)},
+                                       author_comments, speaking)},
         ],
         "format": DRAFT_SCHEMA,
         "stream": False,
@@ -647,8 +717,13 @@ def extract_draft(
             "With a more capable model the problem usually goes away: ollama pull qwen2.5:14b"
         ) from e
 
+    # The gap is written for whoever reads the card, so it follows the **recipe's** language
+    # and not the material's — unlike the prompt above, which follows the material's.
+    cleaned = _refuse_units_absent_from_the_material(
+        _clean_up(draft), f"{caption}\n{transcript}", code_of(language), tables or load_tables()
+    )
     return ExtractionOutcome(
-        draft=_clean_up(draft),
+        draft=cleaned,
         model=model_name,
         is_a_recipe=bool(draft.get("is_a_recipe", True)),
     )
@@ -831,9 +906,13 @@ def _put_back(draft: dict, paths: list[tuple], texts: list[str]) -> dict:
 # person reading the card is the one who needs to know the words were not translated.
 TRANSLATION_GAP: Catalogue = {
     "it": {"failed": "la traduzione automatica non è riuscita: i testi restano nella lingua "
-                     "del reel"},
+                     "del reel",
+           "partial": "qualche parola è rimasta nella lingua del reel: la traduzione "
+                      "automatica non l'ha resa"},
     "en": {"failed": "automatic translation did not succeed: the text is left in the reel's "
-                     "own language"},
+                     "own language",
+           "partial": "some words are left in the reel's own language: the automatic "
+                      "translation did not render them"},
 }
 
 
@@ -851,6 +930,34 @@ def _pinned(pins: dict[str, str]) -> str:
         "These terms are FIXED. Use exactly this translation for them wherever they appear, "
         "and translate only the words around them:\n" + lines + "\n\n"
     )
+
+
+def _indexed(entry, position: int) -> tuple[int, str]:
+    """One answer entry, as `(index, text)`, whatever shape the model chose to send.
+
+    The schema asks for `{"n": 0, "text": "..."}` and Ollama constrains the decoding to it —
+    and the model returns a plain string anyway, often enough that insisting was throwing away
+    **every** fragment of a real recipe. The number is still there, at the front of the string,
+    because that is how it was handed over: `"0. PBJ Overnight Oats"`.
+
+    So all three are read. The object form when it comes. The numbered string, whose prefix is
+    as good an index as the field would have been. And a bare string, which falls back to its
+    position — the weakest of the three, and the only one that can go wrong if the model drops
+    an entry, which is why it is last rather than first.
+
+    The lesson underneath: a schema constrains what a compliant answer looks like, and is not
+    a promise that the answer will be compliant. Code that only handles the shape it asked for
+    is code that fails on the day it is not given it.
+    """
+    if isinstance(entry, dict):
+        try:
+            return int(entry["n"]), _ENUMERATION.sub("", str(entry.get("text", ""))).strip()
+        except (TypeError, ValueError, KeyError):
+            return -1, ""
+    text = str(entry)
+    if numbered := _ENUMERATION.match(text):
+        return int(re.sub(r"[^0-9]", "", numbered.group(0))), text[numbered.end():].strip()
+    return position, text.strip()
 
 
 def translate_draft(
@@ -923,25 +1030,89 @@ def translate_draft(
         # shape raises before the parsing is even reached.
         translated = []
 
-    if len(translated) != len(unique):
-        # Length mismatch means the mapping back is guesswork, and guessing here would put an
-        # ingredient's name onto another ingredient. Keep the original and say so.
-        out = json.loads(json.dumps(draft))
+    # Whatever came back is used; whatever did not is left in its own language. An empty
+    # `text` counts as not coming back: the model dropped the line, and taking the empty
+    # string would delete an ingredient's name outright, leaving a row with an amount and
+    # nothing to put it against.
+    rendered = {source: source for source in unique}
+    for position, entry in enumerate(translated):
+        n, text = _indexed(entry, position)
+        if text and 0 <= n < len(unique):
+            rendered[unique[n]] = text
+
+    out = _put_back(draft, paths, [rendered[t] for t in texts])
+    if any(rendered[u] == u for u in unique):
+        # Something came back untranslated. Said out loud rather than left to be noticed: a
+        # card half in each language is confusing in a way that looks like our mistake, which
+        # it is.
+        out.setdefault("gaps", []).append(text_from(TRANSLATION_GAP, language, "partial"))
+    return out
+
+
+
+UNIT_GAP: Catalogue = {
+    "it": {"absent": "l'unità «{unit}» riportata per «{name}» non compare nel materiale: "
+                     "quantità lasciata senza unità, da verificare sulla fonte"},
+    "en": {"absent": "the unit «{unit}» reported for «{name}» does not appear in the material: "
+                     "the amount is left without a unit, check it against the source"},
+}
+
+
+def _refuse_units_absent_from_the_material(draft: dict, material: str, language: str,
+                                           tables) -> dict:
+    """Drops a unit the material never used, and says so.
+
+    The defence in depth for the one failure this project cannot absorb. A caption saying
+    `2 Tbsp` came back as `2 cucchiaini` — a teaspoon where the material said a tablespoon,
+    a threefold error, and `units.py` converted it faithfully because "cucchiaini" is a
+    perfectly good unit. Nothing downstream could tell: the code sees a valid unit and does
+    its job. The error had already happened.
+
+    Extraction no longer translates, which removes the pressure that produced it. This is what
+    catches it when it happens anyway, and the check is the obvious one — **was this unit in
+    the text we were given?**
+
+    Both sides are canonicalised through `units.yaml` before comparing, which is what makes it
+    usable rather than merely strict: the material says "2 cucchiai" and the model reports
+    "cucchiaio", and those are the same unit. Comparing the strings would refuse a correct
+    answer and produce exactly the false gap this project treats as worse than no gap.
+
+    A unit the tables do not know is left alone. There is nothing to compare it with, and
+    `units.py` already declines to convert what it cannot recognise.
+
+    One outcome looks like a false positive and is not. The material says "1 tazza di latte"
+    and the model reports `cup`: the unit is dropped, because `tazza` lives in `vague.yaml`
+    among the eyeball measures and `cup` is an exact unit in `units.yaml`. Promoting the first
+    to the second manufactures a precision the reel never had, which is the same family of
+    error as an invented density — so the check catching it is the check working.
+
+    When the check fails the unit is **removed**, not merely flagged: keeping it would let the
+    conversion run on it and produce a confident wrong weight, which is the outcome §3 exists
+    to prevent. The amount itself survives, and the gap names the unit that was dropped so the
+    reader can go and look.
+    """
+    if not material.strip():
+        return draft
+
+    # Every unit the material actually uses, canonicalised. Words only — a number cannot be
+    # a unit, and splitting on them keeps "200g" from hiding its "g".
+    in_material = set()
+    for token in re.findall(r"[a-zA-Zàèéìòùáíóúü.]+", material):
+        if canonical := tables.canonical_unit(token):
+            in_material.add(canonical)
+
+    out = json.loads(json.dumps(draft))
+    for ingredient in out.get("ingredients") or []:
+        raw = ingredient.get("unit_raw")
+        canonical = tables.canonical_unit(raw) if raw else None
+        if canonical is None or canonical in in_material:
+            continue
+        ingredient["unit_raw"] = ""
         out.setdefault("gaps", []).append(
-            text_from(TRANSLATION_GAP, language, "failed")
+            text_from(UNIT_GAP, language, "absent",
+                      unit=str(raw).strip(), name=ingredient.get("name") or "?")
         )
-        return out
-
-    # An empty fragment coming back where there was text is the model dropping a line, not a
-    # translation. Keeping the original leaves one word in the wrong language; taking the
-    # empty string would delete an ingredient's name outright, and the card would show a row
-    # with an amount and nothing to put it against.
-    rendered = {
-        old: _ENUMERATION.sub("", str(new)).strip() or old
-        for old, new in zip(unique, translated)
-    }
-    return _put_back(draft, paths, [rendered[t] for t in texts])
-
+    return out
 
 
 def _clean_up(draft: dict) -> dict:

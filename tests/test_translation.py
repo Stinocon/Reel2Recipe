@@ -112,6 +112,17 @@ def test_the_echoed_list_number_is_stripped(returned, expected):
     assert extract._ENUMERATION.sub("", returned) == expected
 
 
+def _numbered(texts: list[str]) -> str:
+    """The answer shape the model is asked for: one entry per fragment, carrying its index.
+
+    It replaced a parallel array. The array threw the whole translation away on a single
+    miscount — twelve fragments out, eleven back, and a recipe left entirely in the wrong
+    language. Indexed, a fragment that goes missing is one untranslated word.
+    """
+    import json as _json
+    return _json.dumps({"translations": [{"n": n, "text": t} for n, t in enumerate(texts)]})
+
+
 def _answering(payload: str):
     """A stand-in for Ollama that returns exactly `payload` as the model's message."""
     class Response:
@@ -134,13 +145,13 @@ def test_a_short_answer_keeps_the_recipe_and_declares_the_gap(offline):
     far more than no recipe, and far more than a recipe whose ingredients have quietly swapped
     names. The user is told rather than left to notice.
     """
-    offline.setattr(extract.httpx, "post", _answering('{"translations": ["only one"]}'))
+    offline.setattr(extract.httpx, "post",
+                    _answering('{"translations": [{"n": 0, "text": "Only this one"}]}'))
     out = extract.translate_draft(_draft(), language="en")
 
-    # The glossary ran before the call, so its work survives the failure: the ingredient it
-    # knew is in English even though the model gave nothing usable.
+    # The glossary ran before the call, so its work survives whatever the model does. And the
+    # fragments that DID come back are no longer thrown away with the ones that did not.
     assert out["ingredients"][0]["name"] == "Onions"
-    # The one it did not know keeps its original wording rather than a guess.
     assert out["ingredients"][1]["name"] == "Guarnizione di casa mia"
     assert out["ingredients"][0]["quantity_raw"] == "250"
     assert any("translation" in g for g in out["gaps"]), out["gaps"]
@@ -169,7 +180,7 @@ def test_the_gap_is_declared_in_the_language_the_user_is_reading(offline):
 
 def test_the_original_draft_is_never_mutated(offline):
     """The caller keeps a usable draft whatever happens in here: the pass works on a copy."""
-    offline.setattr(extract.httpx, "post", _answering('{"translations": ["x"]}'))
+    offline.setattr(extract.httpx, "post", _answering(_numbered(["x"])))
     draft = _draft()
     extract.translate_draft(draft, language="en")
 
@@ -263,7 +274,7 @@ def test_an_empty_fragment_does_not_delete_the_original(offline):
     answer = [""] * len(texts)
     answer[0] = "Yaki Udon"          # only the title comes back
     offline.setattr(extract.httpx, "post",
-                    _answering('{"translations": %s}' % __import__("json").dumps(answer)))
+                    _answering(_numbered(answer)))
 
     out = extract.translate_draft(draft, language="en")
     assert out["ingredients"][1]["name"] == "Guarnizione di casa mia", (
@@ -293,7 +304,7 @@ def test_a_repeated_fragment_is_sent_once_and_answered_once(offline):
             def raise_for_status(self): pass
             def json(self):
                 answer = [f"T{n}" for n in range(len(lines))]
-                return {"message": {"content": _json.dumps({"translations": answer})}}
+                return {"message": {"content": _numbered(answer)}}
         return Response()
 
     offline.setattr(extract.httpx, "post", capture)
@@ -341,7 +352,7 @@ def test_a_name_the_glossary_knows_never_reaches_the_model(offline):
             def json(self):
                 import json as j
                 n = len(sent["body"].splitlines())
-                return {"message": {"content": j.dumps({"translations": ["x"] * n})}}
+                return {"message": {"content": _numbered(["x"] * n)}}
         return Response()
 
     offline.setattr(extract.httpx, "post", capture)
@@ -372,7 +383,7 @@ def test_a_known_name_is_kept_out_of_the_payload_when_the_model_is_still_needed(
             def json(self):
                 import json as j
                 n = len([l for l in sent["body"].splitlines() if l and l[0].isdigit()])
-                return {"message": {"content": j.dumps({"translations": ["x"] * n})}}
+                return {"message": {"content": _numbered(["x"] * n)}}
         return Response()
 
     offline.setattr(extract.httpx, "post", capture)
@@ -405,7 +416,7 @@ def test_a_name_the_glossary_knows_only_in_part_is_pinned_not_replaced(offline):
             def json(self):
                 import json as j
                 n = len([l for l in sent["body"].splitlines() if l and l[0].isdigit()])
-                return {"message": {"content": j.dumps({"translations": ["x"] * n})}}
+                return {"message": {"content": _numbered(["x"] * n)}}
         return Response()
 
     offline.setattr(extract.httpx, "post", capture)
@@ -473,7 +484,7 @@ def test_a_group_heading_the_glossary_knows_never_reaches_the_model(offline):
             def json(self):
                 import json as j
                 n = len([l for l in sent["body"].splitlines() if l and l[0].isdigit()])
-                return {"message": {"content": j.dumps({"translations": ["x"] * n})}}
+                return {"message": {"content": _numbered(["x"] * n)}}
         return Response()
 
     offline.setattr(extract.httpx, "post", capture)
@@ -580,3 +591,138 @@ def test_an_ingredient_with_no_group_stays_without_one():
         {"name": "sale", "quantity_raw": "10", "unit_raw": "g"},
     ]}
     assert [i.group for i in from_draft(draft, language="it").ingredients] == [None, None]
+
+
+def test_one_fragment_going_missing_does_not_cost_the_others(offline):
+    """The reason the answer shape changed from an array to indexed entries.
+
+    Twelve fragments went out and eleven came back, and the parallel array had no way to know
+    *which* eleven — so the whole translation was discarded and a recipe stayed entirely in
+    the wrong language. All-or-nothing was tolerable while the glossary did most of the work;
+    once the extraction stopped translating, this call became responsible for every word.
+
+    Indexed, a missing fragment is one untranslated word among translated ones. It also cannot
+    land on the wrong ingredient, because the mapping is stated rather than counted.
+    """
+    import json as _json
+    draft = {"method": ["Fry the pancetta.", "Whisk the eggs.", "Combine off the heat."],
+             "ingredients": []}
+    texts, _ = extract._collect(draft)
+    # Everything but the middle one comes back, and out of order for good measure.
+    answer = _json.dumps({"translations": [
+        {"n": 2, "text": "Unisci fuori dal fuoco."},
+        {"n": 0, "text": "Friggi la pancetta."},
+    ]})
+    offline.setattr(extract.httpx, "post", _answering(answer))
+    out = extract.translate_draft(draft, language="it")
+
+    assert out["method"][0] == "Friggi la pancetta."
+    assert out["method"][2] == "Unisci fuori dal fuoco."
+    assert out["method"][1] == "Whisk the eggs.", "the missing one took the others with it"
+    assert any("lingua del reel" in g for g in out["gaps"]), out["gaps"]
+
+
+# ----------------------------------------------------------------------------------
+# A unit that was never in the material
+# ----------------------------------------------------------------------------------
+
+
+def _tables():
+    from reel2recipe.units import load_tables
+    return load_tables()
+
+
+def test_a_unit_the_material_never_used_is_dropped_and_declared():
+    """The defence in depth for the worst defect this project has produced.
+
+    A caption saying `2 Tbsp` came back as `2 cucchiaini` — a teaspoon where the material said
+    a tablespoon, a threefold error — and `units.py` converted it faithfully, because
+    "cucchiaini" is a perfectly good unit. Nothing downstream could tell.
+
+    The unit is removed rather than flagged: left in place it would still drive the conversion
+    and produce a confident wrong weight, which is the outcome AGENTS.md §3 exists to prevent.
+    The amount survives and the gap names what was dropped.
+    """
+    material = "RECIPE:\n-200g oats\n-2 Tbsp peanut butter\n-550ml plant milk"
+    draft = {"ingredients": [
+        {"name": "peanut butter", "quantity_raw": "2", "unit_raw": "cucchiaini"},
+        {"name": "oats", "quantity_raw": "200", "unit_raw": "g"},
+    ]}
+    out = extract._refuse_units_absent_from_the_material(draft, material, "it", _tables())
+
+    assert out["ingredients"][0]["unit_raw"] == "", "the invented unit survived"
+    assert out["ingredients"][0]["quantity_raw"] == "2", "the amount was taken with it"
+    assert out["ingredients"][1]["unit_raw"] == "g", "a real unit was dropped"
+    assert any("cucchiaini" in g for g in out["gaps"]), out["gaps"]
+
+
+@pytest.mark.parametrize("material, unit, why", [
+    ("2 cucchiai di zucchero", "cucchiaio", "plural in the material, singular from the model"),
+    ("2 Tbsp peanut butter", "tbsp", "different case"),
+    ("200 grammi di farina", "g", "spelled out in the material, symbol from the model"),
+    ("1 cup of flour", "cup", "the same word"),
+])
+def test_a_real_unit_is_not_refused(material, unit, why):
+    """Both sides are canonicalised through `units.yaml` before comparing, and that is what
+    makes the check usable rather than merely strict.
+
+    Comparing the strings would refuse "cucchiaio" against a material saying "cucchiai" and
+    produce exactly the false gap this project treats as worse than no gap at all.
+    """
+    draft = {"ingredients": [{"name": "x", "quantity_raw": "2", "unit_raw": unit}]}
+    out = extract._refuse_units_absent_from_the_material(draft, material, "it", _tables())
+    assert out["ingredients"][0]["unit_raw"] == unit, why
+    assert not out.get("gaps"), f"a false gap was declared: {out.get('gaps')}"
+
+
+def test_a_vague_measure_is_not_allowed_to_become_an_exact_unit():
+    """Looks like a false positive and is not.
+
+    "tazza" is an eyeball measure in `vague.yaml`; `cup` is an exact unit in `units.yaml`.
+    A model turning one into the other manufactures a precision the reel never had — the same
+    family of error as an invented density.
+    """
+    draft = {"ingredients": [{"name": "latte", "quantity_raw": "1", "unit_raw": "cup"}]}
+    out = extract._refuse_units_absent_from_the_material(
+        draft, "1 tazza di latte", "it", _tables())
+    assert out["ingredients"][0]["unit_raw"] == ""
+
+
+def test_no_material_means_no_opinion():
+    """With nothing to compare against, the check says nothing rather than refusing everything."""
+    draft = {"ingredients": [{"name": "x", "quantity_raw": "2", "unit_raw": "cucchiaini"}]}
+    out = extract._refuse_units_absent_from_the_material(draft, "   ", "it", _tables())
+    assert out["ingredients"][0]["unit_raw"] == "cucchiaini"
+    assert not out.get("gaps")
+
+
+@pytest.mark.parametrize("entry, position, expected", [
+    ({"n": 3, "text": "tre"}, 0, (3, "tre")),          # the shape the schema asks for
+    ("7. sette", 0, (7, "sette")),                     # a numbered string: the prefix IS the index
+    ("12) dodici", 0, (12, "dodici")),
+    ("senza numero", 5, (5, "senza numero")),          # bare string: position, the weakest form
+    ({"wrong": 1}, 0, (-1, "")),                       # unusable: skipped rather than guessed
+])
+def test_every_shape_the_model_actually_sends_is_read(entry, position, expected):
+    """A schema constrains what a *compliant* answer looks like. It is not a promise.
+
+    Ollama is given a schema of `{"n": …, "text": …}` and constrains the decoding to it, and
+    the model returns plain strings anyway — often enough that insisting on the object threw
+    away **every fragment** of a real recipe, leaving it entirely untranslated with one gap to
+    explain it. The index was there the whole time, at the front of the string, because that
+    is how the fragment was handed over.
+    """
+    assert extract._indexed(entry, position) == expected
+
+
+def test_a_recipe_is_translated_even_when_the_model_ignores_the_schema(offline):
+    """The end-to-end version of the above, and the failure it was found by."""
+    import json as _json
+    draft = {"method": ["Fry the pancetta.", "Whisk the eggs."], "ingredients": []}
+    # Strings, not objects: exactly what the real model returned.
+    offline.setattr(extract.httpx, "post", _answering(_json.dumps(
+        {"translations": ["0. Friggi la pancetta.", "1. Monta le uova."]})))
+
+    out = extract.translate_draft(draft, language="it")
+    assert out["method"] == ["Friggi la pancetta.", "Monta le uova."]
+    assert not out.get("gaps"), "a complete translation should declare nothing"
