@@ -44,7 +44,8 @@ Sono tre assi distinti, descritti in
 [Lingua e sistema di misura](#lingua-e-sistema-di-misura). Un limite da conoscere prima di
 farci affidamento: tradurre i **nomi degli ingredienti** è la parte meno affidabile di tutta
 la catena — vedi [la nota sui limiti](#onest%C3%A0-sui-limiti). I numeri restano giusti; sono
-le parole a scivolare.
+le parole a scivolare, e dove il modello non è sicuro ora lascia la parola originale invece di
+indovinare un ingrediente simile.
 
 > **Una nota su questa documentazione.** Questo README e quello dell'add-on esistono in
 > inglese e in italiano, due copie che si muovono insieme. Tutto il resto sta in una lingua
@@ -205,18 +206,34 @@ ed è la parte meno solida — vedi la nota qui sotto.
 
 #### Onestà sui limiti
 
-> La traduzione dei nomi e del procedimento è la parte meno affidabile,
-> ed è l'unica non deterministica dell'intero percorso. Su una fonte **già italiana** la
-> qualità è ottima. Su una fonte **inglese** i nomi degli ingredienti sbagliano con una certa
-> regolarità: `berries` è diventato "fragole", `flax seeds` "semi di lecithia" (parola
-> inesistente), `a pinch` "una pizzetta". Una didascalia **bilingue** peggiora le cose, perché
-> il modello pesca da entrambe le lingue: da un post inglese-tedesco è uscito "dinkel fette".
-> **Verso l'inglese**, da un testo tutto italiano, `qwen2.5:14b` tende a restare ancorato
-> all'italiano: traduce il titolo ma non sempre l'elenco.
+> La traduzione è l'unico passaggio non deterministico dell'intero percorso, ed è la parte
+> meno affidabile. È migliorata parecchio da quando ha smesso di essere un'istruzione dentro
+> la chiamata di estrazione ed è diventata **una chiamata a sé** — ma "migliorata" non è
+> "risolta", e quel che resta va saputo prima di farci affidamento.
 >
-> In tutti questi casi **le quantità restano corrette**: sbagliano le parole, non i numeri.
-> È la ragione per cui la conversione non è affidata al modello, e per cui la revisione prima
-> dell'export non è un ripiego ma parte del flusso.
+> **Cosa è stato risolto.** Chiedendo al modello di capire un reel e di renderlo in un'altra
+> lingua in un colpo solo, la lingua diventava una proprietà tutto-o-niente: su una didascalia
+> scritta in prosa traduceva tutto, su una corta **a lista** non traduceva *niente* — né i
+> nomi, né le intestazioni dei gruppi, né il procedimento. Misurato su una didascalia così:
+> **0%** dei termini tradotti. Diviso in due passaggi, la stessa didascalia fa **5 su 6**, e i
+> gruppi passano al 100%. I numeri li puoi rifare tu: `uv run python
+> tools/benchmark-translation.py`.
+>
+> **Cosa resta, ed è la parte da tenere d'occhio.** Il modello a volte **sostituisce** un
+> ingrediente invece di tradurlo: `maiale` è tornato "bacon", `cavolo cappuccio` "chinese
+> broccoli". È peggio che lasciare una parola in italiano, perché una parola straniera si vede
+> che è straniera mentre un ingrediente sbagliato con sicurezza no — andresti a comprare la
+> cosa sbagliata. Ora il prompt di traduzione vieta la sostituzione e impone di **tenere la
+> parola originale quando non è sicuro**, ed è per questo che ogni tanto vedrai un ingrediente
+> italiano dentro una ricetta inglese. È il comportamento voluto, non un difetto.
+>
+> Una didascalia **bilingue** resta il caso più difficile, perché il modello pesca da entrambe
+> le lingue: da un post inglese-tedesco è uscito "dinkel fette".
+>
+> In tutti questi casi **le quantità restano corrette**: sbagliano le parole, non i numeri — e
+> ora strutturalmente, perché `quantity_raw` e `unit_raw` non entrano proprio nel payload
+> della chiamata di traduzione. È la ragione per cui la conversione non è affidata al modello,
+> e per cui la revisione prima dell'export non è un ripiego ma parte del flusso.
 
 ### Reel privati
 
