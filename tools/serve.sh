@@ -18,7 +18,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # already be exported in an open shell or in a local environment file.
 PORT="${R2R_PORT:-${R2R_PORTA:-8500}}"
 
-if curl -sf --connect-timeout 2 --max-time 4 "http://127.0.0.1:${PORT}/api/stato" >/dev/null 2>&1; then
+if curl -sf --connect-timeout 2 --max-time 4 "http://127.0.0.1:${PORT}/api/status" >/dev/null 2>&1; then
   echo "[web] already up on http://localhost:${PORT}"
   exit 0
 fi
@@ -40,7 +40,7 @@ fi
 cd "${ROOT}" || exit 0
 nohup uv run r2r serve --port "${PORT}" >/tmp/r2r-web.log 2>&1 &
 for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do   # ~6 s: importing FastAPI and the tables is not instant
-  if curl -sf --max-time 2 "http://127.0.0.1:${PORT}/api/stato" >/dev/null 2>&1; then
+  if curl -sf --max-time 2 "http://127.0.0.1:${PORT}/api/status" >/dev/null 2>&1; then
     echo "[web] started on http://localhost:${PORT} (log: /tmp/r2r-web.log)"
     exit 0
   fi

@@ -1,10 +1,14 @@
 # Naming — the Italian → English migration
 
-> **Transitional document, now mostly a record.** It existed while the codebase was moved from
-> Italian to English. The move is done: `src/`, `tests/`, `web/`, the `data/` keys and
-> `docs/architecture.md` are all English. What survives here is worth keeping until it is no
-> longer true — the table of what must *not* be renamed, which is a live constraint on future
-> work, and the account of how a rename hides, which cost four real defects to learn.
+> **Finished, and now a record.** The codebase moved from Italian to English in stages, and
+> the last of them closed the categories this document once listed as permanent exemptions:
+> the SQL schema, the keys and values stored inside a recipe, the element ids and CSS classes,
+> the model's JSON schema, and the add-on's runtime log. What is left in Italian is small,
+> deliberate, and listed below.
+>
+> The parts worth keeping are not the inventory. They are **why a script cannot do this**,
+> **the ways a rename hides**, and **the compatibility net**, which is permanent and grew with
+> every stage. Each was paid for with a real defect.
 
 ## Why there is no script for this
 
@@ -21,6 +25,22 @@ on top of 28 failing tests. The correct method is to **rewrite one module at a t
 identifiers and comments together. That is not extra work compared to a script: the comments
 have to be rewritten into English anyway, and the script was only trying to dodge work that
 is mandatory.
+
+The last stage proved it again, in the one file where the temptation was strongest. A token
+substitution over `extract.py` — whose schema field names are `nome`, `note`, `gruppo`, and
+whose Italian system prompt is made of sentences containing exactly those words — produced
+
+    "Il name dell'ingrediente"
+    "i nomi degli ingredients"
+    "le notes e i nomi dei gruppi"
+
+*inside the prompt the model reads*. Reverted, and the prompt rewritten by hand. What did
+work mechanically, and is the general form of the answer, is a substitution that is
+**position-aware**: not "this word anywhere" but "this word in a slot that holds an
+identifier" — a JSON key, an HTML attribute, a CSS selector, a `classList` argument. The
+frontend rename went that way and the diff proves it: of the 41 lines it changed in
+`index.html`, every one differs only inside `id`/`class`/`for`/`data-icon`, and none of the
+Italian prose on the page moved.
 
 ## Method, per module
 
@@ -53,21 +73,22 @@ axis, and the second one is what to plan around.
    protocol surfaces moved with the only thing that reads them, `web/app.js`: `Recipe`'s JSON
    keys, `Library.list_`'s output keys, the pipeline's stage names, the SSE payload and
    `CookRequest`'s fields.
-2. **Left in Italian on purpose**, each with its reason in the module that holds it:
-   `extract.py`'s prompts, schema and delimiters (the model contract); the URL paths and the
-   export's `?formato=` (external surface — the rule is *add a synonym*, as the CLI does with
-   `--porta`); the nested ingredient keys, the draft's keys and the file names (format);
-   every user-facing Italian string. The SQL columns were on this list and came off it — see
-   the table below.
-3. **Done since:** the `data/*.yaml` keys with their loader (the tables live in the repo, so
-   nothing on a user's disk is keyed that way), and the frontend — `web/i18n.js`'s catalogue
-   keys and placeholders, `web/app.js`'s identifiers and prose, and `icone.js` → `icons.js`
-   with its `data-icon` attributes.
-4. **Deliberately left:** the element **ids** and the **CSS class names**. They live across
-   three files at once — `index.html`, `app.js` and `style.css` — so moving them is a step of
-   its own with no readability gain for the JavaScript, and a missed class breaks the styling
-   silently. `tests/test_web.py` now guards ids in both directions and classes against
-   `style.css`, so the step is safe to take later if it is ever worth taking.
+2. **Done since:** the `data/*.yaml` keys with their loader, and the frontend —
+   `web/i18n.js`'s catalogue keys and placeholders, `web/app.js`'s identifiers and prose, and
+   `icone.js` → `icons.js`.
+3. **Done since, one migration each.** The categories this list used to call permanent: the
+   URL paths and query parameters; the SQL table and columns (`_migrate_italian_schema`); the
+   nested keys of a stored recipe and the values of `Provenance` and `System` (`LEGACY_KEYS`,
+   `LEGACY_PROVENANCES`, `LEGACY_SYSTEMS`); the element ids, CSS class names, custom
+   properties and icon names, all three files at once; and `extract.py`'s schema field names,
+   with the model gate run before and after on the same input.
+4. **The one that was worth deferring.** The ids and classes waited because they live across
+   `index.html`, `app.js` and `style.css` at once and a missed one unstyles the page in
+   silence. Waiting was right, but not because the step was impossible: it was cheap once
+   `tests/test_web.py` held the ids in both directions and the classes against the stylesheet.
+   **Defer a rename until its guard exists, then take it** — not "defer it indefinitely".
+   The guard earned its place immediately, catching `app.js` querying `#edit-ingredients`
+   while its own templates still wrote `id="mod-ingredienti"`.
 5. **Done last:** the test modules' own prose — all ten of them, with the model gate re-run
    for `test_modello.py` — and `docs/architettura.md` → `docs/architecture.md`.
 6. **Deliberately left in Italian:** `docs/legale.md` and `docs/condizioni-uso.md`. They are
@@ -86,9 +107,13 @@ third turned out to be the axis the whole `recipe.py` step turned on, and it hel
 (`"nome"`, `"quantita"`, `"valore"`), so `Quantity` and `Ingredient` were renamed in full
 without touching a single stored recipe. But the top level starts from `asdict(self)`, so
 **`Recipe`'s own fields map straight onto JSON keys** — renaming `titolo` really does rename it
-on disk. So the net went in exactly where it was needed and nowhere else: `stored_field` reads
-both spellings at the top level, the nested objects got nothing, and the split is now covered
-by three tests in `tests/test_store.py` built on a hand-written pre-migration recipe.
+on disk. So the net went in exactly where it was needed and nowhere else.
+
+That reading was right about the mechanism and wrong about the conclusion drawn from it. The
+decoupling was read as a reason the nested keys should *stay* Italian; it was only ever a
+reason they were cheap to leave. When they moved a release later, the literals changed on one
+side and `LEGACY_KEYS` grew on the other, and the whole thing cost one commit. **A property
+that makes something cheap to postpone is not an argument for postponing it for ever.**
 
 Two things the field rename cost that the module rename did not, both worth knowing before
 `extract.py`:
@@ -113,11 +138,13 @@ apostrophes and replaced the ASCII one with itself, with a real consequence on t
 went into its own commit *before* the rename, so the translation commit changed no behaviour.
 Keep that split: a rename that also fixes something is a rename nobody can review.
 
-### The three ways a rename hides
+### The five ways a rename hides
 
-By the end, the migration had produced four real defects and every one of them was invisible
-to `./check.sh`. They fall into three kinds, and the countermeasure for each is now in the
-repo rather than in someone's memory.
+The migration produced six real defects across its stages, and every one of them was invisible
+to `./check.sh`. They fall into five kinds, and the countermeasure for each is now in the repo
+rather than in someone's memory. The first three were enough to learn the
+shape; the last two were found later, and only by sweeping the whole artefact rather than the
+diff.
 
 **1. Tests that do not run.** `extract.py` carries an obligation the others do not: it holds
 the system prompts and the JSON schema, so after touching it the model gate has to run —
@@ -144,6 +171,29 @@ error, a wrong file, visible only on opening it. Both were found by restarting t
 running a real reel end to end. `tests/test_api.py` now covers the export formats; for the
 rest, **restart the thing and use it** is the only guard there is.
 
+**4. A guard with a written-down exemption.** The one that cost the most this time, because
+it was not an oversight: `test_every_key_the_page_reads_exists_in_the_server_json` covered
+`recipe.X` and said, in its own docstring, that the nested accesses "stay out because their
+keys are Italian by choice". Under that exemption `to_dict()` wrote `riga` and `gruppo` while
+`app.js` read `ing.row` and `i.group` — so every ingredient line in the recipe card rendered
+from `undefined`, and the groups disappeared. A card with blank rows, raising nothing, for a
+release. The same shape had already produced four dead `t()` keys, which survived because
+every guard looked at `t('literal')` and all four sat inside a ternary.
+
+**An exemption written into a guard is a defect waiting for the exemption to expire.** Both
+were found by sweeping the whole artefact rather than the part being changed, and neither
+would have been found by the suite. When an exemption's reason goes away, the guard has to be
+widened in the same commit — not the next time somebody happens to read it.
+
+**5. An assertion that passes on nothing.** The most dangerous of the five, and the closest
+call: almost every assertion in `tests/test_modello.py` is of the form "the model did **not**
+invent an amount", which passes for free over an empty list. Renaming the schema's fields made
+`draft.get("ingredienti")` return `None`, and the gate would have gone **green while checking
+nothing** — on the test that protects the project's central promise. Four of those reads were
+inside f-strings with single quotes and survived the first pass. `_reading_something()` now
+stops hard if the key is not the one the schema writes. **A negative assertion needs a
+positive one beside it, saying it found something to assert about.**
+
 And the one that was not this migration's fault but was found by it: `"Libreria vuota."` had
 been `"Library vuota."` since the `store.py` step, and `tests/test_api.py` asserted the broken
 string — a test locking a defect in place. Which is the argument for the string-literal diff:
@@ -151,32 +201,31 @@ extracting every literal from `src/` before and after, and reading the differenc
 four Italian sentences a regex had walked into, a non-breaking space lost by a hand-rewrite,
 and a help line that had started advertising a database file that does not exist.
 
-## What must NOT be renamed
+## What is still Italian, and why
 
-These are **format**, not code. They are keys in `data/*.yaml` and they are written inside
-recipes already saved in the user's library, so renaming them would demand exactly the
-destructive migration this migration is avoiding.
+The list used to be long and is now short. Every row that left it did so with a migration and
+tests, not with a decision that the exemption had stopped mattering — the record of what each
+one cost is in the git history and in the modules themselves.
 
-| stays as it is | where it lives |
-|---|---|
-| ~~`"metrico"`, `"imperiale"`~~ | **moved since**, to `"metric"`/`"imperial"`. `data/` lives in the repo so its keys were free; the stored recipes needed `LEGACY_SYSTEMS` and `system_from_stored` in `units.py` |
-| ~~`"assente"`, `"dichiarato"`, …~~ | **moved since**, to `"absent"`, `"declared"`, `"converted:unit"`, `"converted:density"`, `"count"`, `"estimated:vague"`, `"indeterminate"`. The net is `LEGACY_PROVENANCES` and `provenance_from_stored`, which falls back to `absent` rather than raising: `Provenance("dichiarato")` on the new enum raises `ValueError` **inside `from_dict`**, i.e. while the library is opening |
-| ~~`quantita_raw`, `unita_raw`~~ | **moved since**, with the rest of the schema. They were never on disk — a draft lives between the model and `from_draft` — so the cost was the model gate, not a migration |
-| `unita.yaml`, `densita.yaml`, `vaghe.yaml`, `ricette.db` | file names |
-| the keys inside `data/*.yaml` | renamed in their own step, together with their loader |
-| ~~the SQL table and column names in `store.py`~~ | **moved since.** They really were format, and the way out was the `ALTER TABLE` this table was avoiding — done once, in place, by `_migrate_italian_schema`. The lesson is narrower than "never rename format": a rename over stored data needs a migration and the tests to prove it, not a permanent exemption |
-| ~~the **nested** keys of an ingredient and its quantity~~ | **moved since.** They are `name`, `notes`, `group`, `gap`, `line`, `quantity`, and inside it `value`, `value_max`, `unit`, `provenance`, `original_text`, `note`, `system`, `uncertain`. `LEGACY_KEYS` grew to cover them; being built from string literals was what let them stay, never a reason they had to |
-| ~~the keys of the *draft* read by `from_draft`~~ | **moved since**, to `title`, `ingredients`, `method`, `servings`, `categories`, `gaps`, `confidence`, `description`, `prep_time_min`, `cook_time_min`. The prompt **prose** around them stayed in its own language and was rewritten by hand, not substituted |
+| stays as it is | where it lives | why |
+|---|---|---|
+| `unita.yaml`, `densita.yaml`, `vaghe.yaml`, `ricette.db` | file names | `ricette.db` is a file on the user's disk; the three tables are in the repo and could move cheaply, but renaming them buys nothing the contents did not already buy |
+| the kitchen vocabulary in `data/*.yaml` | `cucchiaio`, `farina 00`, `q.b.` | it is **data**, not naming: it is what the model writes and what the lookup matches against. The English aliases sit next to it, not instead of it |
+| the injection patterns in `tools/check-injection.sh` | the incoming boundary | they detect attempts written in Italian; translating them would be translating the thing being looked for |
+| the prompt **prose** and the delimiters in `extract.py` | the model contract | a local model follows the language it is spoken to in, so the Italian prompt is Italian and the English one English. The delimiters are a security boundary tuned as it is (`.claude/rules/input-non-fidato.md`). The schema's **field names** are English: they are structure |
+| the CLI's Italian option names and values | `--porta`, `--lingua`, `elimina`, `metrico` | *synonyms*, never the only spelling, for anyone with them in a script. `output_axes` normalises the values so nothing downstream sees them |
+| the add-on's three configuration keys | `modello_llm`, `scarica_modello`, `file_cookie` | Home Assistant has them saved in the user's add-on configuration. Renaming them silently resets the chosen model and the cookie path to the defaults, and no migration inside the add-on can prevent that |
+| every user-facing Italian string | the catalogues | they are read, not called. They live next to their English counterpart and `test_web.py` refuses a half-translated language |
 
-One row that did **not** stay: the keys of the dictionary `Library.list_` returns. They looked
-like format and are not — nothing on disk is keyed that way, only `web/app.js` reads them — so
-they moved to English in the same commit as `Recipe`'s fields and the frontend. `store.py`'s
-docstring said so before the move; the SQL columns just above it *were* real format, and they
-stayed for one more release — until they got the migration that being real format calls for.
+The rule the departures taught, and it is narrower than the one this section used to state:
+**a rename over stored data needs a migration and the tests to prove it, not a permanent
+exemption.** "It is format" is a statement about the cost, not a veto. What made each of them
+safe was the same three things — read the stored shape rather than a version stamp, keep the
+old spelling readable for good, and rewrite lazily so the library is never half migrated.
 
-The Python *names* around them change; the strings do not. Where a value is user-facing, add
-the English spelling as a synonym rather than replacing it — as the CLI does with `--porta`
-and `--lingua`.
+One row that never belonged here at all: the keys of the dictionary `Library.list_` returns.
+They looked like format and are not — nothing on disk is keyed that way, only `web/app.js`
+reads them — so they moved a whole release before the SQL columns beside them did.
 
 ## The compatibility net — in place, and permanent
 
@@ -196,6 +245,26 @@ exception, just a library of cards with no servings, no times and no cover. `Sou
 net too, and more sharply: it used to be rebuilt with `Source(**d)`, and that splat would raise
 `TypeError` on every pre-migration recipe — while opening the library, which is the one
 operation that must never fail.
+
+**It grew twice, and the second time it stopped being only about keys.** `LEGACY_KEYS` now
+covers the nested ingredient and quantity dictionaries as well as the top level, and it is
+flat although the recipe is not — which works only while the English names stay unique across
+levels, so `test_store.py` asserts that no two levels ever claim the same one.
+
+The values needed a net of their own, and they fail harder than the keys do. A stored quantity
+carries `"provenienza": "dichiarato"`, and `Provenance("dichiarato")` on the current enum
+raises `ValueError` **inside `from_dict`** — while the library is opening. A missing key gives
+`None` and a blank field; a missing *value* gives no library at all. Hence `LEGACY_PROVENANCES`
+and `LEGACY_SYSTEMS` in `units.py`, read through `provenance_from_stored` and
+`system_from_stored`, both of which **fall back rather than raise**: an unreadable provenance
+becomes `absent`, which is in `UNCERTAIN_PROVENANCES`, so the honest answer to "I cannot tell
+where this number came from" is also the one that makes the interface flag it for review.
+
+The SQL schema is the one part that is *not* a net but a migration: `_migrate_italian_schema`
+renames the table and columns once, in place, and then there is nothing left to be compatible
+with. It reads `sqlite_master` rather than a `user_version` stamp, because a version number is
+a second source of truth that can disagree with the thing it describes — restore a backup, copy
+a file between machines, and it lies.
 
 ## Vocabulary
 

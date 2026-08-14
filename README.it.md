@@ -349,11 +349,14 @@ Documentazione tecnica: [`docs/architecture.md`](docs/architecture.md), in ingle
 ### Se stai leggendo il codice
 
 **Il codice è in inglese** — identificatori, commenti, test, script e documento di
-architettura. L'italiano che resta è deliberato e sta in tre gruppi:
+architettura, le chiavi JSON sul disco, lo schema SQL, gli id e le classi del frontend e il
+registro dell'add-on. L'italiano che resta è deliberato e sta in tre gruppi:
 
-- **Il contratto col modello locale** — prompt, schema JSON e delimitatori di `extract.py`.
-  Sono stati tarati contro un modello vero su reel veri, e si muovono solo insieme a una
-  nuova esecuzione del gate del modello.
+- **I prompt che legge il modello locale** — i due prompt di sistema di `extract.py` restano
+  ciascuno nella propria lingua, perché un modello locale segue la lingua in cui gli si parla,
+  e i delimitatori che recintano l'input non fidato restano italiani perché sono un confine di
+  sicurezza tarato così. I **nomi dei campi** dello schema sono inglesi: sono struttura, non
+  prosa. Qualsiasi cosa in quel file si muove solo insieme a una nuova esecuzione del gate.
 - **Il vocabolario di cucina, che è dato** — `cucchiaio`, `farina 00`, `q.b.` in `data/*.yaml`,
   con gli alias inglesi accanto, e i pattern che rilevano le injection scritte in italiano.
 - **Gli alias italiani della CLI**, tenuti come *sinonimi* e non come unica grafia (`--porta`,

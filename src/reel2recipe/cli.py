@@ -288,12 +288,12 @@ def export_command(args) -> int:
     # — inside the container it would have written next to the code instead of on the
     # persistent volume.
     destination = Path(args.out) if args.out else paths.export_folder()
-    formats = list(dict.fromkeys(args.format))   # senza duplicati, nell'ordine dato
+    formats = list(dict.fromkeys(args.format))   # no duplicates, in the order given
 
-    def scrivi_una(recipe, formato: str) -> Path:
-        if formato == "markdown":
+    def write_one(recipe, fmt: str) -> Path:
+        if fmt == "markdown":
             return write_markdown(recipe, destination)
-        if formato == "pdf":
+        if fmt == "pdf":
             return write_pdf(recipe, destination)
         return write_melarecipe(recipe, destination)
 
@@ -303,17 +303,17 @@ def export_command(args) -> int:
             if not recipes:
                 print(dim("The library is empty: nothing to export."))
                 return 0
-            for formato in formats:
+            for fmt in formats:
                 try:
-                    if formato == "mela":
+                    if fmt == "mela":
                         # Only Mela has a format for several recipes at once: a zip that imports
                         # in one go. Markdown and PDF are one file per recipe.
                         path = write_melarecipes(recipes, destination / "library")
                         print(ok(f"✓ {len(recipes)} recipes in {path}"))
                     else:
                         for recipe in recipes:
-                            scrivi_una(recipe, formato)
-                        print(ok(f"✓ {len(recipes)} recipes as {formato} in {destination}"))
+                            write_one(recipe, fmt)
+                        print(ok(f"✓ {len(recipes)} recipes as {fmt} in {destination}"))
                 except DocumentError as e:
                     print(fail(str(e)))
                     return 1
@@ -322,9 +322,9 @@ def export_command(args) -> int:
             if not recipe:
                 print(fail(f"No recipe with id {args.id}."))
                 return 1
-            for formato in formats:
+            for fmt in formats:
                 try:
-                    print(ok(f"✓ {scrivi_una(recipe, formato)}"))
+                    print(ok(f"✓ {write_one(recipe, fmt)}"))
                 except DocumentError as e:
                     print(fail(str(e)))
                     return 1
