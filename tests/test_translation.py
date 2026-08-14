@@ -539,3 +539,44 @@ def test_a_real_value_that_merely_contains_such_a_word_survives(kept):
     cleaned = extract._clean_up({"title": "X", "servings": kept, "method": [], "notes": [],
                                  "ingredients": []})
     assert cleaned["servings"] == kept
+
+
+def test_a_group_heading_is_normalised_even_when_nothing_is_translated():
+    """The path with no translation to hide behind.
+
+    The model writes the same section as `base` on one run and `Per la base` on the next, and
+    both are right enough that nothing flags them — two recipes in one library, headed
+    differently for the same thing. `translate_draft` already settles it, but only runs when
+    the material is not already in the language asked for, so an Italian reel wanted in
+    Italian never got normalised at all.
+    """
+    from reel2recipe.recipe import from_draft
+
+    draft = {"title": "Tiramisu", "method": ["Monta i tuorli."], "ingredients": [
+        {"name": "savoiardi", "group": "base", "quantity_raw": "200", "unit_raw": "g"},
+        {"name": "cacao", "group": "copertura", "quantity_raw": "", "unit_raw": ""},
+    ]}
+    assert [i.group for i in from_draft(draft, language="it").ingredients] == \
+           ["Per la base", "Per la copertura"]
+
+
+def test_a_heading_the_table_does_not_know_is_left_alone():
+    """There is no house style to impose on "Per la crema al limone", and inventing one would
+    be a worse defect than the inconsistency it fixed."""
+    from reel2recipe.recipe import from_draft
+
+    draft = {"title": "T", "method": ["x"], "ingredients": [
+        {"name": "crema", "group": "Per la crema al limone", "quantity_raw": "", "unit_raw": ""},
+    ]}
+    assert from_draft(draft, language="it").ingredients[0].group == "Per la crema al limone"
+
+
+def test_an_ingredient_with_no_group_stays_without_one():
+    """Normalising must not turn "no section" into a section."""
+    from reel2recipe.recipe import from_draft
+
+    draft = {"title": "T", "method": ["x"], "ingredients": [
+        {"name": "farina", "group": "", "quantity_raw": "500", "unit_raw": "g"},
+        {"name": "sale", "quantity_raw": "10", "unit_raw": "g"},
+    ]}
+    assert [i.group for i in from_draft(draft, language="it").ingredients] == [None, None]

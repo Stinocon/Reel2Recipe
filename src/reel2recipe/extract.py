@@ -151,8 +151,24 @@ DRAFT_SCHEMA: dict = {
                     },
                     "name": {"type": "string", "description": "Il nome dell'ingrediente, senza la quantità"},
                     "notes": {"type": "string", "description": "Es. 'a temperatura ambiente', 'tritato'"},
-                    "group": {"type": "string", "description": "Es. 'Per la base', 'Per la crema'. Vuoto se non ci sono sezioni."},
+                    "group": {"type": "string", "description": "Es. 'Per la base', 'Per la crema'. Stringa VUOTA se la ricetta non raggruppa gli ingredienti."},
                 },
+                # `group` is deliberately NOT required, and that is a measured decision rather
+                # than an oversight. The Italian output was keeping half the sections it had
+                # been given, and "the prompt asks, the schema permits" made this look like
+                # another `servings`. It was not: made required, the numbers did not move at
+                # all — 3 sections out of 6 before and after, in three runs each way.
+                #
+                # The loss was never the field being absent. The model was **dropping the
+                # ingredient**: "Per la copertura: cacao amaro" is a section with one item, and
+                # the item did not reach the list — it turned up in the method and in a gap
+                # instead, so the recipe knew about the cocoa and the shopping list did not.
+                # A rule in the prompt naming that case fixed it, 6 out of 6, both languages.
+                #
+                # Worth keeping as a warning: this project's own lesson — when the prompt and
+                # the schema contradict each other the schema wins — is about a field the model
+                # *omits*. It says nothing about a field the model never gets to fill because
+                # the row it belongs to was never written.
                 "required": ["name", "quantity_raw", "unit_raw"],
             },
         },
@@ -261,6 +277,9 @@ CAMPI
   Il nome del gruppo va scritto nella lingua di uscita, come il resto.
   Una riga che elenca più ingredienti separati da virgole va spezzata in un ingrediente per
   voce, tutti con lo stesso gruppo. Se il materiale non raggruppa, lascia group vuoto.
+  **Un gruppo con UN SOLO ingrediente è comunque un gruppo, e quell'ingrediente va elencato.**
+  "Per la copertura: cacao amaro" è una riga di ingredienti: il cacao va in ingredients, non
+  soltanto citato nel procedimento. Vale anche quando è l'ultima riga dell'elenco.
 - servings: **solo la resa, non una frase**. Da "RICETTA (5 vasetti, 15 min)" esce "5 vasetti";
   da "Ingredienti - per QUATTRO persone" esce "4 persone"; da "Serves 2" esce "2 persone".
   Va nella lingua di uscita e finisce in un campo che le app di ricette mostrano accanto al
@@ -337,6 +356,9 @@ FIELDS
   The group name goes in the output language, like everything else.
   A line listing several comma-separated ingredients is split into one ingredient per entry,
   all with the same group. If the material does not group, leave group empty.
+  **A group with ONE ingredient is still a group, and that ingredient goes in the list.**
+  "For the topping: cocoa powder" is an ingredient line: the cocoa belongs in ingredients, not
+  only mentioned in the method. This holds when it is the last line of the list too.
 - servings: **the yield only, never a sentence**. "RECIPE (5 jars, 15min prep time)" gives
   "5 jars"; "Ingredienti - per QUATTRO persone" gives "4 servings"; "Serves 2" gives
   "2 servings". It goes in the output language and lands in a field recipe apps show next to

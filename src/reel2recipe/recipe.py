@@ -322,6 +322,30 @@ def _int_or_none(value) -> int | None:
         return None
 
 
+def _group_heading(raw: str | None, tables: Tables, language: str) -> str | None:
+    """A section heading, in the form the glossary settles on.
+
+    The model writes the same section in several ways — `base` on one run and `Per la base` on
+    the next, `topping` and `Per la copertura` — and both are right enough that nothing flags
+    them. The result is two recipes in the same library headed differently for the same thing.
+
+    `data/ingredients.yaml` already knows both spellings and which one we emit, and
+    `translate_draft` already applies it. But that only runs when the material is not already
+    in the language asked for, so **an Italian reel wanted in Italian never got normalised at
+    all** — the one path where there is no translation to hide behind. Doing it here covers
+    every draft, translated or not, and applying it twice is harmless: the second pass finds
+    the form it produced.
+
+    A heading the table does not know is left exactly as it is. There is no house style to
+    impose on "Per la crema al limone", and inventing one would be a worse defect than the
+    inconsistency it fixed.
+    """
+    heading = (raw or "").strip()
+    if not heading:
+        return None
+    return tables.group_name(heading, language) or heading
+
+
 def from_draft(
     draft: dict,
     source: Source | None = None,
@@ -362,7 +386,7 @@ def from_draft(
             quantity_raw=raw.get("quantity_raw"),
             unit_raw=raw.get("unit_raw"),
             notes=(raw.get("notes") or None),
-            group=(raw.get("group") or None),
+            group=_group_heading(raw.get("group"), t, language),
             tables=t,
             system=system,
             language=language,

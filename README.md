@@ -235,11 +235,18 @@ time, and that is the weakest part — see the note below.
 > its hands.
 >
 > Measured, in every language combination: **the terms are at 100% and stay there across runs,
-> and so do the amounts.** The **group headings** are usually right and not always, and the
-> reason is upstream of the translation — the extraction itself sometimes loses a heading, or
-> coins one that is not quite a word (`Garnitura` for a garnish). The glossary catches the
-> coinages it has met; it cannot catch a heading that never arrived. Run `uv run python
-> tools/benchmark-translation.py` and see the current numbers rather than these.
+> and so do the amounts.**
+>
+> The **group headings** were the last thing to give way, and the cause turned out to sit
+> upstream of any translation: a section holding a single ingredient — "Per la copertura: cacao
+> amaro" — was losing that ingredient, and the heading went with it. The cocoa still turned up
+> in the method, so the recipe knew about it and the shopping list did not, which is the worst
+> shape a defect can take here. That is fixed, and the headings are now also normalised to one
+> spelling per language, so two recipes in your library do not head the same section
+> differently.
+>
+> Run `uv run python tools/benchmark-translation.py` and see the current numbers rather than
+> trusting these: they are what one machine measured on one day.
 >
 > **What is left.** An ingredient the table does not hold still goes to the model, and there
 > the old caveat stands: it is told never to substitute and to **keep the original word when

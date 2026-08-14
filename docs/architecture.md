@@ -194,6 +194,23 @@ measured a problem that was not there: it used rich prose, and the failure only 
 
 ### 3. When the prompt and the schema contradict each other, the schema wins
 
+**And when they do not contradict each other, the schema is not the answer.** The same lesson
+has a second half, learnt the hard way one release later. Sections were going missing from
+Italian recipes — half of them — and the diagnosis wrote itself: `group` is an optional field,
+optional fields get omitted, make it required like `servings`. Made required, the numbers did
+not move at all: three sections out of six before, three after, over three runs each way.
+
+The field was never missing. The **row** was. "Per la copertura: cacao amaro" is a section
+holding one ingredient, and the model was dropping the ingredient — while still mentioning the
+cocoa in the method and declaring a gap about the topping, so the recipe knew about it and the
+shopping list did not. A schema constrains the shape of what gets written; it has nothing to
+say about a row that never gets written at all. One rule in the prompt naming that case fixed
+it: 6 of 6, both languages, and zero sections invented on a flat list.
+
+The original lesson stands unchanged for what it covers. What is added is its boundary.
+
+
+
 `porzioni` and the times always came out empty, even from sources saying "Serves 2" or "180° per
 25'-30'". The prompt insisted, the mapping was right: the culprit was the **JSON schema**, where
 those fields were optional. With schema-constrained output the model is free to omit an optional
