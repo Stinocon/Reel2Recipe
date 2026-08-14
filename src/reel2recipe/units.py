@@ -15,9 +15,9 @@ Every quantity produced carries its own `provenance`, so the interface can tell 
 figure declared by the reel from an estimate of ours.
 
 There are three tables, in `data/`:
-  - `unita.yaml`    exact conversions between units (cup→ml, oz→g, °F→°C), labels per language
-  - `densita.yaml`  density per ingredient, for the volume→weight step
-  - `vaghe.yaml`    eyeball measures (q.b., un pizzico, a pinch, a drizzle)
+  - `units.yaml`    exact conversions between units (cup→ml, oz→g, °F→°C), labels per language
+  - `densities.yaml`  density per ingredient, for the volume→weight step
+  - `vague.yaml`    eyeball measures (q.b., un pizzico, a pinch, a drizzle)
 
 TWO AXES, NOT ONE: `system` and `language`.
 
@@ -321,7 +321,7 @@ def _key(text: str) -> str:
     # Typographic apostrophes (U+2019, U+2018) to the ASCII one. A line with this intent was
     # already here, but it put the ASCII apostrophe in place of itself: it did nothing, and on
     # a re-read it looked fine. It cost dearly, because the curly apostrophe is what iOS
-    # keyboards and Instagram captions write by default. With that one, the `vaghe.yaml` entry
+    # keyboards and Instagram captions write by default. With that one, the `vague.yaml` entry
     # "bicchiere d'acqua" was no longer found: instead of "200 ml acqua" declared as an
     # estimate, out came "1 bicchiere d'acqua acqua" with provenance `dichiarato` — a
     # meaningless line presented as certain data.
@@ -390,7 +390,7 @@ class Tables:
         return None
 
     def _density_entry(self, ingredient_name: str) -> tuple[str, float, str] | None:
-        """Finds the `densita.yaml` entry matching an ingredient name.
+        """Finds the `densities.yaml` entry matching an ingredient name.
 
         The search is tolerant: first the whole name, then — if that is not enough — the
         longest table entry contained in the name. That way "farina 00 setacciata" finds
@@ -433,9 +433,9 @@ def load_tables(folder: str | None = None) -> Tables:
             )
         return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
-    u = _read("unita.yaml")
-    d = _read("densita.yaml")
-    v = _read("vaghe.yaml")
+    u = _read("units.yaml")
+    d = _read("densities.yaml")
+    v = _read("vague.yaml")
 
     aliases = {_key(k): val for k, val in (u.get("alias") or {}).items()}
     temp = u.get("temperature") or {}
@@ -550,7 +550,7 @@ def _split_off_unit(raw: str | None, tables: Tables) -> tuple[tuple[float, float
     through to its last attempt and return 1, not 1.5.
 
     Eyeball measures do not come through here: "una tazza" splits into ("una", "tazza"), but
-    "tazza" is not a unit of `unita.yaml` — it lives in `vaghe.yaml` — so this function backs
+    "tazza" is not a unit of `units.yaml` — it lives in `vague.yaml` — so this function backs
     off and `_try_vague` handles it, as it should.
     """
     if not raw:
@@ -803,7 +803,7 @@ def _trailing_measure(name: str, tables: Tables) -> tuple[str, str] | None:
     1. **In brackets**, any known eyeball measure: «sale (un pizzico)» becomes a declared
        estimate instead of a hole. Brackets are a strong signal that the text annotates the
        quantity; a parenthetical that is not a measure — «crema di cocco (lattina di cocco
-       parte sopra più grassa)» — does not appear in `vaghe.yaml` and stays where it is.
+       parte sopra più grassa)» — does not appear in `vague.yaml` and stays where it is.
     2. **In the open**, only the «q.b.» family: «semi di sesamo q.b.». Here we stay deliberately
        strict, because without brackets the risk of stealing a word from the name is real.
 
@@ -818,7 +818,7 @@ def _trailing_measure(name: str, tables: Tables) -> tuple[str, str] | None:
     if m := _RE_TRAILING_BRACKETS.match(text):
         rest, inside = m.group(1).strip(), m.group(2).strip()
         # At least two words: «(un pizzico)» is a dose, «(noce)» is the kind of nut and
-        # «(tazza)» the container. Many `vaghe.yaml` entries have single-word aliases — noce,
+        # «(tazza)» the container. Many `vague.yaml` entries have single-word aliases — noce,
         # presa, punta, tazza, bicchiere, filo — which in brackets after a name almost always
         # qualify it rather than dose it.
         if rest and len(inside.split()) >= 2 and _key(inside) in tables.vague:
@@ -985,7 +985,7 @@ def _normalise_ingredient(
 
     minimum, maximum = number
 
-    # 6. A count of pieces: not converted. "2 uova" stays "2 uova"; if `vaghe.yaml` knows a
+    # 6. A count of pieces: not converted. "2 uova" stays "2 uova"; if `vague.yaml` knows a
     #    typical weight we add it as a comment, without replacing the count.
     if unit is None or unit in t.count:
         return _as_count(name, minimum, maximum, unit, unit_raw, original, notes,
@@ -1030,7 +1030,7 @@ def _normalise_ingredient(
             return as_volume(Provenance.CONVERTED_UNIT)
 
         # 9c. Dry with a known density, and a metric destination: this is the case
-        #     `densita.yaml` exists for. Towards imperial density is NOT crossed: a volume
+        #     `densities.yaml` exists for. Towards imperial density is NOT crossed: a volume
         #     stays a volume, because "200 g of flour" rendered in cups would give 1.67 cup,
         #     i.e. a number no measuring cup can make. The source of the datum does not become
         #     a note for the user: it is documentation of the table, and it contains brackets
@@ -1137,7 +1137,7 @@ def _vague_value(definition: dict, system: str) -> tuple[float, str] | None:
 
     It is in the table and not calculated: a pinch is 0.5 g in metric and 1/8 tsp in imperial,
     and converting the first into the second would give 0.018 oz — a number nobody carries out
-    (see the header of `vaghe.yaml`).
+    (see the header of `vague.yaml`).
     """
     value = definition.get("value")
     if not isinstance(value, dict):

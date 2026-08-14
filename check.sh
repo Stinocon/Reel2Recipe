@@ -42,7 +42,7 @@ fi
 # ------------------------------------------------------------ 2. conversion tables
 section "Conversion tables (data/)"
 if uv run python -c "from reel2recipe.units import load_tables; t=load_tables(); assert t.density and t.volume and t.vague" 2>/dev/null; then
-  ok "unita.yaml, densita.yaml, vaghe.yaml load and are coherent"
+  ok "units.yaml, densities.yaml, vague.yaml load and are coherent"
 else
   ko "the tables in data/ do not load or are incomplete"
 fi

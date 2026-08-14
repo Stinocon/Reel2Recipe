@@ -45,7 +45,7 @@ by installing them**, not by using Reel2Recipe.
 
 ## 3. Conversion data
 
-The densities in `data/densita.yaml` derive from **USDA FoodData Central** (public domain) and
+The densities in `data/densities.yaml` derive from **USDA FoodData Central** (public domain) and
 from **King Arthur Baking's Ingredient Weight Chart**, cited entry by entry in the `source`
 field. They are matters of fact, not protected material: the value added here is having
 verified them and made them traceable.
