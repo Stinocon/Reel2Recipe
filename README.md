@@ -232,8 +232,14 @@ time, and that is the weakest part — see the note below.
 > So the names it gets wrong are no longer its to decide. `data/ingredients.yaml` holds them —
 > 156 ingredients and 14 group headings, in both languages — and the code translates the ones
 > it knows without the model seeing the word, exactly as `densities.yaml` keeps weights out of
-> its hands. Every language combination now measures **100%** on the terms, the group headings
-> and the amounts. Run `uv run python tools/benchmark-translation.py` and see for yourself.
+> its hands.
+>
+> Measured, in every language combination: **the terms are at 100% and stay there across runs,
+> and so do the amounts.** The **group headings** are usually right and not always, and the
+> reason is upstream of the translation — the extraction itself sometimes loses a heading, or
+> coins one that is not quite a word (`Garnitura` for a garnish). The glossary catches the
+> coinages it has met; it cannot catch a heading that never arrived. Run `uv run python
+> tools/benchmark-translation.py` and see the current numbers rather than these.
 >
 > **What is left.** An ingredient the table does not hold still goes to the model, and there
 > the old caveat stands: it is told never to substitute and to **keep the original word when

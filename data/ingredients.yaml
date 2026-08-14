@@ -743,7 +743,12 @@ groups:
   guarnizione:
     it: Per guarnire
     en: For the garnish
-    alias: [guarnizione, garnish, to garnish, decorazione, per decorare]
+    # `garnitura` is not standard Italian — the model coins it when asked for an Italian
+    # heading, often enough to show up in the measurement. It looks Italian, so the
+    # translation pass leaves it alone and it reaches the card. Exactly the case this file
+    # is meant to grow for: a real thing got it wrong, so the table learns the word.
+    alias: [guarnizione, garnish, to garnish, decorazione, per decorare, garnitura,
+            guarnire, per la guarnizione, for garnish]
   impasto:
     it: Per l'impasto
     en: For the dough
