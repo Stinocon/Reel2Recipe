@@ -176,8 +176,8 @@ Da riga di comando l'interfaccia non c'è, quindi gli assi sono due e partono da
 
 ```bash
 uv run r2r cook <url> --language en                    # ricetta in inglese, misure imperiali
-uv run r2r cook <url> --language en --system metrico   # inglese, ma con grammi e ml
-uv run r2r cook <url> --system imperiale               # italiano, ma con cup e once
+uv run r2r cook <url> --language en --system metric    # inglese, ma con grammi e ml
+uv run r2r cook <url> --system imperial                # italiano, ma con cup e once
 ```
 
 Nell'interfaccia web gli stessi due selettori stanno nelle *Opzioni*, e di base seguono
@@ -349,17 +349,24 @@ Documentazione tecnica: [`docs/architecture.md`](docs/architecture.md), in ingle
 ### Se stai leggendo il codice
 
 **Il codice è in inglese** — identificatori, commenti, test, script e documento di
-architettura. L'italiano che resta è deliberato e sta in quattro gruppi: il **formato già
-scritto sul disco** (chiavi annidate delle ricette salvate, valori di `Provenance` e
-`System` — le tabelle e le colonne SQL ne facevano parte e ora sono inglesi, con una vera
-migrazione `ALTER TABLE` invece di una rinomina), il **contratto col modello locale** (prompt,
-schema e delimitatori di `extract.py`), il **vocabolario di cucina**, che è dato (`cucchiaio`,
-`farina 00`, `q.b.`,
-e i pattern che rilevano le injection scritte in italiano), e gli **alias italiani della
-CLI**, tenuti come *sinonimi* e non come unica grafia (`--porta`, `--lingua`, `elimina`), per
-chi li avesse in uno script o nella cronologia della shell. Le URL e i parametri di query
-stavano in quest'ultimo gruppo e non ci stanno più: l'unico client è `web/app.js`, che viaggia
-nello stesso commit. E nemmeno l'add-on ci dipende più: la sua riga di avvio usa `--port`.
+architettura. L'italiano che resta è deliberato e sta in tre gruppi:
+
+- **Il contratto col modello locale** — prompt, schema JSON e delimitatori di `extract.py`.
+  Sono stati tarati contro un modello vero su reel veri, e si muovono solo insieme a una
+  nuova esecuzione del gate del modello.
+- **Il vocabolario di cucina, che è dato** — `cucchiaio`, `farina 00`, `q.b.` in `data/*.yaml`,
+  con gli alias inglesi accanto, e i pattern che rilevano le injection scritte in italiano.
+- **Gli alias italiani della CLI**, tenuti come *sinonimi* e non come unica grafia (`--porta`,
+  `--lingua`, `elimina`, e i valori `metrico`/`imperiale`), per chi li avesse in uno script o
+  nella cronologia della shell.
+
+Un quarto gruppo c'era e non c'è più: il **formato scritto sul disco**. Colonne SQL, chiavi
+annidate delle ricette salvate, valori di `Provenance` e `System` sono passati all'inglese —
+non con una rinomina ma con una migrazione e una rete di compatibilità permanente, perché
+quella roba sta dentro la libreria dell'utente. Le URL e i parametri di query hanno lasciato
+il gruppo degli alias per una ragione opposta e più semplice: l'unico client è `web/app.js`,
+che viaggia nello stesso commit, e nemmeno l'add-on ci dipende più — la sua riga di avvio usa
+`--port`.
 
 [`docs/naming.md`](docs/naming.md) è la mappa: cosa si è spostato, cosa no, e perché.
 

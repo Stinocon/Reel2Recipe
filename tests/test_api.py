@@ -73,10 +73,10 @@ def _minimal_recipe() -> dict:
 @pytest.mark.parametrize(
     "request_body, expected_language, expected_system",
     [
-        ({}, "it", "metrico"),                                       # the defaults
-        ({"language": "en"}, "en", "imperiale"),                     # the system follows the language
-        ({"language": "en", "system": "metrico"}, "en", "metrico"),  # English with grams
-        ({"language": "it", "system": "imperiale"}, "it", "imperiale"),
+        ({}, "it", "metric"),                                       # the defaults
+        ({"language": "en"}, "en", "imperial"),                     # the system follows the language
+        ({"language": "en", "system": "metric"}, "en", "metric"),  # English with grams
+        ({"language": "it", "system": "imperial"}, "it", "imperial"),
     ],
 )
 def test_cook_forwards_language_and_system(client, spy, request_body, expected_language,
@@ -142,7 +142,7 @@ def test_cook_file_forwards_every_option(client, spy):
     assert received["skip_audio"] is True
     assert received["caption"] == "una prova"
     assert received["language"] == "en"
-    assert received["system"] == "imperiale"
+    assert received["system"] == "imperial"
     assert received["audio_language"] == "it"
 
 
@@ -165,14 +165,14 @@ def test_cook_file_cleans_up_the_temporary(client, spy):
 # --------------------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("language, expected", [("it", "metrico"), ("en", "imperiale")])
+@pytest.mark.parametrize("language, expected", [("it", "metric"), ("en", "imperial")])
 def test_the_system_follows_the_language(language, expected):
     assert api.CookRequest(language=language).axes()["system"] == expected
 
 
 def test_an_explicitly_asked_system_wins():
-    axes = api.CookRequest(language="en", system="metrico").axes()
-    assert axes == {"language": "en", "system": "metrico"}
+    axes = api.CookRequest(language="en", system="metric").axes()
+    assert axes == {"language": "en", "system": "metric"}
 
 
 # --------------------------------------------------------------------------------------

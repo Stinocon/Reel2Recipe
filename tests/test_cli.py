@@ -119,7 +119,7 @@ def test_batch_accepts_the_same_option():
 
 @pytest.mark.parametrize("old, new, value", [
     (["cook", "x", "--lingua", "en"], ["cook", "x", "--language", "en"], "language"),
-    (["cook", "x", "--sistema", "metrico"], ["cook", "x", "--system", "metrico"], "system"),
+    (["cook", "x", "--sistema", "metric"], ["cook", "x", "--system", "metric"], "system"),
     (["cook", "x", "--didascalia", "t"], ["cook", "x", "--caption", "t"], "caption"),
     (["cook", "x", "--modello", "m"], ["cook", "x", "--model", "m"], "model"),
     (["cook", "x", "--lingua-parlato", "it"], ["cook", "x", "--spoken-language", "it"],

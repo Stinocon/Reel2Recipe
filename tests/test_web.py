@@ -211,10 +211,12 @@ def test_every_key_the_page_reads_exists_in_the_server_json():
     title. It is the same family of mute defect as the guards above, and on a frontend with no
     toolchain there is nothing else that could notice.
 
-    The comparison is deliberately **structural and not exhaustive**: only `recipe.X` accesses
-    are looked at, which are the ones on the JSON's first level. The nested accesses
-    (`ing.riga`, `i.gruppo`) stay out because their keys are Italian by choice and do not
-    follow the Python names.
+    It used to look at `recipe.X` only, and exempt the nested accesses on the stated ground
+    that "their keys are Italian by choice and do not follow the Python names". The exemption
+    is what the defect grew in: `to_dict()` wrote `riga` and `gruppo`, `app.js` read `ing.row`
+    and `i.group`, and every ingredient line in the card rendered from `undefined` — a card
+    with its groups gone and its rows blank, raising nothing. Now that the nested keys are
+    English too there is no ground left for the exemption, so the guard covers them.
     """
     recipe = _sample_recipe().to_dict()
     # `id` is added by the API after the save, not by `to_dict()`.
@@ -227,6 +229,38 @@ def test_every_key_the_page_reads_exists_in_the_server_json():
     assert not missing, (
         f"app.js reads keys the server does not produce: {missing}. "
         f"The server produces: {sorted(available)}"
+    )
+
+
+def test_every_nested_ingredient_key_the_page_reads_exists():
+    """The level below, which is where the mute failure actually happened.
+
+    `ing.row` against a dictionary carrying `line` yields `undefined`, `esc(undefined)` draws
+    an empty row, and the card looks like a recipe whose ingredients have no text. Nothing
+    raises, no test on the Python side can see it, and the page has no toolchain that would.
+
+    The ingredient variables are named by convention in `app.js` — `i` inside a `map`, `ing`
+    inside the render loop — so those are the two the guard follows, and it asserts it found
+    something under each rather than trusting that it did.
+    """
+    ingredient = _sample_recipe().to_dict()["ingredients"][0]
+    available = set(ingredient)
+    quantity_available = set(ingredient["quantity"])
+
+    source = MODULES["app.js"]
+    read_keys = set(re.findall(r"\b(?:ing|i)\.(\w+)", source)) - {"quantity"}
+    quantity_keys = set(re.findall(r"\b(?:ing|i)\.quantity\??\.(\w+)", source))
+
+    assert read_keys, "no ingredient access in app.js: the guard has come unplugged"
+    assert quantity_keys, "no quantity access in app.js: the guard has come unplugged"
+
+    assert not (read_keys - available), (
+        f"app.js reads ingredient keys that `to_dict()` does not write: "
+        f"{sorted(read_keys - available)}. It writes: {sorted(available)}"
+    )
+    assert not (quantity_keys - quantity_available), (
+        f"app.js reads quantity keys that `to_dict()` does not write: "
+        f"{sorted(quantity_keys - quantity_available)}. It writes: {sorted(quantity_available)}"
     )
 
 

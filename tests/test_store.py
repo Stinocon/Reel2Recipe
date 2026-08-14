@@ -173,7 +173,7 @@ def test_the_axes_survive_the_save(lib):
     id = lib.save(r)
     reread = lib.read(id)
     assert reread.language == "en"
-    assert reread.system == "imperiale"
+    assert reread.system == "imperial"
     # And the quantity is still in cups, not reconverted into grams.
     assert reread.ingredients[0].quantity.unit == "cup"
 
@@ -182,12 +182,11 @@ def test_the_axes_survive_the_save(lib):
 # The compatibility net over the keys saved before the migration to English
 # ----------------------------------------------------------------------------------
 
-# A recipe as the code wrote it before `Recipe`'s fields moved to English. It is not a mock:
-# it is the exact shape sitting inside the databases already on users' disks — top-level keys
-# in Italian and the nested ingredient dictionaries in Italian too, the latter never having
-# changed because `to_dict()` builds them from string literals. It is written by hand on
-# purpose: generating it from the current code would only prove that the current code is
-# consistent with itself.
+# A recipe as the code wrote it before the migration to English. It is not a mock: it is the
+# exact shape sitting inside the databases already on users' disks — Italian at every level,
+# keys and values alike, including the nested ingredient dictionaries and the `provenienza`
+# and `sistema` each quantity carries. It is written by hand on purpose: generating it from
+# the current code would only prove that the current code is consistent with itself.
 OLD_RECIPE = {
     "titolo": "Torta di mele della nonna",
     "procedimento": ["Sbuccia le mele.", "Inforna a 180 °C."],
@@ -260,7 +259,10 @@ def test_a_recipe_saved_before_the_migration_still_loads():
     assert r.confidence == {"ingredienti": "alta", "procedimento": "media"}
     assert r.images == ["Zm90bw=="]
     assert r.transcript == "oggi facciamo la torta di mele"
-    assert (r.language, r.system) == ("it", "metrico")
+    # The stored recipe says "metrico"; the net turns it into the value the enum now has.
+    # Reading it back with the old spelling would mean every comparison against `System.METRIC`
+    # in `units.py` silently taking the wrong branch — the same failure `code_of` exists for.
+    assert (r.language, r.system) == ("it", "metric")
 
     # `Source` used to be rebuilt with `Source(**d)`: with the old keys that splat would
     # raise TypeError, and it would do so while the library is being opened.
@@ -275,7 +277,7 @@ def test_a_recipe_saved_before_the_migration_still_loads():
     assert [i.name for i in r.ingredients] == ["farina 00", "cannella"]
     assert r.ingredients[0].group == "Per l'impasto"
     assert (r.ingredients[0].quantity.value, r.ingredients[0].quantity.unit) == (250.0, "g")
-    assert r.ingredients[1].quantity.provenance.value == "assente"
+    assert r.ingredients[1].quantity.provenance.value == "absent"
     assert r.has_uncertainties is True
 
 
@@ -286,10 +288,14 @@ def test_the_rewrite_into_english_is_lazy_and_loses_nothing():
     r = Recipe.from_dict(OLD_RECIPE)
     fresh = r.to_dict()
 
-    # The top level is English now; the nested dictionaries stayed Italian.
+    # Every level is English now, keys and values alike — produced from a recipe whose
+    # stored form is Italian throughout, which is the whole point of the round trip.
     assert "title" in fresh and "titolo" not in fresh
-    assert fresh["ingredients"][0]["nome"] == "farina 00"
-    assert fresh["ingredients"][0]["quantita"]["provenienza"] == "dichiarato"
+    assert fresh["ingredients"][0]["name"] == "farina 00"
+    assert "nome" not in fresh["ingredients"][0]
+    assert fresh["ingredients"][0]["quantity"]["provenance"] == "declared"
+    assert fresh["ingredients"][0]["quantity"]["system"] == "metric"
+    assert fresh["system"] == "metric"
 
     assert Recipe.from_dict(fresh).to_dict() == fresh
 
@@ -457,3 +463,76 @@ def test_a_half_migrated_database_still_migrates(tmp_path):
     with Library(path) as library:
         assert library.count() == 1
         assert library.all_recipes()[0].title == "Torta di mele della nonna"
+
+
+def test_no_two_levels_of_the_recipe_claim_the_same_key():
+    """`LEGACY_KEYS` is flat although the recipe is not, and that only works while the English
+    names are unique across levels.
+
+    The day a nested object gained a key the top level already had, `stored_field` would read
+    one under the other's Italian spelling — silently, and only on the recipes old enough to
+    still carry it. Cheaper to assert the invariant than to debug the day it breaks.
+    """
+    from reel2recipe.recipe import LEGACY_KEYS
+
+    levels = {
+        "recipe": {"title", "ingredients", "method", "description", "servings",
+                   "prep_time_min", "cook_time_min", "notes", "categories", "source",
+                   "gaps", "confidence", "images", "transcript", "language", "system",
+                   "total_time_min", "has_uncertainties"},
+        "source": {"author", "platform", "original_title", "acquired_at"},
+        "ingredient": {"name", "notes", "group", "gap", "line", "quantity"},
+        "quantity": {"value", "value_max", "unit", "provenance", "original_text",
+                     "note", "system", "uncertain"},
+    }
+
+    # `notes`/`system` are shared on purpose: the recipe's notes and the ingredient's, the
+    # recipe's system and the quantity's — same word, same Italian spelling, no ambiguity.
+    # What must never happen is two levels wanting the same English key to mean two *different*
+    # Italian ones, which is what this checks.
+    claimed: dict[str, str] = {}
+    for level, keys in levels.items():
+        for key in keys:
+            italian = LEGACY_KEYS.get(key)
+            if italian is None:
+                continue
+            assert claimed.setdefault(italian, key) == key, (
+                f"«{italian}» is claimed by two different English keys: "
+                f"{claimed[italian]} and {key} (level {level})"
+            )
+
+
+def test_a_quantity_with_italian_values_still_loads():
+    """The keys are only half of it: the *values* were Italian too.
+
+    `Provenance("dichiarato")` on the current enum raises `ValueError`, and it would raise it
+    inside `from_dict` — while the library is being opened. A wrong label is a nuisance; this
+    would be a library that refuses to open.
+    """
+    r = Recipe.from_dict(OLD_RECIPE)
+
+    assert r.system == "metric"
+    assert r.ingredients[0].quantity.provenance.value == "declared"
+    assert r.ingredients[0].quantity.system == "metric"
+    assert r.ingredients[1].quantity.provenance.value == "absent"
+    # And the flag the interface highlights has to survive the translation of the value it
+    # is computed from.
+    assert r.has_uncertainties is True
+
+
+def test_an_unreadable_provenance_does_not_cost_the_library():
+    """A value in neither spelling falls back to `absent` instead of raising.
+
+    `absent` is in `UNCERTAIN_PROVENANCES`, so the honest answer to "I cannot tell where this
+    number came from" is also the one that makes the interface flag it for review. Refusing to
+    open the whole library over one unreadable field would be the wrong trade.
+    """
+    broken = dict(OLD_RECIPE)
+    broken["ingredienti"] = [
+        {**OLD_RECIPE["ingredienti"][0],
+         "quantita": {**OLD_RECIPE["ingredienti"][0]["quantita"], "provenienza": "?????"}}
+    ]
+
+    r = Recipe.from_dict(broken)
+    assert r.ingredients[0].quantity.provenance.value == "absent"
+    assert r.has_uncertainties is True
