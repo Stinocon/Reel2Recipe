@@ -306,13 +306,21 @@ def _singular_plural(word: str) -> set[str]:
 
 
 def _repeated_in_name(unit: str, name: str) -> bool:
-    """True if the unit label coincides with a word of the ingredient name (up to
-    singular/plural). It is what stops us writing "2 uova uova"."""
+    """True if the unit label adds nothing to the ingredient name: every one of its words is
+    already there (up to singular/plural). It is what stops us writing "2 uova uova".
+
+    The check is per word because a model does not only repeat a single one: it also copies
+    the whole name into the unit field, and "cipolle piccole" against "cipolle piccole" was
+    matched by nothing as long as the comparison worked on the label taken whole.
+    """
     name_words = set(_key(name).split())
-    for form in _singular_plural(_key(unit)):
-        if form in name_words:
-            return True
-    return False
+    unit_words = _key(unit).split()
+    if not unit_words:
+        return False
+    return all(
+        any(form in name_words for form in _singular_plural(word))
+        for word in unit_words
+    )
 
 
 def _key(text: str) -> str:
@@ -1072,6 +1080,15 @@ def _normalise_ingredient(
     if outcome := _try_vague(name, original, number, unit_raw, quantity_raw, notes, group,
                              t, system, language):
         return outcome
+
+    # 3-bis. An unrecognised unit that only repeats the name is not a unit: the model copied
+    #    the ingredient into the unit field ("2 cipolle piccole" arrives as name="cipolle
+    #    piccole", unit_raw="cipolle piccole"). Kept, it prints the name twice and raises a
+    #    gap about a unit that never was one — noise on a line that has nothing wrong with
+    #    it. Dropped, what is left is a plain count. `original` keeps the wording of the
+    #    reel: what the material said stays recorded even when we do not use it.
+    if unit is None and unit_raw and _repeated_in_name(str(unit_raw).strip(), name):
+        unit_raw = None
 
     # 4. Unit not recognised.
     if unit is None and unit_raw:
