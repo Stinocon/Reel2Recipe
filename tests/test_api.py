@@ -73,9 +73,9 @@ def _minimal_recipe() -> dict:
 @pytest.mark.parametrize(
     "request_body, expected_language, expected_system",
     [
-        ({}, "it", "metric"),                                       # the defaults
-        ({"language": "en"}, "en", "imperial"),                     # the system follows the language
-        ({"language": "en", "system": "metric"}, "en", "metric"),  # English with grams
+        ({}, "it", "metric"),                                        # the defaults
+        ({"language": "en"}, "en", "metric"),                        # metric whatever the language
+        ({"language": "en", "system": "imperial"}, "en", "imperial"),  # English with cups, asked for
         ({"language": "it", "system": "imperial"}, "it", "imperial"),
     ],
 )
@@ -130,8 +130,8 @@ def test_cook_file_forwards_every_option(client, spy):
     response = client.post(
         "/api/cook-file",
         params={"asr_backend": "faster-whisper", "llm_model": "qwen2.5:14b",
-                "skip_audio": "true", "language": "en", "audio_language": "it",
-                "caption": "una prova"},
+                "skip_audio": "true", "language": "en", "system": "imperial",
+                "audio_language": "it", "caption": "una prova"},
         files={"file": ("reel.mp4", b"non un video vero", "video/mp4")},
     )
     assert response.status_code == 200
@@ -142,6 +142,7 @@ def test_cook_file_forwards_every_option(client, spy):
     assert received["skip_audio"] is True
     assert received["caption"] == "una prova"
     assert received["language"] == "en"
+    # Asked for explicitly, since the language no longer implies it.
     assert received["system"] == "imperial"
     assert received["audio_language"] == "it"
 
@@ -165,14 +166,21 @@ def test_cook_file_cleans_up_the_temporary(client, spy):
 # --------------------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("language, expected", [("it", "metric"), ("en", "imperial")])
-def test_the_system_follows_the_language(language, expected):
-    assert api.CookRequest(language=language).axes()["system"] == expected
+@pytest.mark.parametrize("language", ["it", "en"])
+def test_the_system_does_not_follow_the_language(language):
+    """It used to: English meant cups and ounces. The reasoning was that someone reading in
+    English wants the units they cook with, and it was right — the mapping was wrong. Most
+    people who read recipes in English cook in grams: the United Kingdom, Ireland, Australia,
+    Canada, India. Imperial cooking measures are essentially one country's, and defaulting the
+    whole language to them served the minority of its speakers."""
+    assert api.CookRequest(language=language).axes()["system"] == "metric"
 
 
 def test_an_explicitly_asked_system_wins():
-    axes = api.CookRequest(language="en", system="metric").axes()
-    assert axes == {"language": "en", "system": "metric"}
+    axes = api.CookRequest(language="en", system="imperial").axes()
+    assert axes == {"language": "en", "system": "imperial"}
+    # And the other way, so the default being metric is not mistaken for metric being forced.
+    assert api.CookRequest(language="it", system="imperial").axes()["system"] == "imperial"
 
 
 # --------------------------------------------------------------------------------------

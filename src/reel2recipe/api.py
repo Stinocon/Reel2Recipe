@@ -157,15 +157,15 @@ class CookRequest(BaseModel):
     # means "let Whisper recognise it", and it is the default: deducing it from the requested
     # output language would mean declaring a false language every time we translate.
     audio_language: str | None = None
-    # The two output axes. If the system is not asked for it follows the language, but stays
-    # overridable: English with grams is a real combination.
+    # The two output axes. They are independent: the system does not follow the language, it
+    # defaults to metric and is chosen. See `cli.output_axes` for why that default moved —
+    # briefly, imperial cooking measures are one country's, and most people who read recipes
+    # in English cook in grams.
     language: str = "it"
     system: str | None = None
 
     def axes(self) -> dict:
-        return {"language": self.language,
-                "system": self.system or (System.IMPERIAL.value if self.language == "en"
-                                          else System.METRIC.value)}
+        return {"language": self.language, "system": self.system or System.METRIC.value}
 
 
 # --------------------------------------------------------------------------------------

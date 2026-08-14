@@ -24,7 +24,8 @@ TWO AXES, NOT ONE: `system` and `language`.
 `system` (metric/imperial) decides **the numbers**, so it is settled here, at the conversion.
 `language` (it/en) decides **the words**: unit labels and gap messages. They do not coincide —
 an Australian reads in English and cooks in grams — and keeping them apart is the only way to
-serve both.
+serve both. Which is also why the system stopped defaulting from the language: it defaults to
+metric and is chosen, because that Australian is the common case and not the exception.
 
 The system applies to the **raw** quantity, not downstream of an intermediate conversion.
 "1 cup of flour" stays "1 cup" for someone cooking in imperial rather than becoming 120 g and

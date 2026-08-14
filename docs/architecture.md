@@ -100,7 +100,11 @@ The tables follow the same discipline: **every density in `data/densities.yaml` 
 
 **Two axes, not one: `system` and `language`.** The product works in Italian/English and in
 metric/imperial, and the two axes stay separate because they do not coincide (an Australian
-reads in English but cooks in grams). The **system** decides the numbers — it is settled at the
+reads in English but cooks in grams). Separate to the point that the system does **not** take
+its default from the language: it is metric whatever the language, and imperial is chosen.
+That default used to follow — English meant imperial — which served the one country where
+recipes are cooked in cups and not the several where they are read in English and cooked in
+grams. The **system** decides the numbers — it is settled at the
 conversion, in `units.py`, and it applies to the *raw* quantity: towards imperial density is not
 crossed and quantities are written as fractions (`3/4 cup`), because a measuring cup has no
 0.75. The **language** decides the words: unit labels, eyeball measures and gap messages. The
@@ -196,7 +200,7 @@ those fields were optional. With schema-constrained output the model is free to 
 field, and `qwen2.5:14b` omitted it systematically. The prompt asks, the schema permits: **the
 schema is the mechanical constraint on the decoding, the prompt is a prayer.**
 
-But the remedy has a symmetric cost. Made required, `tempo_preparazione_min` was **invented** —
+But the remedy has a symmetric cost. Made required, `prep_time_min` was **invented** —
 15 and 30 minutes on sources that stated no prep time at all, splitting a cooking range across
 the two fields. So a field is made required only where the datum is normally present in the
 sources: `porzioni` and `tempo_cottura_min` yes, `tempo_preparazione_min` no. A few genuinely

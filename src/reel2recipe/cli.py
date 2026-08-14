@@ -262,15 +262,21 @@ SYSTEM_CHOICES = [s.value for s in System] + list(LEGACY_SYSTEMS)
 def output_axes(args) -> dict:
     """The language and system to pass to the pipeline.
 
-    The system, when not asked for, follows the language: someone producing in English
-    usually wants cups and ounces, someone producing in Italian wants grams. They stay
-    independent, though — an Australian writes `--language en --system metric` and gets
-    English with grams, which is the combination they would really use.
+    **The system does not follow the language: it defaults to metric and is chosen.** It used
+    to follow — English meant cups and ounces — on the reasoning that someone reading in
+    English wants the units they cook with. The reasoning was right and the mapping was wrong:
+    most people who read recipes in English cook in grams, in the United Kingdom, Ireland,
+    Australia, Canada, India and beyond. Imperial cooking measures are essentially one
+    country's, and defaulting the whole language to them served the minority of its speakers.
+
+    Metric is also the system the tables are complete in and the one a conversion can always
+    reach, so it is the safer default in the sense that matters here: the one least likely to
+    hand somebody a number they cannot use.
+
+    Imperial stays one flag away, and that is the part the user asked to keep.
     """
     language = getattr(args, "language", "it")
-    system = getattr(args, "system", None)
-    if system is None:
-        system = System.IMPERIAL.value if language == "en" else System.METRIC.value
+    system = getattr(args, "system", None) or System.METRIC.value
     # `--system metrico` is still accepted, like every other Italian spelling on this command
     # line, and is normalised here rather than at the twenty places downstream that compare
     # against `System.METRIC`. Accepting a value and then never matching it would be worse
