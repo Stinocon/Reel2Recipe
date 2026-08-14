@@ -21,19 +21,19 @@ from reel2recipe.documents import (
 from reel2recipe.recipe import Source, Recipe, from_draft, free_path
 
 DRAFT = {
-    "titolo": "Tiramisù al pistacchio",
-    "porzioni": "6 persone",
-    "tempo_preparazione_min": 25,
-    "ingredienti": [
-        {"quantita_raw": "250", "unita_raw": "g", "nome": "ricotta", "gruppo": "Per la crema"},
-        {"quantita_raw": "1", "unita_raw": "cup", "nome": "zucchero semolato", "gruppo": "Per la crema"},
-        {"quantita_raw": "200", "unita_raw": "g", "nome": "savoiardi", "gruppo": "Per la base"},
-        {"quantita_raw": "un pizzico", "unita_raw": None, "nome": "sale", "gruppo": "Per la base"},
+    "title": "Tiramisù al pistacchio",
+    "servings": "6 persone",
+    "prep_time_min": 25,
+    "ingredients": [
+        {"quantity_raw": "250", "unit_raw": "g", "name": "ricotta", "group": "Per la crema"},
+        {"quantity_raw": "1", "unit_raw": "cup", "name": "zucchero semolato", "group": "Per la crema"},
+        {"quantity_raw": "200", "unit_raw": "g", "name": "savoiardi", "group": "Per la base"},
+        {"quantity_raw": "un pizzico", "unit_raw": None, "name": "sale", "group": "Per la base"},
     ],
-    "procedimento": ["Monta i tuorli con lo zucchero.", "Componi a strati."],
-    "note": ["Riposa in frigo almeno 4 ore."],
-    "confidenza": {"ingredienti": "alta", "procedimento": "alta"},
-    "lacune": ["Il reel non diceva quante uova."],
+    "method": ["Monta i tuorli con lo zucchero.", "Componi a strati."],
+    "notes": ["Riposa in frigo almeno 4 ore."],
+    "confidence": {"ingredients": "alta", "method": "alta"},
+    "gaps": ["Il reel non diceva quante uova."],
 }
 
 
@@ -47,9 +47,9 @@ def recipe() -> Recipe:
 @pytest.fixture
 def simple() -> Recipe:
     return from_draft(
-        {"titolo": "Pasta al burro",
-         "ingredienti": [{"quantita_raw": "100", "unita_raw": "g", "nome": "burro"}],
-         "procedimento": ["Sciogli il burro."], "confidenza": {}, "lacune": []},
+        {"title": "Pasta al burro",
+         "ingredients": [{"quantity_raw": "100", "unit_raw": "g", "name": "burro"}],
+         "method": ["Sciogli il burro."], "confidence": {}, "gaps": []},
     )
 
 
@@ -184,8 +184,8 @@ def test_free_path_does_not_tread_on_an_earlier_export(tmp_path):
 
 
 def test_the_file_name_is_readable_and_safe():
-    assert from_draft({"titolo": "Tiramisù al pistacchio!", "ingredienti": [],
-                     "procedimento": [], "confidenza": {}, "lacune": []}).file_name() \
+    assert from_draft({"title": "Tiramisù al pistacchio!", "ingredients": [],
+                     "method": [], "confidence": {}, "gaps": []}).file_name() \
         == "tiramisu-al-pistacchio"
 
 
@@ -198,10 +198,10 @@ def test_the_english_export_translates_the_wrapper(tmp_path):
     """
     from reel2recipe.units import Language, System
     r = from_draft(
-        {"titolo": "Pancakes",
-         "ingredienti": [{"quantita_raw": "1", "unita_raw": "cup", "nome": "flour"}],
-         "procedimento": ["Mix everything."], "confidenza": {},
-         "lacune": ["the reel did not say how many eggs"]},
+        {"title": "Pancakes",
+         "ingredients": [{"quantity_raw": "1", "unit_raw": "cup", "name": "flour"}],
+         "method": ["Mix everything."], "confidence": {},
+         "gaps": ["the reel did not say how many eggs"]},
         source=Source.now(url="https://x/y", author="baker"),
         language=Language.EN, system=System.IMPERIAL,
     )

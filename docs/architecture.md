@@ -43,7 +43,7 @@ This is the central principle, the one the perceived quality follows from. An LL
 "1 cup of flour" into grams produces a plausible and often wrong number, because it is
 remembering rather than calculating. So:
 
-- The model reports the quantity **as it appears** (`quantita_raw`, `unita_raw`) and never
+- The model reports the quantity **as it appears** (`quantity_raw`, `unit_raw`) and never
   converts.
 - `units.py` converts with deterministic, versioned tables (`data/`).
 - With no known density for an ingredient, the volume→weight conversion **is not done**: the
@@ -112,7 +112,7 @@ What the wrapper straightens out:
   bianca (facoltativa)" became "1 (facoltativa) melanzana bianca". The first version of this
   rule said "no unit of measurement is written in brackets" and stopped there, because that
   looks like a cheaper and safer criterion than a vocabulary. It was false: the model also
-  writes `unita_raw="(g)"`, and since the normalisation already strips brackets, before that
+  writes `unit_raw="(g)"`, and since the normalisation already strips brackets, before that
   check "200" + "(g)" converted correctly. Demoting it to a note turned "200 g di farina" into a
   count of two hundred flours, **without even a gap** — the regression lasted half a day and was
   found by a cold re-read, not by the tests. Now the content is inspected: if it is a known

@@ -6,7 +6,7 @@ Ask a language model "how many grams is 1 cup of flour?" and it produces a plaus
 Sometimes 120, sometimes 128, sometimes 150, and for sugar it may well repeat the same number
 it gave for flour — which is wrong by 67%. The model is not calculating, it is misremembering.
 
-Here nothing is guessed: quantities arrive raw from `extract.py` (`quantita_raw`, `unita_raw`,
+Here nothing is guessed: quantities arrive raw from `extract.py` (`quantity_raw`, `unit_raw`,
 exactly as spoken or written in the reel) and are converted with the versioned tables in
 `data/`. When a conversion is not possible — typically a volume of an ingredient whose density
 we do not know — **nothing is invented**: the original unit is kept and the gap is declared.
@@ -734,7 +734,7 @@ def _resolve_contradictory_unit(
     """The quantity carries a unit inside it that contradicts the one the model isolated.
 
     This happens when the reel writes the same dose two ways and the model mixes their pieces.
-    Out of «1¼ cups (300 ml) water» came `quantita_raw="1¼ cups"` and `unita_raw="ml"`: the
+    Out of «1¼ cups (300 ml) water» came `quantity_raw="1¼ cups"` and `unit_raw="ml"`: the
     number of one representation and the unit of the other. The product was "1 ml" of water
     instead of 300, with provenance `dichiarato` — that is, a wrong number presented as
     certain, which is the failure this project exists to prevent.
@@ -768,13 +768,13 @@ def _resolve_contradictory_unit(
 def _unit_in_brackets(unit_raw: str | None, tables: Tables) -> str | None:
     """The content of a "unit" that is in fact a word in brackets.
 
-    Out of «1 melanzana bianca (facoltativa)» the model produces `unita_raw="(facoltativa)"`,
+    Out of «1 melanzana bianca (facoltativa)» the model produces `unit_raw="(facoltativa)"`,
     and the ingredient came out as «1 (facoltativa) melanzana bianca». The rule that demotes a
     non-unit to a note did not fire, because it requires the number to be missing — and here
     the number is there.
 
     "No unit is written in brackets" looks like a sufficient criterion, and it is not: the
-    model also writes `unita_raw="(g)"`, and `_key` already strips brackets, so before this
+    model also writes `unit_raw="(g)"`, and `_key` already strips brackets, so before this
     check «200» + «(g)» converted perfectly well. Demoting it to a note turned it into a count
     of two hundred flours — a wrong number without even a gap. So we look **inside** the
     brackets: if it is a known unit, nothing is touched.
@@ -934,8 +934,8 @@ def _normalise_ingredient(
     number = parse_quantity(quantity_raw)
     unit = t.canonical_unit(unit_raw)
 
-    # 2-bis. The model does not always separate number and unit: `quantita_raw` can arrive as
-    #    "80g" or "1 1/2 cup" with `unita_raw` empty. Without this recovery the unit would be
+    # 2-bis. The model does not always separate number and unit: `quantity_raw` can arrive as
+    #    "80g" or "1 1/2 cup" with `unit_raw` empty. Without this recovery the unit would be
     #    lost and the number would end up read as a count of pieces — "80g di maiale" became
     #    "80 maiale". It is recovered only when the unit is missing entirely: if the model
     #    isolated one, its one is the good one.
@@ -954,7 +954,7 @@ def _normalise_ingredient(
 
         # 4a. Without a number in front of it, an unrecognised word is NOT a unit: it is an
         #     attribute of the ingredient that the model put in the wrong field ("Dashi in
-        #     polvere" arrives as name="Dashi", unita_raw="polvere"). Treating it as a unit
+        #     polvere" arrives as name="Dashi", unit_raw="polvere"). Treating it as a unit
         #     puts it in front of the name and produces "polvere Dashi". It becomes a note in
         #     brackets instead — which Mela reads as a comment — and the quantity stays
         #     honestly absent.
@@ -1167,7 +1167,7 @@ def _try_indeterminate(
     """"q.b.", "qualche", "un po'": no number to extract, and that has to be said clearly.
 
     The match tolerates the expression being buried in a longer string: models sometimes
-    produce unita_raw="burro q.b." instead of isolating the "q.b.". In that case the name stays
+    produce unit_raw="burro q.b." instead of isolating the "q.b.". In that case the name stays
     the one in the `name` field and the ingredient becomes "burro q.b.".
     """
     for raw in (quantity_raw, unit_raw, original):

@@ -337,25 +337,26 @@ def from_draft(
     "cup") and comes out with the metric ones and their provenance. Gaps that emerge during
     the conversion are added to the ones the LLM already declared.
 
-    The draft's own keys stay Italian, and are read as such below: they are the JSON schema the
-    local model answers with (`extract.py`), and changing them means re-running the model gate.
-    They are the input format, not this module's names.
+    The draft's keys are `extract.py`'s schema — the JSON the local model answers with — and
+    they are read here as literals. They moved to English together with that schema and a
+    re-run of the model gate; no compatibility net was needed for them, because a draft lives
+    between the model and this function and is never written to disk.
     """
     t = tables or load_tables()
 
     ingredients: list[Ingredient] = []
-    gaps: list[str] = list(draft.get("lacune") or [])
+    gaps: list[str] = list(draft.get("gaps") or [])
 
-    for raw in draft.get("ingredienti") or []:
-        name = (raw.get("nome") or "").strip()
+    for raw in draft.get("ingredients") or []:
+        name = (raw.get("name") or "").strip()
         if not name:
             continue
         ingredient = normalise_ingredient(
             name=name,
-            quantity_raw=raw.get("quantita_raw"),
-            unit_raw=raw.get("unita_raw"),
-            notes=(raw.get("note") or None),
-            group=(raw.get("gruppo") or None),
+            quantity_raw=raw.get("quantity_raw"),
+            unit_raw=raw.get("unit_raw"),
+            notes=(raw.get("notes") or None),
+            group=(raw.get("group") or None),
             tables=t,
             system=system,
             language=language,
@@ -368,7 +369,7 @@ def from_draft(
     # not have that scale. Every substitution is tracked among the notes.
     method: list[str] = []
     temperature_notes: list[str] = []
-    for step in draft.get("procedimento") or []:
+    for step in draft.get("method") or []:
         text = str(step).strip()
         if not text:
             continue
@@ -376,7 +377,7 @@ def from_draft(
         method.append(converted)
         temperature_notes.extend(substitutions)
 
-    notes = list(draft.get("note") or [])
+    notes = list(draft.get("notes") or [])
     if temperature_notes:
         # The direction depends on the system: towards metric you arrive at Celsius, towards
         # imperial at Fahrenheit. Saying it the wrong way round would be worse than not saying it.
@@ -392,18 +393,18 @@ def from_draft(
     return Recipe(
         language=code_of(language),
         system=code_of(system),
-        title=(draft.get("titolo") or "Ricetta senza titolo").strip(),
+        title=(draft.get("title") or "Ricetta senza titolo").strip(),
         ingredients=ingredients,
         method=method,
-        description=(draft.get("descrizione") or None),
-        servings=(draft.get("porzioni") or None),
-        prep_time_min=_int_or_none(draft.get("tempo_preparazione_min")),
-        cook_time_min=_int_or_none(draft.get("tempo_cottura_min")),
+        description=(draft.get("description") or None),
+        servings=(draft.get("servings") or None),
+        prep_time_min=_int_or_none(draft.get("prep_time_min")),
+        cook_time_min=_int_or_none(draft.get("cook_time_min")),
         notes=notes,
-        categories=[c for c in (draft.get("categorie") or []) if c],
+        categories=[c for c in (draft.get("categories") or []) if c],
         source=source,
         gaps=list(dict.fromkeys(gaps)),
-        confidence=dict(draft.get("confidenza") or {}),
+        confidence=dict(draft.get("confidence") or {}),
         images=list(images or []),
         transcript=transcript,
     )

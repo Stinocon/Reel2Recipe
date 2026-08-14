@@ -23,25 +23,25 @@ from reel2recipe.recipe import Source, Recipe, from_draft
 
 
 DRAFT = {
-    "titolo": "Tiramisù al pistacchio",
-    "porzioni": "6 persone",
-    "tempo_preparazione_min": 25,
-    "tempo_cottura_min": 0,
-    "ingredienti": [
-        {"quantita_raw": "250", "unita_raw": "g", "nome": "mascarpone", "gruppo": "Per la crema"},
-        {"quantita_raw": "3", "unita_raw": None, "nome": "uova", "gruppo": "Per la crema"},
-        {"quantita_raw": "1", "unita_raw": "cup", "nome": "zucchero semolato", "gruppo": "Per la crema"},
-        {"quantita_raw": "200", "unita_raw": "g", "nome": "savoiardi", "gruppo": "Per la base"},
-        {"quantita_raw": "q.b.", "unita_raw": None, "nome": "cacao amaro", "gruppo": "Per la base"},
+    "title": "Tiramisù al pistacchio",
+    "servings": "6 persone",
+    "prep_time_min": 25,
+    "cook_time_min": 0,
+    "ingredients": [
+        {"quantity_raw": "250", "unit_raw": "g", "name": "mascarpone", "group": "Per la crema"},
+        {"quantity_raw": "3", "unit_raw": None, "name": "uova", "group": "Per la crema"},
+        {"quantity_raw": "1", "unit_raw": "cup", "name": "zucchero semolato", "group": "Per la crema"},
+        {"quantity_raw": "200", "unit_raw": "g", "name": "savoiardi", "group": "Per la base"},
+        {"quantity_raw": "q.b.", "unit_raw": None, "name": "cacao amaro", "group": "Per la base"},
     ],
-    "procedimento": [
+    "method": [
         "Monta i tuorli con lo zucchero fino a ottenere un composto chiaro.",
         "Inforna a 350°F per 20 minuti.",
     ],
-    "note": ["Riposa in frigo almeno 4 ore."],
-    "categorie": ["Dolci", "Senza cottura"],
-    "confidenza": {"ingredienti": "alta", "procedimento": "media"},
-    "lacune": [],
+    "notes": ["Riposa in frigo almeno 4 ore."],
+    "categories": ["Dolci", "Senza cottura"],
+    "confidence": {"ingredients": "alta", "method": "media"},
+    "gaps": [],
 }
 
 
@@ -124,9 +124,9 @@ def test_groups_become_hash_headings(recipe):
 def test_a_single_group_produces_no_heading():
     """With only one group (or none), the heading is noise."""
     r = from_draft({
-        "titolo": "Pasta al burro",
-        "ingredienti": [{"quantita_raw": "100", "unita_raw": "g", "nome": "burro"}],
-        "procedimento": ["Sciogli il burro."],
+        "title": "Pasta al burro",
+        "ingredients": [{"quantity_raw": "100", "unit_raw": "g", "name": "burro"}],
+        "method": ["Sciogli il burro."],
     })
     assert not any(line.startswith("#") for line in ingredient_lines(r))
 
@@ -199,7 +199,7 @@ def test_the_link_is_filled_in_for_attribution(recipe):
 
 
 def test_readable_durations():
-    r = from_draft({"titolo": "X", "tempo_preparazione_min": 90, "tempo_cottura_min": 45})
+    r = from_draft({"title": "X", "prep_time_min": 90, "cook_time_min": 45})
     d = to_melarecipe(r)
     assert d["prepTime"] == "1 h 30 min"
     assert d["cookTime"] == "45 min"
@@ -208,15 +208,15 @@ def test_readable_durations():
 
 def test_categories_without_commas():
     """Mela does not allow commas in category names: they would be split on import."""
-    r = from_draft({"titolo": "X", "categorie": ["Dolci, freddi"]})
+    r = from_draft({"title": "X", "categories": ["Dolci, freddi"]})
     assert "," not in to_melarecipe(r)["categories"][0]
 
 
 def test_the_gaps_end_up_in_the_notes():
     """An estimate must never pass for certain data: it goes into the recipe."""
     r = from_draft({
-        "titolo": "Test",
-        "ingredienti": [{"quantita_raw": "1", "unita_raw": "cup", "nome": "gorgonzola"}],
+        "title": "Test",
+        "ingredients": [{"quantity_raw": "1", "unit_raw": "cup", "name": "gorgonzola"}],
     })
     notes = to_melarecipe(r)["notes"]
     assert "Da verificare" in notes

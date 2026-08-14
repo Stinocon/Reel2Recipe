@@ -17,10 +17,10 @@ def lib(tmp_path):
 def _recipe(title, url=None, ingredients=None):
     return from_draft(
         {
-            "titolo": title,
-            "ingredienti": [{"quantita_raw": "1", "unita_raw": "", "nome": n}
+            "title": title,
+            "ingredients": [{"quantity_raw": "1", "unit_raw": "", "name": n}
                             for n in (ingredients or ["farina"])],
-            "procedimento": ["Mescola tutto."],
+            "method": ["Mescola tutto."],
         },
         source=Source.now(url=url, author="tester"),
     )
@@ -88,8 +88,8 @@ def test_delete(lib):
 def test_the_listing_reports_the_uncertainties(lib):
     """The library has to be able to flag the recipes with estimates worth reviewing."""
     r = from_draft({
-        "titolo": "Con stime",
-        "ingredienti": [{"quantita_raw": "1", "unita_raw": "pizzico", "nome": "sale"}],
+        "title": "Con stime",
+        "ingredients": [{"quantity_raw": "1", "unit_raw": "pizzico", "name": "sale"}],
     })
     lib.save(r)
     entry = lib.list_()[0]
@@ -166,8 +166,8 @@ def test_the_axes_survive_the_save(lib):
     database: the export needs them, and it happens after the save."""
     from reel2recipe.units import Language, System
     r = from_draft(
-        {"titolo": "Pancakes", "ingredienti": [{"quantita_raw": "1", "unita_raw": "cup", "nome": "flour"}],
-         "procedimento": ["Mix."], "confidenza": {}, "lacune": []},
+        {"title": "Pancakes", "ingredients": [{"quantity_raw": "1", "unit_raw": "cup", "name": "flour"}],
+         "method": ["Mix."], "confidence": {}, "gaps": []},
         language=Language.EN, system=System.IMPERIAL,
     )
     id = lib.save(r)
