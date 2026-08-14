@@ -20,8 +20,10 @@ that holds.
                  extract  (local LLM through Ollama, output constrained to a JSON schema)
                      │
                      ▼   RecipeDraft — RAW quantities, never converted by the model
-               translate  (second LLM call, ONLY when the material is not already in the
-                     │     requested language — and the amounts are not in its payload)
+               translate  ← data/ingredients.yaml decides the names it knows; only what is
+                     │     left goes to a second LLM call, and the amounts are not in its
+                     │     payload. Skipped entirely when the material is already in the
+                     │     language that was asked for.
                      ▼   RecipeDraft, its words in the requested language
                   units    ← data/units.yaml + densities.yaml + vague.yaml (language × system)
                      │
@@ -56,6 +58,21 @@ Every quantity carries its **provenance** (`declared`, `converted:density`,
 `estimated:vague`, `indeterminate`, …), which the interface and the exports use to tell data
 from an estimate at a glance.
 
+**And once more, for identity.** The model must not guess a weight (`densities.yaml`); it must
+not guess an ingredient either. Asked to render `maiale` in English, qwen2.5:14b answered
+"bacon", and `cavolo cappuccio` came back as "chinese broccoli" — not clumsy translations but
+**different ingredients**, stated with confidence and invisible on the card. So
+`data/ingredients.yaml` holds the names, and the translation pass consults it first: a name the
+table knows is settled in code and never sent, a name it knows only in part is sent with the
+known term **pinned**, and a name it has never heard of goes to the model as before. The third
+case is the same honest fallback as an unknown density.
+
+The table's authority reaches further than translation. The density lookup matches the longest
+known ingredient *contained* in a name, which is how `lievito di birra` — fresh yeast — was
+being given the density of `birra`, beer. It converted, confidently and wrongly. The glossary
+is what settles it: it knows both strings and knows they are different ingredients, so the
+match is refused and the gap is declared instead.
+
 **The same rule, one level up: the model handles words, the code handles numbers.** When a
 recipe has to come out in a language the material is not in, the translation is a **second
 call** whose payload contains the text and nothing else — `quantity_raw` and `unit_raw` are
@@ -89,9 +106,12 @@ crossed and quantities are written as fractions (`3/4 cup`), because a measuring
 0.75. The **language** decides the words: unit labels, eyeball measures and gap messages. The
 first two live in `data/`, indexed by language and by system; the messages live in `units.py`
 (they are program strings, not data). Temperatures follow the system in both directions
-(°F↔°C). The translation of names and method is done by the model in `extract.py`, with one
-system prompt per language — and it is the only non-deterministic piece of the path, hence the
-least reliable.
+(°F↔°C).
+
+Translation is the least deterministic piece of the path, and it is split accordingly: the
+ingredient names and group headings that `data/ingredients.yaml` holds are settled by the code,
+and only what the table does not hold — the prose, and the unusual ingredients — reaches the
+model in `extract.py`, which keeps one system prompt per language.
 
 **A third axis, which does not belong to that pair: the language *spoken* in the reel.** It
 concerns the input, not the output, which is why it is called `audio_language` and not

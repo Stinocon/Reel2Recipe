@@ -51,7 +51,7 @@ from dataclasses import dataclass
 
 import httpx
 
-from .units import Catalogue, code_of, text_from
+from .units import Catalogue, code_of, load_tables, text_from
 
 DEFAULT_OLLAMA_URL = "http://localhost:11434"
 
@@ -708,6 +708,67 @@ _TRANSLATABLE_INGREDIENT = ("name", "notes", "group")
 _TRANSLATABLE_LISTS = ("method", "notes", "categories", "gaps")
 
 
+def _from_the_glossary(draft: dict, language: str,
+                       tables) -> tuple[dict, dict[str, str], set[tuple]]:
+    """Applies `data/ingredients.yaml` before the model gets a say.
+
+    Two outcomes, and the difference is the whole point:
+
+    **The whole name is in the table** — "maiale", "cavolo cappuccio". The code writes the
+    translation and the word never reaches the model. Deterministic, and it is what stops
+    `maiale` coming back as "bacon": you cannot mistranslate what you were not asked about.
+
+    **Part of it is** — "maiale (fettina grassa)". Dropping the modifier would lose something
+    a cook needs, so the name still goes to the model, but the term the table knows is handed
+    over with it as a **pin**. The model translates the rest and does not get to reconsider
+    the ingredient.
+
+    Returns the draft with the certain names already replaced, the pins for the rest, and the
+    **paths that are settled** — those must be kept out of the payload afterwards, or the
+    model would be handed the finished translation and given the chance to undo it. It is the
+    same contract as the density table: what is known comes from the table, what is not is
+    handled honestly rather than invented.
+    """
+    def like(source: str, translated: str) -> str:
+        """The translation, capitalised the way the original was.
+
+        The glossary stores one canonical spelling, lower case, because that is what a table
+        of terms should hold. The model capitalises as it sees fit. Emitting the two side by
+        side gave a card reading "Cooked udon / onions / Soy sauce" — the seam between the two
+        halves of the translation, visible to anyone and explainable to no one.
+        """
+        if source[:1].isupper() and not translated[:1].isupper():
+            return translated[0].upper() + translated[1:]
+        return translated
+
+    out = json.loads(json.dumps(draft))
+    pins: dict[str, str] = {}
+    settled: set[tuple] = set()
+    for n, ingredient in enumerate(out.get("ingredients") or []):
+        # The heading first: it is matched whole or not at all, so there is nothing to pin.
+        heading = ingredient.get("group")
+        if heading and isinstance(heading, str):
+            if translated := tables.group_name(heading, language):
+                ingredient["group"] = like(heading, translated)
+                settled.add(("ingredient", n, "group"))
+
+        name = ingredient.get("name")
+        if not name or not isinstance(name, str):
+            continue
+        found = tables.ingredient_name(name, language, ingredient.get("quantity_raw"))
+        if found is None:
+            continue
+        if found.whole:
+            ingredient["name"] = like(name, found.name)
+            settled.add(("ingredient", n, "name"))
+        else:
+            # The pin names the term the table matched, not the whole ingredient: pinning
+            # "maiale (fettina grassa) -> pork" would tell the model to render the lot as
+            # "pork" and drop the cut, which is what the partial branch exists to keep.
+            pins[found.matched] = found.name
+    return out, pins, settled
+
+
 def _collect(draft: dict) -> tuple[list[str], list[tuple]]:
     """The fragments to translate and where each one came from.
 
@@ -754,22 +815,55 @@ TRANSLATION_GAP: Catalogue = {
 }
 
 
+def _pinned(pins: dict[str, str]) -> str:
+    """The glossary's terms, handed to the model as settled rather than suggested.
+
+    These are the names the table matched only in part — "maiale (fettina grassa)" — where the
+    modifier is worth keeping and the ingredient is not up for discussion. Stating them as a
+    short list ahead of the text is enough; there is nothing here the model has to work out.
+    """
+    if not pins:
+        return ""
+    lines = "\n".join(f"- {source} -> {target}" for source, target in sorted(pins.items()))
+    return (
+        "These terms are FIXED. Use exactly this translation for them wherever they appear, "
+        "and translate only the words around them:\n" + lines + "\n\n"
+    )
+
+
 def translate_draft(
     draft: dict,
     language: str,
     model: str | None = None,
     url: str = DEFAULT_OLLAMA_URL,
     timeout: float | None = None,
+    tables=None,
 ) -> dict:
     """Renders a draft's text in `language`, leaving every number where it is.
+
+    Two steps, in this order and for this reason: **the glossary first, the model second**.
+    `data/ingredients.yaml` settles the names it knows — deterministically, without the model
+    seeing the word — and only what is left over is sent to be translated. It is the same
+    order as the conversion: the table decides what the table knows, and the model handles the
+    remainder rather than the whole.
 
     Returns the draft unchanged if there is nothing to translate or if the model's answer does
     not line up. **A failed translation must not cost the recipe**: an Italian recipe is worth
     far more than no recipe, and the mismatch is declared in `gaps` so the user is told rather
-    than left to notice.
+    than left to notice. Note that the glossary's work survives that failure: it happened
+    before the call, so a model that answers nothing still leaves the known ingredients right.
     """
     timeout = timeout if timeout is not None else llm_timeout()
-    texts, paths = _collect(draft)
+    draft, pins, settled = _from_the_glossary(draft, language, tables or load_tables())
+
+    # What the glossary settled is dropped from the payload here rather than never collected,
+    # so `_collect` keeps one job and one meaning: everything a person reads.
+    texts: list[str] = []
+    paths: list[tuple] = []
+    for text, path in zip(*_collect(draft)):
+        if path not in settled:
+            texts.append(text)
+            paths.append(path)
     if not texts:
         return draft
 
@@ -788,7 +882,7 @@ def translate_draft(
             {"role": "system",
              "content": TRANSLATION_PROMPT.format(
                  language_name=LANGUAGE_NAMES.get(code_of(language), "English"))},
-            {"role": "user", "content": numbered},
+            {"role": "user", "content": _pinned(pins) + numbered},
         ],
         "format": TRANSLATION_SCHEMA,
         "stream": False,

@@ -343,6 +343,12 @@ def from_draft(
     between the model and this function and is never written to disk.
     """
     t = tables or load_tables()
+    # The system is normalised on the way in, not only on the way out of storage. A value the
+    # enum does not have does not raise: every `code_of(system) == System.METRIC.value` simply
+    # returns False and the imperial branch is taken in silence. That is how a page still
+    # sending the pre-rename `metrico` produced "1 cup farina" for someone who had picked
+    # "Metriche (g, ml)" — asked for grams, given cups, nothing anywhere saying so.
+    system = system_from_stored(system)
 
     ingredients: list[Ingredient] = []
     gaps: list[str] = list(draft.get("gaps") or [])

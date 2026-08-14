@@ -25,7 +25,7 @@ import pytest
 import ast
 from pathlib import Path
 
-from reel2recipe import api, documents, mela, pipeline, units
+from reel2recipe import api, cli, documents, mela, pipeline, units
 from reel2recipe.paths import REPO_ROOT
 
 WEB_FOLDER = REPO_ROOT / "web"
@@ -59,6 +59,40 @@ def test_every_option_control_is_read():
         f"controls drawn in index.html but never read by the JavaScript: {unread}. "
         "A control that does nothing is to be wired up or removed."
     )
+
+
+def test_every_option_value_in_the_markup_is_a_value_the_code_knows():
+    """A `<option value="…">` is a string the server will compare against an enum, and a
+    comparison that fails is silent.
+
+    It happened: the markup still offered `value="metrico"` after `System` had moved to
+    `metric`. Nothing raised. `code_of(system) == System.METRIC.value` simply returned False,
+    the imperial branch was taken, and someone who picked **"Metriche (g, ml)" got cups** —
+    asked for grams, given ounces, with the interface showing the choice they had made.
+
+    The controls were already guarded in both directions; their *values* were not, and the
+    value is the half that reaches the code.
+    """
+    from reel2recipe.units import Language, System
+
+    known = {
+        "opt-system": {s.value for s in System},
+        "opt-language": {l.value for l in Language},
+        "opt-ui-language": {l.value for l in Language},
+        "opt-spoken-language": {l.value for l in Language} | {"auto"},
+    }
+    offenders = []
+    for control, allowed in known.items():
+        block = re.search(rf'<select id="{control}"[^>]*>(.*?)</select>', INDEX, re.S)
+        assert block, f"the {control} control is gone: the guard has come unplugged"
+        values = set(re.findall(r'<option value="([^"]*)"', block.group(1)))
+        # An empty value is the "follow the previous axis" choice and is handled before any
+        # comparison, so it is legitimately not an enum member.
+        unknown = {v for v in values if v} - allowed
+        if unknown:
+            offenders.append(f"{control} offers {sorted(unknown)}, the code knows {sorted(allowed)}")
+
+    assert not offenders, "\n".join(offenders)
 
 
 def test_no_selector_points_at_nothing():
@@ -126,7 +160,11 @@ def test_every_markup_key_exists_in_the_catalogue():
     """A `data-i18n` that does not find its key raises nothing: `t()` falls back to the key
     itself, and `lbl_measures` appears on screen where "Misure" should be."""
     keys = _i18n_keys()["it"]
-    used = set(re.findall(r'data-i18n(?:-\w+)?="([\w-]+)"', INDEX))
+    # `-[\w-]+` and not `-\w+`: the attribute names have a second hyphen — `data-i18n-aria-label`
+    # — and the narrower pattern skipped them silently. That is how `lingua_interfaccia`
+    # survived the catalogue's rename to English: the key was dead, `t()` fell back to the key
+    # itself, and the language selector announced "lingua_interfaccia" to a screen reader.
+    used = set(re.findall(r'data-i18n(?:-[\w-]+)?="([\w-]+)"', INDEX))
     assert used, "no data-i18n attribute in the markup: the guard has come unplugged"
     assert not (used - keys), f"keys used in the markup and absent from the catalogue: {sorted(used - keys)}"
 
@@ -157,7 +195,9 @@ def test_every_key_app_js_asks_for_exists_in_the_catalogue():
     )
 
 
-@pytest.mark.parametrize("module, catalogue", [("pipeline", pipeline.TEXTS), ("api", api.TEXTS)])
+@pytest.mark.parametrize("module, catalogue", [
+    ("pipeline", pipeline.TEXTS), ("api", api.TEXTS), ("cli", cli.CARD),
+])
 def test_the_python_catalogues_are_complete(module, catalogue):
     """The same rule for the strings born in the server: progress, warnings and API errors.
     The fallback to Italian is there, but it exists to break nothing — not to make a missing

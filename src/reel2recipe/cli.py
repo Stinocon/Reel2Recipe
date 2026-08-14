@@ -21,7 +21,7 @@ import sys
 from pathlib import Path
 
 from . import __version__
-from .units import LEGACY_SYSTEMS, System
+from .units import LEGACY_SYSTEMS, Catalogue, System, text_from
 
 # ANSI colour codes, switched off when the output is not a terminal (a pipe, a log file).
 _TTY = sys.stdout.isatty()
@@ -107,15 +107,29 @@ def cook_command(args) -> int:
     return 0
 
 
+# The headings of the printed card. They follow the **recipe's** language, not the interface's:
+# what is printed here is the recipe itself, and an Italian card under an English heading is
+# the same seam the translation pass exists to remove. The CLI has no interface language of
+# its own — its `--help` and its messages are English — so this is the one catalogue here that
+# has to be bilingual.
+CARD: Catalogue = {
+    "it": {"ingredients": "Ingredienti", "method": "Procedimento", "gaps": "Da controllare"},
+    "en": {"ingredients": "Ingredients", "method": "Method", "gaps": "To check"},
+}
+
+
 def _print_recipe(recipe) -> None:
     from .units import UNCERTAIN_PROVENANCES
+
+    def heading(key: str) -> str:
+        return text_from(CARD, recipe.language, key)
 
     if recipe.servings or recipe.total_time_min():
         details = [d for d in (recipe.servings,
                                 f"{recipe.total_time_min()} min" if recipe.total_time_min() else None) if d]
         print(dim("  " + " · ".join(details)))
 
-    print("\n  " + _c("Ingredients", "1"))
+    print("\n  " + _c(heading("ingredients"), "1"))
     for group in recipe.groups:
         if group and len([g for g in recipe.groups if g]) > 0 and len(recipe.groups) > 1:
             print(dim(f"    — {group} —"))
@@ -124,12 +138,12 @@ def _print_recipe(recipe) -> None:
                 line = f"    {i.mela_line()}"
                 print(warn(line) if i.quantity.provenance in UNCERTAIN_PROVENANCES else line)
 
-    print("\n  " + _c("Method", "1"))
+    print("\n  " + _c(heading("method"), "1"))
     for n, step in enumerate(recipe.method, 1):
         print(f"    {n}. {step}")
 
     if recipe.gaps:
-        print("\n  " + warn("To check"))
+        print("\n  " + warn(heading("gaps")))
         for l in recipe.gaps:
             print(warn(f"    • {l}"))
 

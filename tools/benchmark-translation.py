@@ -110,14 +110,19 @@ TERMS = {
     ],
 }
 
-# Groups: the label the model should produce, in the target language.
+# Groups: the label the pipeline should produce, in the target language.
+#
+# These are matched as substrings, and they have to track what `data/ingredients.yaml`
+# actually emits — not what seems a reasonable translation. "For the garnish" comes out as
+# "Per guarnire", and a list expecting "guarnizione" scored it a miss and reported a defect
+# that was not there. A benchmark that under-reports is as misleading as one that over-reports.
 GROUPS = {
     ("it-list", "it"): ["verdure", "salsa"],
     ("it-list", "en"): ["vegetable", "vegetables", "sauce"],
     ("it", "it"): ["base", "copertura"],
     ("it", "en"): ["base", "topping", "coating", "cover"],
     ("en", "en"): ["sauce", "garnish"],
-    ("en", "it"): ["salsa", "sugo", "guarnizione", "decorazione"],
+    ("en", "it"): ["salsa", "sugo", "guarnire", "guarnizione", "decorazione"],
 }
 
 # The amounts stated in the caption. They must survive unconverted, whatever the language.

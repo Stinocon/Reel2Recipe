@@ -42,10 +42,11 @@ davvero per cucinare.
 
 Sono tre assi distinti, descritti in
 [Lingua e sistema di misura](#lingua-e-sistema-di-misura). Un limite da conoscere prima di
-farci affidamento: tradurre i **nomi degli ingredienti** è la parte meno affidabile di tutta
-la catena — vedi [la nota sui limiti](#onest%C3%A0-sui-limiti). I numeri restano giusti; sono
-le parole a scivolare, e dove il modello non è sicuro ora lascia la parola originale invece di
-indovinare un ingrediente simile.
+farci affidamento: tradurre è la parte meno deterministica di tutta la catena — vedi
+[la nota sui limiti](#onest%C3%A0-sui-limiti). I nomi degli ingredienti più comuni vengono da
+una tabella e non dal modello, quindi quelli sono fermi; al modello restano la prosa e gli
+ingredienti che la tabella non ha, e lì gli è imposto di tenere la parola originale invece di
+indovinarne una simile. I numeri non si muovono in nessun caso.
 
 > **Una nota su questa documentazione.** Questo README e quello dell'add-on esistono in
 > inglese e in italiano, due copie che si muovono insieme. Tutto il resto sta in una lingua
@@ -211,21 +212,31 @@ ed è la parte meno solida — vedi la nota qui sotto.
 > la chiamata di estrazione ed è diventata **una chiamata a sé** — ma "migliorata" non è
 > "risolta", e quel che resta va saputo prima di farci affidamento.
 >
-> **Cosa è stato risolto.** Chiedendo al modello di capire un reel e di renderlo in un'altra
-> lingua in un colpo solo, la lingua diventava una proprietà tutto-o-niente: su una didascalia
-> scritta in prosa traduceva tutto, su una corta **a lista** non traduceva *niente* — né i
+> **Cosa è stato risolto, in due passi.** Chiedendo al modello di capire un reel e di renderlo
+> in un'altra lingua in un colpo solo, la lingua diventava una proprietà tutto-o-niente: su una
+> didascalia in prosa traduceva tutto, su una corta **a lista** non traduceva *niente* — né i
 > nomi, né le intestazioni dei gruppi, né il procedimento. Misurato su una didascalia così:
-> **0%** dei termini tradotti. Diviso in due passaggi, la stessa didascalia fa **5 su 6**, e i
-> gruppi passano al 100%. I numeri li puoi rifare tu: `uv run python
+> **0%**.
+>
+> Separare estrazione e traduzione in due chiamate ha portato all'83%. Quel che mancava non era
+> un fallimento di lingua ma uno peggiore: il modello **sostituiva** gli ingredienti invece di
+> tradurli — `maiale` tornava "bacon", `cavolo cappuccio` "chinese broccoli". Una parola
+> straniera si vede che è straniera; un ingrediente sbagliato con sicurezza no, e andresti a
+> comprare la cosa sbagliata.
+>
+> Così i nomi che sbaglia non sono più affare suo. `data/ingredients.yaml` li tiene — 156
+> ingredienti e 14 intestazioni di gruppo, in tutte e due le lingue — e quelli che conosce li
+> traduce il codice senza che il modello veda la parola, esattamente come `densities.yaml`
+> tiene i pesi fuori dalla sua portata. Ogni combinazione di lingue ora misura **100%** su
+> termini, gruppi e quantità. I numeri li puoi rifare tu: `uv run python
 > tools/benchmark-translation.py`.
 >
-> **Cosa resta, ed è la parte da tenere d'occhio.** Il modello a volte **sostituisce** un
-> ingrediente invece di tradurlo: `maiale` è tornato "bacon", `cavolo cappuccio` "chinese
-> broccoli". È peggio che lasciare una parola in italiano, perché una parola straniera si vede
-> che è straniera mentre un ingrediente sbagliato con sicurezza no — andresti a comprare la
-> cosa sbagliata. Ora il prompt di traduzione vieta la sostituzione e impone di **tenere la
-> parola originale quando non è sicuro**, ed è per questo che ogni tanto vedrai un ingrediente
-> italiano dentro una ricetta inglese. È il comportamento voluto, non un difetto.
+> **Cosa resta.** Un ingrediente che la tabella non ha va ancora al modello, e lì vale il
+> vecchio avvertimento: gli è vietato sostituire e gli è imposto di **tenere la parola
+> originale quando non è sicuro**, quindi ogni tanto vedrai una parola italiana dentro una
+> ricetta inglese. È il comportamento voluto — una parola straniera leggibile batte una parola
+> sbagliata detta con sicurezza — ed è anche il segnale che al glossario manca una voce che
+> varrebbe la pena aggiungere.
 >
 > Una didascalia **bilingue** resta il caso più difficile, perché il modello pesca da entrambe
 > le lingue: da un post inglese-tedesco è uscito "dinkel fette".
@@ -354,7 +365,7 @@ src/reel2recipe/     il codice
   pipeline.py        la catena completa
   api.py             l'interfaccia web
   cli.py             i comandi da terminale
-data/                le tabelle di conversione (leggibili e modificabili)
+data/                le tabelle: conversioni, densità, misure a occhio, nomi degli ingredienti
 web/                 l'interfaccia (HTML/CSS/JS, senza build)
   i18n.js            le parole dell'interfaccia, in italiano e in inglese
   icons.js           le icone SVG, incorporate (nessun CDN)
