@@ -131,6 +131,32 @@ def test_every_markup_key_exists_in_the_catalogue():
     assert not (used - keys), f"keys used in the markup and absent from the catalogue: {sorted(used - keys)}"
 
 
+def test_every_key_app_js_asks_for_exists_in_the_catalogue():
+    """The same rule as the markup guard above, for the keys that are only in the JavaScript.
+
+    The markup guard did not cover them, and the gap cost four dead keys: the catalogue's keys
+    were renamed to English and `stato_nessun_modello`, `stato_ollama_spento`, `opzioni_apri`
+    and `opzioni_chiudi` were left behind in `app.js`. `t()` falls back to the key itself, so
+    the options button read `opzioni_apri` on its first click and the status label read
+    `stato_ollama_spento` — which is the line you get exactly when Ollama is down and you most
+    need to read it.
+
+    They survived because every existing guard looked at `t('literal')`, and all four sit
+    inside a ternary — `t(cond ? 'a' : 'b')`. So this one collects **every** quoted key-shaped
+    literal inside a `t(...)` call, both branches included.
+    """
+    keys = _i18n_keys()["it"]
+    used = {
+        literal
+        for call in re.findall(r"\bt\(([^()]*)\)", MODULES["app.js"])
+        for literal in re.findall(r"'([a-z][a-z_0-9]*)'", call)
+    }
+    assert len(used) > 30, "the guard is reading almost no keys: it has come unplugged"
+    assert not (used - keys), (
+        f"keys app.js asks for and absent from the catalogue: {sorted(used - keys)}"
+    )
+
+
 @pytest.mark.parametrize("module, catalogue", [("pipeline", pipeline.TEXTS), ("api", api.TEXTS)])
 def test_the_python_catalogues_are_complete(module, catalogue):
     """The same rule for the strings born in the server: progress, warnings and API errors.

@@ -272,8 +272,8 @@ export const currentLanguage = () => current;
 export function t(key, data = {}, forced = null) {
   const catalogue = TEXTS[forced] || TEXTS[current] || TEXTS[FALLBACK];
   const raw = catalogue[key] ?? TEXTS[FALLBACK][key] ?? key;
-  return raw.replace(/\{(\w+)\}/g, (intero, name) =>
-    (name in data ? String(data[name]) : intero));
+  return raw.replace(/\{(\w+)\}/g, (whole, name) =>
+    (name in data ? String(data[name]) : whole));
 }
 
 /** Fills the static markup: `data-i18n` for text, `data-i18n-html` where the string

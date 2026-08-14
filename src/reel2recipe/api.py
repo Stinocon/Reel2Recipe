@@ -11,13 +11,19 @@ page shows the stages in real time instead of a mute spinner.
 Everything stays local: no data leaves the machine, and by default the app listens on
 127.0.0.1 only.
 
-**The URL paths are deliberately left as they are** — `/api/stato`, `/api/recipes`,
-`/api/cook/{job}/eventi`, and the `?formato=` of the export. They are this product's external
-surface, the one thing here you can reach with a `curl` or a bookmark, and `docs/` documents
-them. The rule in docs/naming.md for user-facing values is *add an English synonym, do not
-replace* — as the CLI does with `--porta` — and a second set of routes is surface this local,
-single-user app has no reason to grow. The JSON keys travelling over those paths did move,
-together with `web/app.js`, which is the only thing that reads them.
+**The URL paths and query parameters are English too, since the last pass** — `/api/status`,
+`/api/recipes`, `/api/cook/{job}/events`, `?format=`, `?ui_language=`. They used to be
+Italian, kept that way on the argument that a URL is external surface and external surface
+gets a synonym rather than a rename. That argument was worth less than it looked: the only
+client is `web/app.js`, which ships in the same commit, and this is a single-user app on
+localhost — the bookmark it was protecting does not exist. A second set of aliased routes
+would have doubled the surface to protect nothing, which AGENTS.md §10 argues against.
+
+The one thing that trap left behind is worth keeping in mind whenever a query parameter is
+renamed here: **in FastAPI the parameter's Python name _is_ the query name**. Renaming
+`formato` to `format_` once made all three export formats silently return a `.melarecipe` —
+no error, a wrong file, visible only on opening it. Where the two have to differ, say so with
+an explicit `Query(alias=...)` rather than relying on the spelling, as `export_one` does.
 """
 
 from __future__ import annotations
@@ -30,7 +36,7 @@ import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, UploadFile
+from fastapi import FastAPI, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -49,7 +55,7 @@ WEB_FOLDER = REPO_ROOT / "web"
 # The errors the interface shows the user.
 #
 # These follow the language **of the interface**, not of the recipe, which is why the parameter
-# is called `lingua_ui`: `/api/cook` already has a `language` meaning something else entirely —
+# is called `ui_language`: `/api/cook` already has a `language` meaning something else entirely —
 # the language to produce the recipe in. Two different names because they are two different
 # things, and calling them the same would have cost a silent defect the moment the two values
 # diverged.
@@ -123,7 +129,7 @@ class JobRegistry:
 
 
 # --------------------------------------------------------------------------------------
-# Modelli di request
+# Request models
 # --------------------------------------------------------------------------------------
 
 
@@ -178,18 +184,18 @@ def create_app(db: str | None = None, ollama_url: str = "http://localhost:11434"
         nonlocal registry
         registry = JobRegistry(asyncio.get_running_loop())
 
-    # ---- diagnostica -----------------------------------------------------------------
+    # ---- diagnostics -----------------------------------------------------------------
 
-    @app.get("/api/stato")
+    @app.get("/api/status")
     def status() -> dict:
         """What is ready and what is missing. The page uses it to warn before starting."""
         return pipeline.check_environment(ollama_url)
 
-    # ---- estrazione ------------------------------------------------------------------
+    # ---- extraction ------------------------------------------------------------------
 
     @app.post("/api/cook")
     async def cook(request: CookRequest) -> dict:
-        """Avvia un'estrazione da URL. Ritorna subito un id da seguire via SSE."""
+        """Starts an extraction from a URL. Returns an id to follow over SSE straight away."""
         if not request.url or not request.url.strip():
             # The interface's language does not reach this far: the only reference is the
             # recipe's, which in normal use coincides because it follows it.
@@ -230,12 +236,12 @@ def create_app(db: str | None = None, ollama_url: str = "http://localhost:11434"
         ).start()
         return {"job": job.id}
 
-    @app.get("/api/cook/{job}/eventi")
-    async def eventi(job: str, lingua_ui: str = "it") -> StreamingResponse:
+    @app.get("/api/cook/{job}/events")
+    async def events(job: str, ui_language: str = "it") -> StreamingResponse:
         """SSE stream with a job's progress."""
         job = registry.get(job)
         if not job:
-            raise HTTPException(404, text(lingua_ui, "unknown_job"))
+            raise HTTPException(404, text(ui_language, "unknown_job"))
 
         async def generate():
             while True:
@@ -247,42 +253,42 @@ def create_app(db: str | None = None, ollama_url: str = "http://localhost:11434"
         return StreamingResponse(generate(), media_type="text/event-stream",
                                  headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
-    # ---- libreria --------------------------------------------------------------------
+    # ---- library ---------------------------------------------------------------------
 
-    @app.get("/api/ricette")
+    @app.get("/api/recipes")
     def list_recipes(search: str | None = None) -> list[dict]:
         with library() as lib:
             return lib.list_(search=search)
 
-    @app.get("/api/ricette/{id}")
-    def read_recipe(id: int, lingua_ui: str = "it") -> dict:
+    @app.get("/api/recipes/{id}")
+    def read_recipe(id: int, ui_language: str = "it") -> dict:
         with library() as lib:
             recipe = lib.read(id)
         if not recipe:
-            raise HTTPException(404, text(lingua_ui, "recipe_not_found"))
+            raise HTTPException(404, text(ui_language, "recipe_not_found"))
         d = recipe.to_dict()
         d["id"] = id
         return d
 
-    @app.put("/api/ricette/{id}")
-    def update_recipe(id: int, recipe: dict, lingua_ui: str = "it") -> dict:
+    @app.put("/api/recipes/{id}")
+    def update_recipe(id: int, recipe: dict, ui_language: str = "it") -> dict:
         """Saves the user's manual corrections. It is the step that makes the export
         trustworthy: the LLM proposes, the user corrects, and only then does it export."""
         with library() as lib:
             if not lib.read(id):
-                raise HTTPException(404, text(lingua_ui, "recipe_not_found"))
+                raise HTTPException(404, text(ui_language, "recipe_not_found"))
             recipe.pop("id", None)
             lib.update(id, Recipe.from_dict(recipe))
         return {"ok": True}
 
-    @app.delete("/api/ricette/{id}")
-    def delete_recipe(id: int, lingua_ui: str = "it") -> dict:
+    @app.delete("/api/recipes/{id}")
+    def delete_recipe(id: int, ui_language: str = "it") -> dict:
         with library() as lib:
             if not lib.delete(id):
-                raise HTTPException(404, text(lingua_ui, "recipe_not_found"))
+                raise HTTPException(404, text(ui_language, "recipe_not_found"))
         return {"ok": True}
 
-    @app.post("/api/ricette")
+    @app.post("/api/recipes")
     def save_new(recipe: dict) -> dict:
         """Saves a freshly extracted recipe (with any corrections) into the library."""
         with library() as lib:
@@ -291,13 +297,16 @@ def create_app(db: str | None = None, ollama_url: str = "http://localhost:11434"
 
     # ---- export ----------------------------------------------------------------------
 
-    @app.get("/api/ricette/{id}/export")
-    def export_one(id: int, formato: str = "mela", lingua_ui: str = "it") -> FileResponse:
-        """Downloads a recipe. `formato` is `mela` (the default), `markdown` or `pdf`.
+    @app.get("/api/recipes/{id}/export")
+    def export_one(id: int, fmt: str = Query("mela", alias="format"),
+                   ui_language: str = "it") -> FileResponse:
+        """Downloads a recipe. `?format=` is `mela` (the default), `markdown` or `pdf`.
 
-        The query parameter keeps its Italian name for the same reason the routes do: it is
-        part of the URL, this product's external surface (see the module docstring). It is
-        also where a rename bit — see `tests/test_api.py`.
+        The alias is not decoration. In FastAPI the query name *is* the parameter name, and
+        `format` alone would shadow the builtin inside this function, so the two have to
+        differ — which is exactly the situation that once made every format silently return a
+        `.melarecipe`. Stating the query name explicitly is what stops the next rename from
+        moving it by accident; `tests/test_api.py` covers all three formats.
 
         The default stays Mela because that is the format the app imports; the other two are
         for anyone who does not have Mela and wants to keep the recipe anyway.
@@ -305,30 +314,30 @@ def create_app(db: str | None = None, ollama_url: str = "http://localhost:11434"
         with library() as lib:
             recipe = lib.read(id)
         if not recipe:
-            raise HTTPException(404, text(lingua_ui, "recipe_not_found"))
+            raise HTTPException(404, text(ui_language, "recipe_not_found"))
 
         try:
-            if formato == "markdown":
-                path, tipo = write_markdown(recipe, export_folder()), "text/markdown"
-            elif formato == "pdf":
-                path, tipo = write_pdf(recipe, export_folder()), "application/pdf"
-            elif formato == "mela":
-                path, tipo = write_melarecipe(recipe, export_folder()), "application/json"
+            if fmt == "markdown":
+                path, media_type = write_markdown(recipe, export_folder()), "text/markdown"
+            elif fmt == "pdf":
+                path, media_type = write_pdf(recipe, export_folder()), "application/pdf"
+            elif fmt == "mela":
+                path, media_type = write_melarecipe(recipe, export_folder()), "application/json"
             else:
-                raise HTTPException(400, text(lingua_ui, "unknown_format", format=formato))
+                raise HTTPException(400, text(ui_language, "unknown_format", format=fmt))
         except DocumentError as e:
             # The `doc` extra is missing: an installation problem, not a problem with the request.
             raise HTTPException(503, str(e)) from e
 
-        return FileResponse(path, media_type=tipo, filename=path.name)
+        return FileResponse(path, media_type=media_type, filename=path.name)
 
     @app.get("/api/export")
-    def export_all(lingua_ui: str = "it") -> FileResponse:
+    def export_all(ui_language: str = "it") -> FileResponse:
         with library() as lib:
             recipes = lib.all_recipes()
         if not recipes:
-            raise HTTPException(404, text(lingua_ui, "empty_library"))
-        path = write_melarecipes(recipes, export_folder() / "libreria")
+            raise HTTPException(404, text(ui_language, "empty_library"))
+        path = write_melarecipes(recipes, export_folder() / "library")
         return FileResponse(path, media_type="application/zip", filename=path.name)
 
     @app.post("/api/preview-mela")
@@ -336,20 +345,20 @@ def create_app(db: str | None = None, ollama_url: str = "http://localhost:11434"
         """What the recipe will look like in Mela, without writing it to disk."""
         return to_melarecipe(Recipe.from_dict(recipe))
 
-    # ---- frontend statico ------------------------------------------------------------
+    # ---- static frontend -------------------------------------------------------------
 
     if WEB_FOLDER.is_dir():
         app.mount("/", StaticFiles(directory=WEB_FOLDER, html=True), name="web")
-    else:  # pragma: no cover - solo se qualcuno cancella web/
+    else:  # pragma: no cover - only if someone deletes web/
         @app.get("/")
         def _no_frontend():
-            return JSONResponse({"error": "Cartella web/ mancante."}, status_code=500)
+            return JSONResponse({"error": "The web/ folder is missing."}, status_code=500)
 
     return app
 
 
 # --------------------------------------------------------------------------------------
-# Esecuzione nei thread di job
+# Execution in the job threads
 # --------------------------------------------------------------------------------------
 
 
