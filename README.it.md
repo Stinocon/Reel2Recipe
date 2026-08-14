@@ -350,9 +350,11 @@ Documentazione tecnica: [`docs/architecture.md`](docs/architecture.md), in ingle
 
 **Il codice è in inglese** — identificatori, commenti, test, script e documento di
 architettura. L'italiano che resta è deliberato e sta in quattro gruppi: il **formato già
-scritto sul disco** (colonne SQL, chiavi annidate delle ricette salvate, valori di
-`Provenance` e `System`), il **contratto col modello locale** (prompt, schema e delimitatori
-di `extract.py`), il **vocabolario di cucina**, che è dato (`cucchiaio`, `farina 00`, `q.b.`,
+scritto sul disco** (chiavi annidate delle ricette salvate, valori di `Provenance` e
+`System` — le tabelle e le colonne SQL ne facevano parte e ora sono inglesi, con una vera
+migrazione `ALTER TABLE` invece di una rinomina), il **contratto col modello locale** (prompt,
+schema e delimitatori di `extract.py`), il **vocabolario di cucina**, che è dato (`cucchiaio`,
+`farina 00`, `q.b.`,
 e i pattern che rilevano le injection scritte in italiano), e gli **alias italiani della
 CLI**, tenuti come *sinonimi* e non come unica grafia (`--porta`, `--lingua`, `elimina`), per
 chi li avesse in uno script o nella cronologia della shell. Le URL e i parametri di query
