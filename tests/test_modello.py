@@ -202,7 +202,7 @@ def test_it_translates_towards_italian(italian_draft_from_english):
 # `null`, would have turned nothing red.
 #
 # The caption below is **synthetic**, written on purpose: it reproduces the four patterns
-# without bringing third-party material into the repo (see docs/legale.md). The checks look at
+# without bringing third-party material into the repo (see docs/legal.md). The checks look at
 # the RESULT of the whole chain, not at the model's internal choices: the same amount may
 # arrive as "1¼"+"cups" or as "300"+"ml" and either is fine — what must not happen is that it
 # becomes one millilitre.

@@ -16,7 +16,7 @@
 > Extraction is automatic and can get things wrong. The project is built to make its
 > uncertainties visible rather than hide them, but **read the recipe before you cook it**,
 > weights and times above all; and if you have allergies, go back to the original source,
-> which is always cited. Details in [`docs/condizioni-uso.md`](docs/condizioni-uso.md)
+> which is always cited. Details in [`docs/terms-of-use.md`](docs/terms-of-use.md)
 > (Italian).
 
 **From Instagram cooking reels to a tidy recipe book you can import into
@@ -304,9 +304,12 @@ convince you, correct it there — declaring the source, which the tests insist 
 
 Reel2Recipe is meant for **personal use**, on content **you have already saved**. The terms
 addressed to whoever uses the tool are in
-[`docs/condizioni-uso.md`](docs/condizioni-uso.md); the legal analysis behind the design
-decisions is in [`docs/legale.md`](docs/legale.md). Both are authoritative in Italian and
-open with an English summary. In short:
+[`docs/terms-of-use.md`](docs/terms-of-use.md); the legal analysis behind the design
+decisions is in [`docs/legal.md`](docs/legal.md). Both exist **in full in both languages** —
+the Italian counterparts are [`terms-of-use.it.md`](docs/terms-of-use.it.md) and
+[`legal.it.md`](docs/legal.it.md) — and both carry a prevalence clause naming the Italian as
+authoritative, so that a divergence has a defined resolution rather than an ambiguous one.
+In short:
 
 - **Ingredient lists are not protected by copyright**: extracting and reformatting them is
   lawful.

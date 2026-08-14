@@ -15,7 +15,7 @@
 > L'estrazione è automatica e può sbagliare. Il progetto è costruito per rendere visibili le
 > incertezze invece di nasconderle, ma **rileggi la ricetta prima di cucinarla**, soprattutto
 > pesi e tempi; e se hai allergie, torna alla fonte originale, che è sempre citata.
-> Dettagli in [`docs/condizioni-uso.md`](docs/condizioni-uso.md).
+> Dettagli in [`docs/terms-of-use.it.md`](docs/terms-of-use.it.md).
 
 **Dai reel di cucina di Instagram a un ricettario ordinato, importabile in [Mela](https://mela.recipes).**
 Incolli un link, premi *Cook*, e ottieni una ricetta pulita — con gli ingredienti in grammi
@@ -301,9 +301,12 @@ convince, la correggi lì — dichiarando la fonte, che i test pretendono.
 
 Reel2Recipe è pensato per **uso personale**, su contenuti che **tu hai già salvato**.
 Le condizioni rivolte a chi usa lo strumento stanno in
-[`docs/condizioni-uso.md`](docs/condizioni-uso.md); l'analisi giuridica che sta dietro alle
-scelte di progetto in [`docs/legale.md`](docs/legale.md). Entrambi fanno fede in italiano e
-si aprono con un riassunto inglese. In breve:
+[`docs/terms-of-use.it.md`](docs/terms-of-use.it.md); l'analisi giuridica che sta dietro alle
+scelte di progetto in [`docs/legal.it.md`](docs/legal.it.md). Entrambi esistono **per intero in
+tutte e due le lingue** — le versioni inglesi sono [`terms-of-use.md`](docs/terms-of-use.md) e
+[`legal.md`](docs/legal.md) — e portano una clausola di prevalenza che dichiara facente fede
+l'italiano, così che una divergenza abbia una risoluzione definita invece che ambigua.
+In breve:
 
 - **Gli elenchi di ingredienti non sono protetti da copyright**: estrarli e riformattarli è
   lecito.

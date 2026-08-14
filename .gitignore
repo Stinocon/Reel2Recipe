@@ -2,7 +2,7 @@
 # `workspace/` contiene materiale di terzi scaricato dai reel (video, audio, keyframe,
 # didascalie) e la libreria personale delle ricette. NON esce mai dalla macchina:
 # non si committa, non si ridistribuisce. Nel repo va solo il codice.
-# Vedi docs/legale.md.
+# See docs/legal.md.
 workspace/
 
 # --- Strumenti di sviluppo, fuori dal repo pubblicato -------------------------

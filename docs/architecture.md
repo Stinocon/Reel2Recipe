@@ -1,7 +1,7 @@
 # Architecture
 
 The *why* behind the choices. For the *what* there is the [README](../README.md); for the
-legal side there is [`legale.md`](legale.md), which stays in Italian because it is the version
+legal side there is [`legal.md`](legal.md), which stays in Italian because it is the version
 that holds.
 
 ---
@@ -320,7 +320,7 @@ install alongside — a necessary condition for running inside a container or on
   inside explicit delimiters and the prompt requires that any commands contained in the material
   be disobeyed. It is the boundary mirroring the anti-leak one.
 - **Third-party material (outgoing).** Everything downloaded stays in `workspace/`, outside git.
-  The guard in `check.sh` verifies it before every commit. Details in [`legale.md`](legale.md).
+  The guard in `check.sh` verifies it before every commit. Details in [`legal.md`](legal.md).
 
 ---
 

@@ -1,15 +1,12 @@
 # Copyright, brevetti e Termini d'Uso
 
-> **In English — non-binding summary.** This note explains why Reel2Recipe is built the way
-> it is. It is not legal advice. In one line: **extracting a recipe for personal use is
-> lawful; redistributing a creator's prose is not; downloading from Instagram breaches that
-> platform's Terms of Use.** Ingredient lists are information, not protected expression, so
-> extracting and reformatting them is fine. Descriptive prose *is* protected, which is why
-> the tool rewrites the method in its own words and always links back to the source. Patents
-> do not bear on home cooking.
->
-> **The Italian text below is the authoritative one** — it carries the citations and the
-> reasoning this summary compresses.
+<p align="right"><strong>Italiano</strong> · <a href="legal.md">English</a></p>
+
+> **Questa è la versione facente fede.** Il documento esiste in due lingue e le due dicono la
+> stessa cosa. Dove sembrassero divergere, prevale questa: è quella scritta per prima e porta
+> le citazioni nella loro formulazione originale. Dirlo apertamente è meglio che far finta che
+> due testi non possano scostarsi — possono, e nominare quale vince è ciò che rende un
+> documento legale bilingue utilizzabile invece che ambiguo.
 
 Questa nota spiega perché Reel2Recipe è costruito come è costruito. Non è consulenza legale:
 è la ricognizione onesta che ha guidato le scelte di progetto. Le conclusioni condizionano

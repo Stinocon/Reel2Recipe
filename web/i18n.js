@@ -127,6 +127,10 @@ const TEXTS = {
       + 'Le lacune sono sempre dichiarate, mai riempite a caso.',
     footer_code: 'Codice sorgente',
     footer_terms: 'Condizioni d’uso',
+    // The terms exist in both languages, so the link follows the interface too:
+    // sending an English reader to the Italian text would be a translated label
+    // pointing at an untranslated document.
+    footer_terms_url: 'https://github.com/Stinocon/Reel2Recipe/blob/main/docs/terms-of-use.it.md',
     footer_licence: 'Licenza MIT',
   },
 
@@ -236,6 +240,7 @@ const TEXTS = {
       + 'Gaps are always declared, never filled in at random.',
     footer_code: 'Source code',
     footer_terms: 'Terms of use',
+    footer_terms_url: 'https://github.com/Stinocon/Reel2Recipe/blob/main/docs/terms-of-use.md',
     footer_licence: 'MIT licence',
   },
 };
@@ -277,7 +282,11 @@ export function t(key, data = {}, forced = null) {
 }
 
 /** Fills the static markup: `data-i18n` for text, `data-i18n-html` where the string
- *  contains inline markup, `data-i18n-<attribute>` for placeholders and titles.
+ *  contains inline markup, `data-i18n-<attribute>` for placeholders, titles and hrefs.
+ *
+ *  `href` is in that list because the terms of use exist in both languages: a translated
+ *  label pointing at an untranslated document is worse than either, and it is the generic
+ *  mechanism that answers it rather than a special case for one link.
  *
  *  `data-i18n-html` exists because replacing the `textContent` of an element that contains
  *  other nodes deletes them — and in one case that node was the `<input type="file">` hidden
@@ -290,7 +299,7 @@ export function applyTexts(root = document) {
   root.querySelectorAll('[data-i18n-html]').forEach((el) => {
     el.innerHTML = t(el.dataset.i18nHtml);
   });
-  for (const attribute of ['placeholder', 'title', 'aria-label']) {
+  for (const attribute of ['placeholder', 'title', 'aria-label', 'href']) {
     const marker = `data-i18n-${attribute}`;
     root.querySelectorAll(`[${marker}]`).forEach((el) => {
       el.setAttribute(attribute, t(el.getAttribute(marker)));

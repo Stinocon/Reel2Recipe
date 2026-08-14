@@ -91,10 +91,13 @@ axis, and the second one is what to plan around.
    while its own templates still wrote `id="mod-ingredienti"`.
 5. **Done last:** the test modules' own prose — all ten of them, with the model gate re-run
    for `test_modello.py` — and `docs/architettura.md` → `docs/architecture.md`.
-6. **Deliberately left in Italian:** `docs/legale.md` and `docs/condizioni-uso.md`. They are
-   authoritative in Italian and carry a non-binding English summary; translating them in full
-   would put two published legal versions in circulation, which is a real problem rather than
-   a stylistic one (the rule predates this migration).
+6. **Done since, and the reasoning corrected.** `docs/legal.md` and `docs/terms-of-use.md`
+   were once left Italian-with-an-English-summary, on the ground that two published legal
+   versions can diverge. The risk is real; refusing to translate is not the answer to it, it
+   is only a way of not having the problem by not having the document. Both now exist in full
+   in both languages, with a **prevalence clause** naming the Italian authoritative — which is
+   what bilingual legal texts do, and it turns a possible divergence from an ambiguity into a
+   defined resolution.
 
 ### What the hard modules taught
 
