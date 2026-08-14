@@ -1,0 +1,778 @@
+# ingredients.yaml — the words of a recipe that have a settled translation. A glossary, not
+# a dictionary: ingredient names, and the headings they are grouped under.
+#
+# Why this file exists. Translating an ingredient name is the one step of the pipeline where a
+# local model does not merely produce a clumsy sentence but **a different ingredient**. Seen,
+# reproducibly, on qwen2.5:14b: `maiale` came back as "bacon" and `cavolo cappuccio` as
+# "chinese broccoli". A clumsy translation is legible; a wrong ingredient sends someone to the
+# shop for the wrong thing, and nothing on the card says so.
+#
+# It is the same argument as `densities.yaml`, one axis over. There the model must not guess a
+# weight; here it must not guess an identity. Both are facts that belong in a table.
+#
+# HOW IT IS USED (`extract.translate_draft`):
+#
+#   whole name in the table   ->  the code translates it. The model never sees the word.
+#   part of the name matches  ->  the name goes to the model WITH the known term pinned:
+#                                 "Maiale (fettina grassa)" keeps its modifier, and `maiale`
+#                                 is not up for discussion.
+#   nothing matches           ->  the model translates it, as before.
+#
+# The third case is not a failure of this file. A glossary that tried to hold every ingredient
+# in the world would be wrong more often than it was useful; this one holds what is common in
+# the kitchens the tool is aimed at, and grows when something real gets it wrong.
+#
+# SHAPE. `it` and `en` are the names a cook reads and the ones we write. `alias` are the other
+# spellings the material might use — regional names, common English variants, the forms we do
+# not emit — in either language, matched case- and accent-insensitively. An alias is never an
+# output: it only ever leads to `it`/`en`.
+#
+# `it_plural`/`en_plural` are optional and exist for the ingredients a recipe counts. "2 uovo"
+# and "3 carrot" are the kind of wrong that makes a card look machine-made, and the number is
+# right there in `quantity_raw`, so there is no reason to guess: the plural is used when the
+# amount is anything other than exactly one. Mass nouns — flour, salt, oil — have no plural
+# and need none.
+#
+# RULE: an alias must be the SAME ingredient, not a similar one. `pancetta` is not `bacon`,
+# `cavolo cappuccio` is not `cavolo nero`. That distinction is the whole point of the file, and
+# `test_units.py` checks that no alias is claimed by two entries.
+
+ingredients:
+
+  # ---------------------------------------------------------------------------------
+  # Meat, fish, eggs
+  # ---------------------------------------------------------------------------------
+  maiale:
+    it: maiale
+    en: pork
+    alias: [carne di maiale, pork meat, carne suina]
+  pancetta:
+    it: pancetta
+    en: pancetta
+    alias: [pancetta affumicata]
+  guanciale:
+    it: guanciale
+    en: guanciale
+  prosciutto crudo:
+    it: prosciutto crudo
+    en: prosciutto
+    alias: [prosciutto di parma, dry-cured ham]
+  prosciutto cotto:
+    it: prosciutto cotto
+    en: cooked ham
+    alias: [ham]
+  speck:
+    it: speck
+    en: speck
+  salsiccia:
+    it: salsiccia
+    en: sausage
+    it_plural: salsicce
+    en_plural: sausages
+    alias: [salsicce, sausages]
+  manzo:
+    it: manzo
+    en: beef
+    alias: [carne di manzo, carne bovina, beef meat]
+  vitello:
+    it: vitello
+    en: veal
+  agnello:
+    it: agnello
+    en: lamb
+  pollo:
+    it: pollo
+    en: chicken
+    alias: [petto di pollo, chicken breast]
+  tacchino:
+    it: tacchino
+    en: turkey
+  coniglio:
+    it: coniglio
+    en: rabbit
+  bacon:
+    it: bacon
+    en: bacon
+    alias: [pancetta affumicata a fette]
+  uovo:
+    it: uovo
+    en: egg
+    it_plural: uova
+    en_plural: eggs
+    alias: [uova, eggs]
+  tuorlo:
+    it: tuorlo
+    en: egg yolk
+    it_plural: tuorli
+    en_plural: egg yolks
+    alias: [tuorli, rosso d'uovo, yolk, yolks, egg yolks]
+  albume:
+    it: albume
+    en: egg white
+    it_plural: albumi
+    en_plural: egg whites
+    alias: [albumi, bianco d'uovo, egg whites]
+  tonno:
+    it: tonno
+    en: tuna
+  salmone:
+    it: salmone
+    en: salmon
+  merluzzo:
+    it: merluzzo
+    en: cod
+    alias: [baccala, baccalà]
+  gamberi:
+    it: gamberi
+    en: prawns
+    alias: [gambero, gamberetti, shrimp, shrimps, prawn]
+  cozze:
+    it: cozze
+    en: mussels
+    alias: [cozza, mussel]
+  vongole:
+    it: vongole
+    en: clams
+    alias: [vongola, clam]
+  acciughe:
+    it: acciughe
+    en: anchovies
+    alias: [acciuga, alici, alice, anchovy]
+  calamari:
+    it: calamari
+    en: squid
+    alias: [calamaro, totani]
+
+  # ---------------------------------------------------------------------------------
+  # Vegetables
+  # ---------------------------------------------------------------------------------
+  cipolla:
+    it: cipolla
+    en: onion
+    it_plural: cipolle
+    en_plural: onions
+    alias: [cipolle, onions, cipolla bianca, cipolla dorata]
+  cipolla rossa:
+    it: cipolla rossa
+    en: red onion
+    it_plural: cipolle rosse
+    en_plural: red onions
+    alias: [cipolle rosse, cipolla di tropea, red onions]
+  scalogno:
+    it: scalogno
+    en: shallot
+    it_plural: scalogni
+    en_plural: shallots
+    alias: [scalogni, shallots]
+  aglio:
+    it: aglio
+    en: garlic
+    alias: [spicchio d'aglio, spicchi d'aglio, garlic clove, garlic cloves]
+  porro:
+    it: porro
+    en: leek
+    it_plural: porri
+    en_plural: leeks
+    alias: [porri, leeks]
+  carota:
+    it: carota
+    en: carrot
+    it_plural: carote
+    en_plural: carrots
+    alias: [carote, carrots]
+  sedano:
+    it: sedano
+    en: celery
+  patata:
+    it: patata
+    en: potato
+    it_plural: patate
+    en_plural: potatoes
+    alias: [patate, potatoes]
+  patata dolce:
+    it: patata dolce
+    en: sweet potato
+    it_plural: patate dolci
+    en_plural: sweet potatoes
+    alias: [patate dolci, sweet potatoes, batata]
+  pomodoro:
+    it: pomodoro
+    en: tomato
+    it_plural: pomodori
+    en_plural: tomatoes
+    alias: [pomodori, tomatoes, pomodorini, cherry tomatoes, pomodorino]
+  pomodori pelati:
+    it: pomodori pelati
+    en: peeled tomatoes
+    alias: [pelati, canned peeled tomatoes]
+  passata di pomodoro:
+    it: passata di pomodoro
+    en: tomato passata
+    alias: [passata, tomato puree, tomato purée]
+  concentrato di pomodoro:
+    it: concentrato di pomodoro
+    en: tomato paste
+    alias: [doppio concentrato, tomato concentrate]
+  zucchina:
+    it: zucchina
+    en: courgette
+    it_plural: zucchine
+    en_plural: courgettes
+    alias: [zucchine, zucchini, courgettes]
+  melanzana:
+    it: melanzana
+    en: aubergine
+    it_plural: melanzane
+    en_plural: aubergines
+    alias: [melanzane, aubergines, eggplant, eggplants]
+  # "pepper" alone is claimed by two different ingredients in English — the vegetable and the
+  # spice — so neither entry gets to own it. The vegetable is always spelled out; `pepe` keeps
+  # the bare word, which is what a recipe means by it in a list of seasonings.
+  peperone:
+    it: peperone
+    en: bell pepper
+    it_plural: peperoni
+    en_plural: bell peppers
+    alias: [peperoni, bell peppers, capsicum, sweet pepper]
+  cavolo cappuccio:
+    it: cavolo cappuccio
+    en: cabbage
+    alias: [cappuccio, white cabbage, verza bianca]
+  cavolo nero:
+    it: cavolo nero
+    en: cavolo nero
+    alias: [black kale, tuscan kale, lacinato kale]
+  verza:
+    it: verza
+    en: savoy cabbage
+    alias: [cavolo verza]
+  cavolfiore:
+    it: cavolfiore
+    en: cauliflower
+  broccolo:
+    it: broccolo
+    en: broccoli
+    it_plural: broccoli
+    en_plural: broccoli
+    alias: [broccoli, broccoletti]
+  spinaci:
+    it: spinaci
+    en: spinach
+    alias: [spinacio]
+  bietola:
+    it: bietola
+    en: chard
+    alias: [bietole, coste, swiss chard]
+  funghi:
+    it: funghi
+    en: mushrooms
+    alias: [fungo, mushroom, champignon, funghi champignon]
+  funghi porcini:
+    it: funghi porcini
+    en: porcini mushrooms
+    alias: [porcini, porcino]
+  piselli:
+    it: piselli
+    en: peas
+    alias: [pisello]
+  fagiolini:
+    it: fagiolini
+    en: green beans
+    alias: [fagiolino]
+  zucca:
+    it: zucca
+    en: pumpkin
+    alias: [squash, butternut]
+  finocchio:
+    it: finocchio
+    en: fennel
+    it_plural: finocchi
+    en_plural: fennel bulbs
+    alias: [finocchi]
+  radicchio:
+    it: radicchio
+    en: radicchio
+  rucola:
+    it: rucola
+    en: rocket
+    alias: [arugula]
+  lattuga:
+    it: lattuga
+    en: lettuce
+    alias: [insalata]
+  cetriolo:
+    it: cetriolo
+    en: cucumber
+    it_plural: cetrioli
+    en_plural: cucumbers
+    alias: [cetrioli, cucumbers]
+  mais:
+    it: mais
+    en: sweetcorn
+    alias: [granoturco, corn, sweet corn]
+  olive:
+    it: olive
+    en: olives
+    alias: [oliva, olive nere, olive verdi, black olives, green olives]
+  capperi:
+    it: capperi
+    en: capers
+    alias: [cappero]
+
+  # ---------------------------------------------------------------------------------
+  # Fruit
+  # ---------------------------------------------------------------------------------
+  mela:
+    it: mela
+    en: apple
+    it_plural: mele
+    en_plural: apples
+    alias: [mele, apples]
+  pera:
+    it: pera
+    en: pear
+    it_plural: pere
+    en_plural: pears
+    alias: [pere, pears]
+  limone:
+    it: limone
+    en: lemon
+    it_plural: limoni
+    en_plural: lemons
+    alias: [limoni, lemons, succo di limone, lemon juice]
+  arancia:
+    it: arancia
+    en: orange
+    it_plural: arance
+    en_plural: oranges
+    alias: [arance, oranges, succo d'arancia, orange juice]
+  banana:
+    it: banana
+    en: banana
+    it_plural: banane
+    en_plural: bananas
+    alias: [banane, bananas]
+  fragole:
+    it: fragole
+    en: strawberries
+    alias: [fragola, strawberry]
+  frutti di bosco:
+    it: frutti di bosco
+    en: berries
+    alias: [mixed berries, bosco]
+  mirtilli:
+    it: mirtilli
+    en: blueberries
+    alias: [mirtillo, blueberry]
+  lamponi:
+    it: lamponi
+    en: raspberries
+    alias: [lampone, raspberry]
+  pesca:
+    it: pesca
+    en: peach
+    it_plural: pesche
+    en_plural: peaches
+    alias: [pesche, peaches]
+  uva:
+    it: uva
+    en: grapes
+    alias: [grape]
+  avocado:
+    it: avocado
+    en: avocado
+
+  # ---------------------------------------------------------------------------------
+  # Dairy
+  # ---------------------------------------------------------------------------------
+  latte:
+    it: latte
+    en: milk
+  panna:
+    it: panna
+    en: cream
+    alias: [panna fresca, panna liquida, heavy cream, double cream, whipping cream]
+  burro:
+    it: burro
+    en: butter
+  yogurt:
+    it: yogurt
+    en: yoghurt
+    alias: [yoghurt, yogurt greco, greek yoghurt, greek yogurt]
+  mascarpone:
+    it: mascarpone
+    en: mascarpone
+  ricotta:
+    it: ricotta
+    en: ricotta
+  mozzarella:
+    it: mozzarella
+    en: mozzarella
+    alias: [fiordilatte, fior di latte]
+  parmigiano:
+    it: parmigiano
+    en: parmesan
+    alias: [parmigiano reggiano, grana, grana padano, parmesan cheese]
+  pecorino:
+    it: pecorino
+    en: pecorino
+    alias: [pecorino romano]
+  gorgonzola:
+    it: gorgonzola
+    en: gorgonzola
+  stracchino:
+    it: stracchino
+    en: stracchino
+  formaggio:
+    it: formaggio
+    en: cheese
+    alias: [formaggi, cheeses]
+
+  # ---------------------------------------------------------------------------------
+  # Grains, flours, pasta, bread
+  # ---------------------------------------------------------------------------------
+  farina:
+    it: farina
+    en: flour
+    alias: [farina 00, farina 0, all-purpose flour, plain flour, farina bianca]
+  farina integrale:
+    it: farina integrale
+    en: wholemeal flour
+    alias: [whole wheat flour, wholewheat flour]
+  semola:
+    it: semola
+    en: semolina
+    alias: [semola rimacinata, semola di grano duro]
+  amido di mais:
+    it: amido di mais
+    en: cornflour
+    alias: [maizena, cornstarch, corn starch]
+  pane:
+    it: pane
+    en: bread
+  pangrattato:
+    it: pangrattato
+    en: breadcrumbs
+    alias: [pan grattato, breadcrumb]
+  riso:
+    it: riso
+    en: rice
+    alias: [riso carnaroli, riso arborio]
+  pasta:
+    it: pasta
+    en: pasta
+  spaghetti:
+    it: spaghetti
+    en: spaghetti
+  udon:
+    it: udon
+    en: udon
+    alias: [udon noodles, noodles udon]
+  avena:
+    it: avena
+    en: oats
+    alias: [fiocchi d'avena, rolled oats, oat flakes]
+  couscous:
+    it: couscous
+    en: couscous
+  lievito di birra:
+    it: lievito di birra
+    en: fresh yeast
+    alias: [lievito fresco, brewer's yeast]
+  lievito in polvere:
+    it: lievito in polvere
+    en: baking powder
+    alias: [lievito per dolci]
+    # NOT "baking soda": that is bicarbonate of soda, a different raising agent with a
+    # different quantity. It has its own entry below, and mixing the two is exactly the class
+    # of error this file exists to stop.
+  bicarbonato:
+    it: bicarbonato
+    en: bicarbonate of soda
+    alias: [bicarbonato di sodio, baking soda]
+  savoiardi:
+    it: savoiardi
+    en: ladyfingers
+    alias: [savoiardo, sponge fingers, ladyfinger]
+
+  # ---------------------------------------------------------------------------------
+  # Legumes and nuts
+  # ---------------------------------------------------------------------------------
+  ceci:
+    it: ceci
+    en: chickpeas
+    alias: [cece, chickpea, garbanzo]
+  lenticchie:
+    it: lenticchie
+    en: lentils
+    alias: [lenticchia, lentil]
+  fagioli:
+    it: fagioli
+    en: beans
+    alias: [fagiolo, bean, cannellini, borlotti]
+  mandorle:
+    it: mandorle
+    en: almonds
+    alias: [mandorla, almond]
+  noci:
+    it: noci
+    en: walnuts
+    alias: [noce, walnut]
+  nocciole:
+    it: nocciole
+    en: hazelnuts
+    alias: [nocciola, hazelnut]
+  pinoli:
+    it: pinoli
+    en: pine nuts
+    alias: [pinolo, pine nut]
+  pistacchi:
+    it: pistacchi
+    en: pistachios
+    alias: [pistacchio, pistachio]
+  arachidi:
+    it: arachidi
+    en: peanuts
+    alias: [arachide, peanut, burro di arachidi, peanut butter]
+  semi di lino:
+    it: semi di lino
+    en: flax seeds
+    alias: [linseed, linseeds, flaxseed, flaxseeds]
+  semi di sesamo:
+    it: semi di sesamo
+    en: sesame seeds
+    alias: [sesamo, sesame]
+
+  # ---------------------------------------------------------------------------------
+  # Herbs, spices, seasonings
+  # ---------------------------------------------------------------------------------
+  sale:
+    it: sale
+    en: salt
+    alias: [sale fino, sale grosso, fine salt, coarse salt]
+  pepe:
+    it: pepe
+    en: pepper
+    alias: [pepe nero, black pepper]
+  peperoncino:
+    it: peperoncino
+    en: chilli
+    alias: [peperoncini, chili, chilli pepper, red pepper flakes]
+  basilico:
+    it: basilico
+    en: basil
+  prezzemolo:
+    it: prezzemolo
+    en: parsley
+  rosmarino:
+    it: rosmarino
+    en: rosemary
+  salvia:
+    it: salvia
+    en: sage
+  timo:
+    it: timo
+    en: thyme
+  origano:
+    it: origano
+    en: oregano
+  alloro:
+    it: alloro
+    en: bay leaf
+    alias: [foglia di alloro, foglie di alloro, bay leaves]
+  menta:
+    it: menta
+    en: mint
+  erba cipollina:
+    it: erba cipollina
+    en: chives
+  noce moscata:
+    it: noce moscata
+    en: nutmeg
+  cannella:
+    it: cannella
+    en: cinnamon
+  zafferano:
+    it: zafferano
+    en: saffron
+  curcuma:
+    it: curcuma
+    en: turmeric
+  cumino:
+    it: cumino
+    en: cumin
+  paprika:
+    it: paprika
+    en: paprika
+  zenzero:
+    it: zenzero
+    en: ginger
+  vaniglia:
+    it: vaniglia
+    en: vanilla
+    alias: [estratto di vaniglia, vanilla extract, baccello di vaniglia, vanilla pod]
+
+  # ---------------------------------------------------------------------------------
+  # Pantry, fats, sweeteners, liquids
+  # ---------------------------------------------------------------------------------
+  olio d'oliva:
+    it: olio d'oliva
+    en: olive oil
+    alias: [olio extravergine d'oliva, olio evo, extra virgin olive oil, evoo, olio di oliva]
+  olio di semi:
+    it: olio di semi
+    en: vegetable oil
+    alias: [olio di semi di girasole, sunflower oil, seed oil]
+  aceto:
+    it: aceto
+    en: vinegar
+    alias: [aceto di vino, wine vinegar]
+  aceto balsamico:
+    it: aceto balsamico
+    en: balsamic vinegar
+  zucchero:
+    it: zucchero
+    en: sugar
+    alias: [zucchero semolato, caster sugar, granulated sugar, white sugar]
+  zucchero a velo:
+    it: zucchero a velo
+    en: icing sugar
+    alias: [powdered sugar, confectioners sugar]
+  zucchero di canna:
+    it: zucchero di canna
+    en: brown sugar
+    alias: [cane sugar]
+  miele:
+    it: miele
+    en: honey
+  cioccolato:
+    it: cioccolato
+    en: chocolate
+    alias: [cioccolato fondente, dark chocolate, cioccolata]
+  cacao:
+    it: cacao
+    en: cocoa
+    alias: [cacao amaro, cocoa powder, unsweetened cocoa]
+  acqua:
+    it: acqua
+    en: water
+  brodo:
+    it: brodo
+    en: stock
+    alias: [brodo vegetale, brodo di pollo, vegetable stock, chicken stock, broth]
+  birra:
+    it: birra
+    en: beer
+    # Here because of `lievito di birra`, not because recipes call for beer often. The
+    # density lookup was matching the shorter word inside the longer name and giving fresh
+    # yeast the density of beer; the glossary is what lets `units.py` refuse that, and it can
+    # only refuse what it knows.
+  vino bianco:
+    it: vino bianco
+    en: white wine
+  vino rosso:
+    it: vino rosso
+    en: red wine
+  caffe:
+    it: caffè
+    en: coffee
+    alias: [caffè, caffe amaro, espresso]
+  latte di cocco:
+    it: latte di cocco
+    en: coconut milk
+  salsa di soia:
+    it: salsa di soia
+    en: soy sauce
+    alias: [soia, soy]
+  mirin:
+    it: mirin
+    en: mirin
+  dashi:
+    it: dashi
+    en: dashi
+    alias: [dashi in polvere, dashi powder, powdered dashi]
+  senape:
+    it: senape
+    en: mustard
+  maionese:
+    it: maionese
+    en: mayonnaise
+    alias: [mayo]
+  tofu:
+    it: tofu
+    en: tofu
+  tahina:
+    it: tahina
+    en: tahini
+    alias: [tahin]
+
+# ---------------------------------------------------------------------------------
+# Group headings
+# ---------------------------------------------------------------------------------
+#
+# The labels a recipe divides its ingredients under. Not ingredients, but the same kind of
+# fact — a word with one right translation — and the last thing the measurement showed the
+# model getting wrong: "Sauce" came back as "Salsa" and "Garnish" stayed English, on the same
+# card, so one recipe ended up half in each language.
+#
+# Only the whole heading is matched, and deliberately so. "Per la crema al limone" is mostly
+# free text and belongs to the model; pattern-matching "Per la ..." would be a translation
+# engine, which is the thing this file exists not to be.
+
+groups:
+  base:
+    it: Per la base
+    en: For the base
+    alias: [base, la base, the base]
+  crema:
+    it: Per la crema
+    en: For the cream
+    alias: [crema, cream]
+  copertura:
+    it: Per la copertura
+    en: For the topping
+    alias: [copertura, topping, for the coating, coating]
+  salsa:
+    it: Per la salsa
+    en: For the sauce
+    alias: [salsa, sauce, sugo]
+  condimento:
+    it: Per il condimento
+    en: For the dressing
+    alias: [condimento, dressing, seasoning]
+  guarnizione:
+    it: Per guarnire
+    en: For the garnish
+    alias: [guarnizione, garnish, to garnish, decorazione, per decorare]
+  impasto:
+    it: Per l'impasto
+    en: For the dough
+    alias: [impasto, dough, batter, pastella]
+  ripieno:
+    it: Per il ripieno
+    en: For the filling
+    alias: [ripieno, filling, farcia]
+  marinatura:
+    it: Per la marinatura
+    en: For the marinade
+    alias: [marinatura, marinade, marinata]
+  verdure:
+    it: Verdure
+    en: Vegetables
+    alias: [le verdure, vegetables, veggies, ortaggi]
+  spezie:
+    it: Spezie
+    en: Spices
+    alias: [le spezie, spices]
+  secchi:
+    it: Ingredienti secchi
+    en: Dry ingredients
+    alias: [secchi, dry, dry ingredients]
+  liquidi:
+    it: Ingredienti liquidi
+    en: Wet ingredients
+    alias: [liquidi, wet, wet ingredients]
+  servire:
+    it: Per servire
+    en: To serve
+    alias: [servire, to serve, per accompagnare]

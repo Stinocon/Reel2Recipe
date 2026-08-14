@@ -92,7 +92,7 @@ ingredients:
   "amido di mais":
     g_per_ml: 0.5410
     source: "USDA FDC 169698 — 128 g per cup"
-    alias: [maizena, cornstarch, amido]
+    alias: [maizena, cornstarch, amido, cornflour]
   "fecola di patate":
     g_per_ml: 0.6425
     source: "King Arthur Baking, Ingredient Weight Chart — 152 g per cup"
@@ -229,13 +229,13 @@ ingredients:
     g_per_ml: 0.4227
     source: "USDA FDC 171247 — 100 g per cup"
     alias: [parmigiano, grana grattugiato, pecorino grattugiato, formaggio grattugiato,
-            grated parmesan]
+            grated parmesan, parmesan]
   "passata di pomodoro":
     g_per_ml: 1.0567
     liquid: true
     source: "USDA FDC 170460 — 250 g per cup"
     alias: [passata, polpa di pomodoro, pomodori pelati, tomato sauce, salsa di pomodoro,
-            tomato puree]
+            tomato puree, peeled tomatoes]
   "brodo":
     g_per_ml: 1.0144
     liquid: true
@@ -293,11 +293,11 @@ ingredients:
   "ceci secchi":
     g_per_ml: 0.8454
     source: "USDA FDC 173756 — 200 g per cup, dried"
-    alias: [ceci, dried chickpeas]
+    alias: [ceci, dried chickpeas, chickpeas]
   "fagioli secchi":
     g_per_ml: 0.7777
     source: "USDA FDC 173744 — 184 g per cup, dried"
-    alias: [fagioli, fagioli borlotti, fagioli cannellini, dried beans]
+    alias: [fagioli, fagioli borlotti, fagioli cannellini, dried beans, beans]
   "piselli secchi":
     g_per_ml: 0.8284
     source: "USDA FDC 172428 — 196 g per cup, dried, split"
@@ -391,7 +391,7 @@ ingredients:
   "cacao amaro":
     g_per_ml: 0.3635
     source: "USDA FDC 169593 — 86 g per cup, powdered unsweetened"
-    alias: [cacao, cacao in polvere, cocoa powder, cacao amaro in polvere]
+    alias: [cacao, cacao in polvere, cocoa powder, cacao amaro in polvere, cocoa]
   "pangrattato":
     g_per_ml: 0.4565
     source: "USDA FDC 174928 — 108 g per cup, dry"
@@ -400,7 +400,7 @@ ingredients:
     g_per_ml: 0.7186
     source: "King Arthur Baking, Ingredient Weight Chart — 170 g per cup, chips or chunks"
     alias: [cioccolato, gocce di cioccolato, cioccolato a pezzi, chocolate chips,
-            dark chocolate]
+            dark chocolate, chocolate]
   "gelatina in polvere":
     g_per_ml: 0.4734
     source: "USDA FDC 169599 — 7 g per one-tablespoon sachet"
@@ -428,11 +428,11 @@ ingredients:
   "pepe nero":
     g_per_ml: 0.4666
     source: "USDA FDC 170931 — 2,3 g per teaspoon, ground"
-    alias: [pepe, pepe macinato, black pepper]
+    alias: [pepe, pepe macinato, black pepper, pepper]
   "origano secco":
     g_per_ml: 0.2029
     source: "USDA FDC 171328 — 1 g per teaspoon, leaf form"
-    alias: [origano, dried oregano]
+    alias: [origano, dried oregano, oregano]
   "aglio in polvere":
     g_per_ml: 0.6289
     source: "USDA FDC 171325 — 3,1 g per teaspoon"
@@ -457,7 +457,7 @@ ingredients:
   "bicarbonato":
     g_per_ml: 0.9333
     source: "USDA FDC 175040 — 4,6 g per teaspoon"
-    alias: [bicarbonato di sodio, baking soda]
+    alias: [bicarbonato di sodio, baking soda, bicarbonate of soda]
   "cremor tartaro":
     g_per_ml: 0.6087
     source: "USDA FDC 175041 — 3 g per teaspoon"

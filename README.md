@@ -45,10 +45,11 @@ actually cook from.
 
 The three are separate axes, described under
 [Language and measurement system](#language-and-measurement-system). Be aware of one honest
-limitation before you rely on it: translating **ingredient names** is the least reliable part
-of the whole chain — see [the note on limits](#honesty-about-the-limits). The numbers stay
-right; it is the words that slip, and where the model is unsure it now leaves the original
-word rather than guessing a similar ingredient.
+limitation before you rely on it: translating is the least deterministic part of the whole
+chain — see [the note on limits](#honesty-about-the-limits). The common ingredient names come
+from a table rather than from the model, so those are settled; what is left to the model is
+the prose and the ingredients the table does not hold, and there it is told to keep the
+original word rather than guess a similar one. The numbers never move either way.
 
 > **A note on this documentation.** This README and the add-on's are kept in English and
 > Italian, as two copies that move together. Everything else exists in one language only,
@@ -213,21 +214,28 @@ time, and that is the weakest part — see the note below.
 > extraction call and became **a call of its own** — but "better" is not "solved", and what is
 > left is worth knowing before you rely on it.
 >
-> **What was fixed.** Asked to understand a reel and render it in another language in one go,
-> the model treated the language as all-or-nothing: on a caption written as prose it
-> translated everything, on a short **list-shaped** one it translated *nothing* — not the
-> names, not the group headings, not the method. Measured on such a caption: **0%** of the
-> terms translated. Split into two passes, the same caption scores **5 out of 6**, and the
-> group headings come through at 100%. Run `uv run python tools/benchmark-translation.py` to
-> see the numbers for yourself.
+> **What was fixed, in two steps.** Asked to understand a reel and render it in another
+> language in one go, the model treated the language as all-or-nothing: on a caption written
+> as prose it translated everything, on a short **list-shaped** one it translated *nothing* —
+> not the names, not the group headings, not the method. Measured on such a caption: **0%**.
 >
-> **What is left, and it is the part to watch.** The model sometimes **substitutes** an
-> ingredient instead of translating it: `maiale` came back as "bacon", `cavolo cappuccio` as
-> "chinese broccoli". That is worse than leaving a word in Italian, because a foreign word is
-> visibly foreign while a confidently wrong ingredient is not — you would buy the wrong thing.
-> The translation prompt now forbids substitution outright and tells the model to **keep the
-> original word when it is unsure**, which is why you will occasionally see an Italian
-> ingredient inside an English recipe. That is the intended behaviour, not a failure.
+> Splitting extraction and translation into two calls took it to 83%. What was still missing
+> was not a language failure but a worse one: the model **substituted** ingredients rather
+> than translating them — `maiale` came back as "bacon", `cavolo cappuccio` as "chinese
+> broccoli". A foreign word is visibly foreign; a confidently wrong ingredient is not, and you
+> would buy the wrong thing.
+>
+> So the names it gets wrong are no longer its to decide. `data/ingredients.yaml` holds them —
+> 156 ingredients and 14 group headings, in both languages — and the code translates the ones
+> it knows without the model seeing the word, exactly as `densities.yaml` keeps weights out of
+> its hands. Every language combination now measures **100%** on the terms, the group headings
+> and the amounts. Run `uv run python tools/benchmark-translation.py` and see for yourself.
+>
+> **What is left.** An ingredient the table does not hold still goes to the model, and there
+> the old caveat stands: it is told never to substitute and to **keep the original word when
+> unsure**, so you will occasionally see an Italian word inside an English recipe. That is the
+> intended behaviour — a legible foreign word beats a confident wrong one — and it is also the
+> signal that the glossary is missing an entry worth adding.
 >
 > A **bilingual** caption is still the hardest case, because the model draws on both
 > languages: an English-German post produced "dinkel fette".
@@ -358,7 +366,7 @@ src/reel2recipe/     the code
   pipeline.py        the whole chain
   api.py             the web interface
   cli.py             the terminal commands
-data/                the conversion tables (readable and editable)
+data/                the tables: conversions, densities, eyeball measures, ingredient names
 web/                 the interface (HTML/CSS/JS, no build step)
   i18n.js            the interface's words, in Italian and English
   icons.js           the SVG icons, embedded (no CDN)

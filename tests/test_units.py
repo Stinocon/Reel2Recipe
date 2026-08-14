@@ -814,3 +814,150 @@ def test_a_one_word_parenthetical_qualifies_the_ingredient(t, name):
     brackets after a name indicate its variety or its container, not its dose."""
     ingr = normalise_ingredient(name, "", "", tables=t)
     assert ingr.quantity.provenance is Provenance.ABSENT, ingr.mela_line()
+
+
+# ----------------------------------------------------------------------------------
+# The ingredient glossary
+# ----------------------------------------------------------------------------------
+
+
+def _glossary_file() -> dict:
+    import yaml
+    from reel2recipe.paths import REPO_ROOT
+    return yaml.safe_load((REPO_ROOT / "data" / "ingredients.yaml").read_text("utf-8"))
+
+
+def _glossary() -> dict:
+    return _glossary_file()["ingredients"]
+
+
+def _group_headings() -> dict:
+    return _glossary_file()["groups"]
+
+
+def test_no_spelling_is_claimed_by_two_ingredients():
+    """The rule the whole file rests on: an alias must be the SAME ingredient, not a similar one.
+
+    Two entries claiming one spelling means the lookup silently picks whichever was loaded
+    last, and the card gets an ingredient nobody chose. It already caught one: `pepper` was
+    claimed by both `peperone` and `pepe` — the vegetable and the spice — so neither keeps the
+    bare word and the vegetable is spelled out.
+    """
+    claimed: dict[str, str] = {}
+    collisions = []
+    for name, entry in _glossary().items():
+        spellings = [entry["it"], entry["en"],
+                     *(entry.get(k) for k in ("it_plural", "en_plural") if entry.get(k)),
+                     *(entry.get("alias") or [])]
+        for spelling in spellings:
+            key = spelling.strip().lower()
+            if claimed.get(key, name) != name:
+                collisions.append(f"«{key}» is claimed by both {claimed[key]} and {name}")
+            claimed[key] = name
+
+    assert not collisions, "\n".join(collisions)
+
+
+def test_every_entry_names_the_ingredient_in_both_languages():
+    """An entry with one language is worse than no entry: the lookup matches and then returns
+    nothing, so the caller falls through to the model believing the table had no opinion."""
+    missing = [name for name, entry in _glossary().items()
+               if not entry.get("it") or not entry.get("en")]
+    assert not missing, f"entries missing a language: {missing}"
+
+
+def test_a_plural_never_stands_alone():
+    """`it_plural` without `en_plural` (or the other way round) gives a card that agrees in one
+    language and not the other — "3 carote" next to "3 carrot"."""
+    lopsided = [name for name, entry in _glossary().items()
+                if bool(entry.get("it_plural")) != bool(entry.get("en_plural"))]
+    assert not lopsided, f"entries with a plural in one language only: {lopsided}"
+
+
+def test_every_glossary_name_is_found_by_its_own_lookup():
+    """A name the glossary lists must be a name the glossary finds. Sounds tautological; it is
+    not, because `_key` normalises and a stray character would put the two out of step."""
+    tables = load_tables()
+    lost = [f"«{spelling}» ({name})"
+            for name, entry in _glossary().items()
+            for spelling in (entry["it"], entry["en"])
+            if tables.ingredient_name(spelling, "it") is None]
+    assert not lost, "names the glossary lists but cannot find: " + ", ".join(lost)
+
+
+def test_an_ingredient_has_a_density_in_both_languages_or_in_neither():
+    """The asymmetry that the translation pass turned from harmless into a real defect.
+
+    Names used to reach `units.py` in the language the reel was written in. Now the glossary
+    translates them **before** the conversion, so an English recipe looks up "cocoa" where the
+    Italian one looked up "cacao" — and `densities.yaml` knew only the second. The English
+    recipe silently lost a volume→weight conversion the Italian one got: no error, a volume
+    where there should have been grams, and a gap declared for a density we actually have.
+
+    Ten ingredients were in that state. This holds the invariant that matters: the two
+    languages of one ingredient must be worth the same to the conversion.
+    """
+    tables = load_tables()
+    lopsided = []
+    for name, entry in _glossary().items():
+        italian = tables.density_for(entry["it"]) is not None
+        english = tables.density_for(entry["en"]) is not None
+        if italian != english:
+            lopsided.append(
+                f"{name}: «{entry['it']}» {'has' if italian else 'has no'} density, "
+                f"«{entry['en']}» {'has' if english else 'has no'}"
+            )
+    assert not lopsided, (
+        "an ingredient converts in one language and not the other:\n" + "\n".join(lopsided)
+    )
+
+
+def test_a_name_that_merely_contains_another_ingredient_is_not_that_ingredient():
+    """`lievito di birra` is fresh yeast. It was being given the density of `birra` — beer —
+    because the density lookup matches the longest table entry *contained* in the name, and
+    nothing said the containment was meaningless here.
+
+    It converted, confidently and wrongly, which is the one outcome this project treats as
+    worse than not converting at all. The glossary is what settles it: it knows both strings
+    and knows they are different ingredients, so the match is refused and the gap is declared.
+    """
+    tables = load_tables()
+    assert tables.density_for("birra") is not None, "the fixture ingredient has gone"
+    assert tables.density_for("lievito di birra") is None, (
+        "fresh yeast is being given the density of beer again"
+    )
+    # And the fix must not have made the lookup blind: a modifier the glossary does not know
+    # still finds the ingredient underneath it.
+    assert tables.density_for("farina 00 setacciata") is not None
+    assert tables.density_for("olio extravergine d'oliva") is not None
+
+
+def test_no_group_heading_is_claimed_by_two_entries():
+    """Same rule as the ingredients, and the same failure if it slips: the lookup takes
+    whichever loaded last and a section of the recipe ends up under someone else's title."""
+    claimed: dict[str, str] = {}
+    collisions = []
+    for name, entry in _group_headings().items():
+        for spelling in [entry["it"], entry["en"], *(entry.get("alias") or [])]:
+            key = spelling.strip().lower()
+            if claimed.get(key, name) != name:
+                collisions.append(f"«{key}» is claimed by both {claimed[key]} and {name}")
+            claimed[key] = name
+    assert not collisions, "\n".join(collisions)
+
+
+def test_a_group_heading_survives_the_round_trip():
+    """A heading translated one way and back has to come home. It is the cheapest check that
+    the two languages of an entry really are the same heading and not two different ones."""
+    tables = load_tables()
+    for name, entry in _group_headings().items():
+        there = tables.group_name(entry["it"], "en")
+        assert there == entry["en"], f"{name}: «{entry['it']}» -> {there!r}"
+        back = tables.group_name(there, "it")
+        assert back == entry["it"], f"{name}: «{there}» -> {back!r}, expected «{entry['it']}»"
+
+
+def test_a_heading_the_table_does_not_know_stays_with_the_model():
+    """Whole match only. "Per la crema al limone" is mostly free text, and matching it on its
+    prefix would make this table a translation engine — the thing it exists not to be."""
+    assert load_tables().group_name("Per la crema al limone", "en") is None

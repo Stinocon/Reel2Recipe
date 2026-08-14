@@ -38,6 +38,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from dataclasses import dataclass, replace
+from typing import NamedTuple
 from enum import Enum
 from functools import lru_cache
 from pathlib import Path
@@ -330,6 +331,21 @@ def _key(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+class GlossaryMatch(NamedTuple):
+    """What `Tables.ingredient_name` found.
+
+    `matched` is the spelling in the table that the name matched, and it is the field that
+    makes a partial match useful: for "maiale (fettina grassa)" it is `maiale`, so the caller
+    can pin *that* term for the model and leave the cut alone. Pinning the whole name instead
+    would tell the model to render the lot as "pork", dropping the very thing the partial
+    match exists to preserve.
+    """
+
+    name: str          # the ingredient in the requested language, number agreed
+    whole: bool        # the whole name was the ingredient, so the code can settle it outright
+    matched: str       # the table spelling that matched, normalised
+
+
 @dataclass(frozen=True)
 class Tables:
     volume: dict[str, float]
@@ -348,6 +364,13 @@ class Tables:
     liquids: frozenset[str]            # ingredients measured by volume, not by weight
     vague: dict[str, dict]             # normalised key → definition
     indeterminate: frozenset[str]
+    # Glossary: normalised spelling (name in either language, or an alias) → the entry's name
+    # per language. It is what keeps an ingredient's *identity* out of the model's hands, the
+    # way `density` keeps its weight out.
+    ingredients: dict[str, dict[str, str]]
+    # The headings ingredients are grouped under. Same table, same idea, matched only whole:
+    # a heading is short and closed, an ingredient name carries modifiers.
+    groups: dict[str, dict[str, str]]
 
     def label(self, unit: str | None, value: float | None,
               language: str = Language.IT) -> str | None:
@@ -400,16 +423,96 @@ class Tables:
         k = _key(ingredient_name)
         if k in self.density:
             return k, self.density[k], self.density_source[k]
+
         candidates = [entry for entry in self.density if re.search(rf"\b{re.escape(entry)}\b", k)]
         if not candidates:
             return None
         best = max(candidates, key=len)
+
+        # A containment match is a guess about what the name is *made of*, and it is wrong
+        # when the name is a single ingredient that merely contains another one's word.
+        # `lievito di birra` is fresh yeast, and it was being given the density of `birra` —
+        # beer — because the shorter entry sits inside the longer name. Nothing caught it: the
+        # conversion succeeded and produced a confident, wrong weight.
+        #
+        # The glossary is the authority on that question, because it is the file that says
+        # which strings are one ingredient. The match is refused only when the glossary knows
+        # *both* the whole name and the fragment, and says they are different ingredients —
+        # then no conversion happens, which is the rule this module already follows for an
+        # unknown density. A fragment the glossary has never heard of is left alone: refusing
+        # on it too cost `olio extravergine d'oliva` its density the first time this was
+        # written, which is a regression dressed as a fix.
+        known = self.ingredients.get(k)
+        fragment = self.ingredients.get(best)
+        if known is not None and fragment is not None and fragment is not known:
+            return None
         return best, self.density[best], self.density_source[best]
 
     def density_for(self, ingredient_name: str) -> tuple[float, str] | None:
         """Density in g/ml and its source, or `None` if the ingredient is not in the table."""
         found = self._density_entry(ingredient_name)
         return (found[1], found[2]) if found else None
+
+    def ingredient_name(self, name: str, language: str,
+                        quantity_raw: str | None = None) -> "GlossaryMatch | None":
+        """The ingredient's name in `language`, and whether the whole name matched.
+
+        Returns `None` when the glossary does not know it — which is the common case and not a
+        failure: the caller then falls back to the model, exactly as an unknown density falls
+        back to keeping the volume.
+
+        The flag is the useful half. **Whole match** means the name *is* the ingredient and the
+        code can translate it outright, without the model seeing the word. **Partial match**
+        means the name carries something more — "maiale (fettina grassa)", "farina 00
+        setacciata" — and dropping that would lose information a cook needs; there the caller
+        keeps the model in the loop and only pins the term the table is sure of.
+
+        The tolerance is `_density_entry`'s, for the same reason and with the same rule: the
+        longest matching entry wins, so "cavolo nero" is not read as "cavolo".
+
+        `quantity_raw` picks the plural where the entry has one: "2 uovo" and "3 carrot" are
+        the kind of wrong that makes a card look machine-made, and the number is right there —
+        there is nothing to guess.
+        """
+        k = _key(name)
+        entry = self.ingredients.get(k)
+        if entry is None:
+            candidates = [e for e in self.ingredients if re.search(rf"\b{re.escape(e)}\b", k)]
+            if not candidates:
+                return None
+            matched = max(candidates, key=len)
+            entry, whole = self.ingredients[matched], False
+        else:
+            matched, whole = k, True
+
+        translated = self._number_agreed(entry, code_of(language), quantity_raw)
+        return GlossaryMatch(translated, whole, matched) if translated else None
+
+    def group_name(self, heading: str, language: str) -> str | None:
+        """A group heading in `language`, or `None` when the table does not know it.
+
+        Whole match only. A heading like "Per la crema al limone" is mostly free text and
+        belongs to the model; matching it on its prefix would make this a translation engine,
+        which is what the table exists not to be.
+        """
+        entry = self.groups.get(_key(heading))
+        return (entry.get(code_of(language)) or None) if entry else None
+
+    @staticmethod
+    def _number_agreed(entry: dict[str, str], language: str, quantity_raw: str | None) -> str:
+        """The entry's name in `language`, plural when the amount is not exactly one.
+
+        No amount at all also takes the plural: a bare list line — "Verdure: cipolle, carote" —
+        is a list of kinds, not of single items. An unreadable amount ("q.b.", "un pizzico")
+        does the same, which is right for the mass nouns those expressions attach to and
+        harmless for the rest.
+        """
+        singular = entry.get(language) or ""
+        plural = entry.get(f"{language}_plural")
+        if not plural:
+            return singular
+        amount = parse_quantity(quantity_raw)
+        return singular if amount and amount[0] == 1.0 and amount[1] == 1.0 else plural
 
 
 def _default_data_path() -> Path:
@@ -436,6 +539,7 @@ def load_tables(folder: str | None = None) -> Tables:
     u = _read("units.yaml")
     d = _read("densities.yaml")
     v = _read("vague.yaml")
+    g = _read("ingredients.yaml")
 
     aliases = {_key(k): val for k, val in (u.get("alias") or {}).items()}
     temp = u.get("temperature") or {}
@@ -453,6 +557,24 @@ def load_tables(folder: str | None = None) -> Tables:
             density_source[k] = source
             if entry.get("liquid"):
                 liquids.add(k)
+
+    # Glossary: every spelling of an ingredient — its name in both languages and every alias
+    # — points at the same per-language pair. The same flattening as the density table, and it
+    # is what makes the lookup a dictionary access rather than a search.
+    glossary: dict[str, dict[str, str]] = {}
+    for entry in (g.get("ingredients") or {}).values():
+        names = {code: entry[code] for code in ("it", "en", "it_plural", "en_plural")
+                 if entry.get(code)}
+        # The plural forms are reachable as spellings too: material that says "carote" has to
+        # find the entry, not only produce it.
+        for label in [*names.values(), *(entry.get("alias") or [])]:
+            glossary[_key(label)] = names
+
+    group_headings: dict[str, dict[str, str]] = {}
+    for entry in (g.get("groups") or {}).values():
+        names = {code: entry[code] for code in ("it", "en") if entry.get(code)}
+        for label in [*names.values(), *(entry.get("alias") or [])]:
+            group_headings[_key(label)] = names
 
     # Vague expressions: same again, canonical + aliases towards the same definition.
     vague: dict[str, dict] = {}
@@ -482,6 +604,8 @@ def load_tables(folder: str | None = None) -> Tables:
         liquids=frozenset(liquids),
         vague=vague,
         indeterminate=frozenset(_key(x) for x in (v.get("indeterminate") or [])),
+        ingredients=glossary,
+        groups=group_headings,
     )
 
 

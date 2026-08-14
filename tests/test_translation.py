@@ -27,9 +27,12 @@ def _draft() -> dict:
         "categories": ["Primi"],
         "gaps": ["quantità non indicata per «cipolla»"],
         "ingredients": [
+            # In the glossary: the code settles this one and the model never sees the word.
             {"name": "Cipolla", "notes": "affettata", "group": "Verdure",
              "quantity_raw": "250", "unit_raw": "g"},
-            {"name": "Maiale", "notes": None, "group": None,
+            # Not in the glossary: this is the half that still depends on the model, and the
+            # half whose fate the failure-path tests below are about.
+            {"name": "Guarnizione di casa mia", "notes": None, "group": None,
              "quantity_raw": "80", "unit_raw": "g"},
         ],
     }
@@ -134,7 +137,11 @@ def test_a_short_answer_keeps_the_recipe_and_declares_the_gap(offline):
     offline.setattr(extract.httpx, "post", _answering('{"translations": ["only one"]}'))
     out = extract.translate_draft(_draft(), language="en")
 
-    assert [i["name"] for i in out["ingredients"]] == ["Cipolla", "Maiale"]
+    # The glossary ran before the call, so its work survives the failure: the ingredient it
+    # knew is in English even though the model gave nothing usable.
+    assert out["ingredients"][0]["name"] == "Onions"
+    # The one it did not know keeps its original wording rather than a guess.
+    assert out["ingredients"][1]["name"] == "Guarnizione di casa mia"
     assert out["ingredients"][0]["quantity_raw"] == "250"
     assert any("translation" in g for g in out["gaps"]), out["gaps"]
 
@@ -147,7 +154,7 @@ def test_an_unusable_answer_never_costs_the_recipe(offline, payload):
     offline.setattr(extract.httpx, "post", _answering(payload))
     out = extract.translate_draft(_draft(), language="it")
 
-    assert out["ingredients"][0]["name"] == "Cipolla"
+    assert out["ingredients"][1]["name"] == "Guarnizione di casa mia"
     assert out["title"] == "Yaki Udon"
     assert any("traduzione" in g for g in out["gaps"]), out["gaps"]
 
@@ -259,8 +266,12 @@ def test_an_empty_fragment_does_not_delete_the_original(offline):
                     _answering('{"translations": %s}' % __import__("json").dumps(answer)))
 
     out = extract.translate_draft(draft, language="en")
-    assert out["ingredients"][0]["name"] == "Cipolla", "an empty answer deleted the name"
-    assert out["ingredients"][0]["group"] == "Verdure"
+    assert out["ingredients"][1]["name"] == "Guarnizione di casa mia", (
+        "an empty answer deleted the name"
+    )
+    # The heading was settled by the glossary before the call, so it is English regardless of
+    # what the model did or did not return.
+    assert out["ingredients"][0]["group"] == "Vegetables"
     assert out["method"] == ["Taglia le verdure.", "Rosola il maiale."]
 
 
@@ -286,16 +297,214 @@ def test_a_repeated_fragment_is_sent_once_and_answered_once(offline):
         return Response()
 
     offline.setattr(extract.httpx, "post", capture)
+    # Headings the glossary does NOT know, on purpose: the ones it knows never reach the
+    # model, so they could not test what happens to a repeated fragment that does.
     draft = {
         "ingredients": [
-            {"name": "Pecorino", "group": "Sauce", "quantity_raw": "50", "unit_raw": "g"},
-            {"name": "Pepper", "group": "Sauce", "quantity_raw": "", "unit_raw": ""},
+            {"name": "Pecorino", "group": "For my mother's sauce",
+             "quantity_raw": "50", "unit_raw": "g"},
+            {"name": "Pepper", "group": "For my mother's sauce",
+             "quantity_raw": "", "unit_raw": ""},
+            {"name": "Parsley", "group": "For the fancy bit",
+             "quantity_raw": "", "unit_raw": ""},
+        ],
+    }
+    out = extract.translate_draft(draft, language="it")
+
+    assert sent["body"].count("For my mother's sauce") == 1, (
+        f"the repeated heading was sent more than once:\n{sent['body']}"
+    )
+    groups = [i["group"] for i in out["ingredients"]]
+    assert groups[0] == groups[1], f"one group came back as two: {groups}"
+    assert groups[2] != groups[0], f"two groups collapsed into one: {groups}"
+
+
+# ----------------------------------------------------------------------------------
+# The glossary: what the code settles before the model is asked
+# ----------------------------------------------------------------------------------
+
+
+def test_a_name_the_glossary_knows_never_reaches_the_model(offline):
+    """The reason this file exists at all.
+
+    `maiale` came back from qwen2.5:14b as "bacon" and `cavolo cappuccio` as "chinese
+    broccoli" — not a clumsy translation but a **different ingredient**, stated with
+    confidence and invisible on the card. A name the table knows is therefore settled in code
+    and is not in the payload: you cannot mistranslate what you were not asked about.
+    """
+    sent = {}
+
+    def capture(*a, **k):
+        sent["body"] = k["json"]["messages"][1]["content"]
+        class Response:
+            def raise_for_status(self): pass
+            def json(self):
+                import json as j
+                n = len(sent["body"].splitlines())
+                return {"message": {"content": j.dumps({"translations": ["x"] * n})}}
+        return Response()
+
+    offline.setattr(extract.httpx, "post", capture)
+    draft = {"ingredients": [
+        {"name": "Cavolo Cappuccio", "quantity_raw": "", "unit_raw": ""},
+        {"name": "Maiale", "quantity_raw": "80", "unit_raw": "g"},
+    ]}
+    out = extract.translate_draft(draft, language="en")
+
+    assert [i["name"] for i in out["ingredients"]] == ["Cabbage", "Pork"]
+    # Both names were in the table, so there was nothing left to ask about and the model was
+    # not called at all. A draft of known ingredients is translated without a network round
+    # trip — which is the strongest form of "the model cannot get this wrong".
+    assert "body" not in sent, (
+        f"the model was called although the glossary had settled everything:\n{sent['body']}"
+    )
+
+
+def test_a_known_name_is_kept_out_of_the_payload_when_the_model_is_still_needed(offline):
+    """The same, when there *is* something else to translate: the settled name must not travel
+    with it. Sending it would hand the model the finished answer and a chance to undo it."""
+    sent = {}
+
+    def capture(*a, **k):
+        sent["body"] = k["json"]["messages"][1]["content"]
+        class Response:
+            def raise_for_status(self): pass
+            def json(self):
+                import json as j
+                n = len([l for l in sent["body"].splitlines() if l and l[0].isdigit()])
+                return {"message": {"content": j.dumps({"translations": ["x"] * n})}}
+        return Response()
+
+    offline.setattr(extract.httpx, "post", capture)
+    draft = {
+        "method": ["Taglia le verdure."],
+        "ingredients": [{"name": "Cavolo Cappuccio", "quantity_raw": "", "unit_raw": ""}],
+    }
+    out = extract.translate_draft(draft, language="en")
+
+    assert out["ingredients"][0]["name"] == "Cabbage"
+    assert "Cavolo" not in sent["body"], (
+        f"a name the glossary had settled was still sent:\n{sent['body']}"
+    )
+    assert "Taglia le verdure." in sent["body"], "the method should still have been sent"
+
+
+def test_a_name_the_glossary_knows_only_in_part_is_pinned_not_replaced(offline):
+    """"Maiale (fettina grassa)" carries something the table does not: the cut.
+
+    Replacing the whole name with "pork" would drop it, so the name goes to the model — but
+    the term the table is sure of goes with it as a fixed translation. The model renders the
+    modifier and does not get to reconsider the ingredient.
+    """
+    sent = {}
+
+    def capture(*a, **k):
+        sent["body"] = k["json"]["messages"][1]["content"]
+        class Response:
+            def raise_for_status(self): pass
+            def json(self):
+                import json as j
+                n = len([l for l in sent["body"].splitlines() if l and l[0].isdigit()])
+                return {"message": {"content": j.dumps({"translations": ["x"] * n})}}
+        return Response()
+
+    offline.setattr(extract.httpx, "post", capture)
+    draft = {"ingredients": [{"name": "Maiale (fettina grassa)",
+                              "quantity_raw": "80", "unit_raw": "g"}]}
+    extract.translate_draft(draft, language="en")
+
+    assert "Maiale (fettina grassa)" in sent["body"], "the modifier was dropped"
+    assert "maiale -> pork" in sent["body"].lower(), (
+        f"the known term was not pinned:\n{sent['body']}"
+    )
+
+
+@pytest.mark.parametrize("name, quantity, expected", [
+    ("uova", None, "eggs"),
+    ("uovo", "1", "egg"),
+    ("uova", "3", "eggs"),
+    ("carote", None, "carrots"),
+    ("carota", "1", "carrot"),
+    # A mass noun has no plural and needs none, whatever the amount says.
+    ("farina", "250", "flour"),
+    ("sale", None, "salt"),
+])
+def test_the_glossary_agrees_with_the_number(name, quantity, expected):
+    """"2 uovo" and "3 carrot" make a card look machine-made, and the number is right there in
+    `quantity_raw`. No amount takes the plural too: a bare list line is a list of kinds."""
+    from reel2recipe.units import load_tables
+    found = load_tables().ingredient_name(name, "en", quantity)
+    assert found is not None, f"«{name}» is not in the glossary"
+    assert found[0] == expected
+
+
+def test_the_glossary_does_not_reach_past_what_it_knows():
+    """An ingredient the table has never heard of returns nothing, and the model handles it.
+
+    This is the same contract as an unknown density: the table answers for what it holds and
+    says nothing about the rest. A glossary that guessed would be the defect it exists to stop.
+    """
+    from reel2recipe.units import load_tables
+    assert load_tables().ingredient_name("guarnizione di casa mia", "en") is None
+
+
+def test_the_longest_entry_wins():
+    """"cavolo nero" is not a kind of "cavolo": it is a different vegetable, and the shorter
+    entry must not swallow it. Same rule as the density lookup."""
+    from reel2recipe.units import load_tables
+    tables = load_tables()
+    assert tables.ingredient_name("cavolo nero", "en")[0] == "cavolo nero"
+    assert tables.ingredient_name("cavolo cappuccio", "en")[0] == "cabbage"
+
+
+def test_a_group_heading_the_glossary_knows_never_reaches_the_model(offline):
+    """The last thing the measurement showed the model getting wrong.
+
+    From English into Italian it rendered "Sauce" as "Salsa" and left "Garnish" in English —
+    on the same card, so one recipe came out half in each language. A heading is a short,
+    closed vocabulary: there is no reason to ask.
+    """
+    sent = {}
+
+    def capture(*a, **k):
+        sent["body"] = k["json"]["messages"][1]["content"]
+        class Response:
+            def raise_for_status(self): pass
+            def json(self):
+                import json as j
+                n = len([l for l in sent["body"].splitlines() if l and l[0].isdigit()])
+                return {"message": {"content": j.dumps({"translations": ["x"] * n})}}
+        return Response()
+
+    offline.setattr(extract.httpx, "post", capture)
+    draft = {
+        "method": ["Fry the pancetta."],
+        "ingredients": [
+            {"name": "Pecorino", "group": "Sauce", "quantity_raw": "", "unit_raw": ""},
             {"name": "Parsley", "group": "Garnish", "quantity_raw": "", "unit_raw": ""},
         ],
     }
     out = extract.translate_draft(draft, language="it")
 
-    assert sent["body"].count("Sauce") == 1, f"«Sauce» was sent more than once:\n{sent['body']}"
-    groups = [i["group"] for i in out["ingredients"]]
-    assert groups[0] == groups[1], f"one group came back as two: {groups}"
-    assert groups[2] != groups[0], f"two groups collapsed into one: {groups}"
+    assert [i["group"] for i in out["ingredients"]] == ["Per la salsa", "Per guarnire"]
+    assert "Sauce" not in sent["body"] and "Garnish" not in sent["body"], (
+        f"a heading the glossary knows was still sent:\n{sent['body']}"
+    )
+
+
+@pytest.mark.parametrize("original, expected", [
+    ("Cipolla", "Onions"),
+    ("cipolla", "onions"),
+    ("CIPOLLA", "Onions"),
+])
+def test_the_glossary_keeps_the_capitalisation_it_was_given(offline, original, expected):
+    """The table holds one spelling, lower case; the model capitalises as it sees fit.
+
+    Emitting both untouched gave a card reading "Cooked udon / onions / Soy sauce" — the seam
+    between the deterministic half of the translation and the model's half, visible to anyone
+    and explainable to no one.
+    """
+    offline.setattr(extract.httpx, "post", _answering('{"translations": []}'))
+    draft = {"ingredients": [{"name": original, "quantity_raw": "", "unit_raw": ""}]}
+    out = extract.translate_draft(draft, language="en")
+    assert out["ingredients"][0]["name"] == expected
