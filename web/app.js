@@ -43,7 +43,7 @@ function toast(message, isError = false) {
   // needed today, but the first line that did need it would fail in an unreadable way.
   const element = $('#toast');
   element.textContent = message;
-  element.classList.toggle('errore', isError);
+  element.classList.toggle('error', isError);
   element.hidden = false;
   clearTimeout(element._timer);
   element._timer = setTimeout(() => (element.hidden = true), 3200);
@@ -91,36 +91,36 @@ async function api(path, options = {}) {
 async function refreshStatus() {
   try {
     const s = await api('/api/status');
-    const dot = $('#pallino-stato');
-    const label = $('#testo-stato');
+    const dot = $('#status-dot');
+    const label = $('#status-text');
 
     // Fills the available models into their option.
-    const select = $('#opt-modello');
+    const select = $('#opt-model');
     if (s.llm_models?.length && select.options.length <= 1) {
       s.llm_models.forEach((m) => select.add(new Option(m, m)));
     }
 
     if (!s.ready) {
-      dot.className = 'pallino ko';
+      dot.className = 'dot ko';
       label.textContent = t(s.ollama_up ? 'status_no_model' : 'status_ollama_down');
       // The message does not assume it is running on a development machine: inside the Home
       // Assistant add-on there is no shell to type `ollama pull` into, and the add-on
       // downloads the model itself — saying "run" there is advice that cannot be followed.
       // State first, command second, for whoever has somewhere to type it.
-      $('#cook-nota').textContent = s.ollama_up
+      $('#cook-note').textContent = s.ollama_up
         ? t('note_no_model', { model: s.recommended_model })
         : t('note_ollama_down');
-      $('#cook-nota').classList.add('errore');
+      $('#cook-note').classList.add('error');
     } else if (!s.asr_ready) {
-      dot.className = 'pallino parziale';
+      dot.className = 'dot partial';
       label.textContent = t('status_ready_captions');
     } else {
-      dot.className = 'pallino ok';
+      dot.className = 'dot ok';
       label.textContent = t('status_all_ready');
     }
   } catch {
-    $('#pallino-stato').className = 'pallino ko';
-    $('#testo-stato').textContent = t('status_unreachable');
+    $('#status-dot').className = 'dot ko';
+    $('#status-text').textContent = t('status_unreachable');
   }
 }
 
@@ -140,15 +140,15 @@ function chosenOptions() {
     asr_backend: $('#opt-asr').value,
     // Empty = Whisper recognises it. It is a fact about the input and does not follow the
     // recipe's language: an English reel becoming an Italian recipe is the commonest case.
-    audio_language: $('#opt-lingua-parlato').value || null,
-    llm_model: $('#opt-modello').value || null,
+    audio_language: $('#opt-spoken-language').value || null,
+    llm_model: $('#opt-model').value || null,
     skip_audio: $('#opt-no-audio').checked,
     // Empty = "same as the interface". It is the first link of the three-axis chain:
     // interface → recipe → measures, each with the previous one as its fallback.
-    language: $('#opt-lingua').value || currentLanguage(),
+    language: $('#opt-language').value || currentLanguage(),
     // Empty means "same as the language", and the server decides: the rule lives in one
     // place (`CookRequest.axes()`), not here as well.
-    system: $('#opt-sistema').value || null,
+    system: $('#opt-system').value || null,
   };
 }
 
@@ -209,8 +209,8 @@ function followJob(job) {
         loadLibrary();
       } else {
         toast(payload.error || t('toast_extraction_failed'), true);
-        $('#cook-nota').textContent = payload.error || '';
-        $('#cook-nota').classList.add('errore');
+        $('#cook-note').textContent = payload.error || '';
+        $('#cook-note').classList.add('error');
       }
     }
   };
@@ -226,49 +226,49 @@ function followJob(job) {
 // ---------------------------------------------------------------------------
 
 function startUI() {
-  $('#cook-nota').textContent = '';
-  $('#cook-nota').classList.remove('errore');
-  $('#scheda-ricetta').hidden = true;
+  $('#cook-note').textContent = '';
+  $('#cook-note').classList.remove('error');
+  $('#recipe-card').hidden = true;
   $('#btn-cook').disabled = true;
-  $('#btn-cook').classList.add('in-corso');
+  $('#btn-cook').classList.add('in-progress');
 
-  const container = $('#fasi');
+  const container = $('#stages');
   container.innerHTML = '';
   for (const [key, stage] of Object.entries(STAGES)) {
     if (key === 'fatto') continue;
     const row = document.createElement('div');
-    row.className = 'fase';
+    row.className = 'stage';
     row.dataset.stage = key;
     row.innerHTML =
-      `<span class="fase-icona">${icon(stage.icon, 16)}</span>` +
-      `<span class="fase-testo">${t(stage.key)}</span>`;
+      `<span class="stage-icon">${icon(stage.icon, 16)}</span>` +
+      `<span class="stage-text">${t(stage.key)}</span>`;
     container.appendChild(row);
   }
-  $('#pannello-avanzamento').hidden = false;
-  $('#pannello-avanzamento').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  $('#progress-panel').hidden = false;
+  $('#progress-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function markStage(stage, message) {
   const rows = [...$$('#fasi .stage')];
   const index = rows.findIndex((r) => r.dataset.stage === stage);
   rows.forEach((r, i) => {
-    r.classList.remove('attiva');
+    r.classList.remove('active');
     // A finished stage shows the tick in place of its own icon; the one under way keeps its
     // own and lights up (the CSS supplies the colour and the pulse).
     if (i < index) {
-      r.classList.add('fatta');
-      r.querySelector('.fase-icona').innerHTML = icon('spunta', 16);
+      r.classList.add('done');
+      r.querySelector('.stage-icon').innerHTML = icon('tick', 16);
     } else if (i === index) {
-      r.classList.add('attiva');
+      r.classList.add('active');
     }
   });
-  if (index >= 0 && message) rows[index].querySelector('.fase-testo').textContent = message;
+  if (index >= 0 && message) rows[index].querySelector('.stage-text').textContent = message;
 }
 
 function endUI() {
   $('#btn-cook').disabled = false;
-  $('#btn-cook').classList.remove('in-corso');
-  $('#pannello-avanzamento').hidden = true;
+  $('#btn-cook').classList.remove('in-progress');
+  $('#progress-panel').hidden = true;
 }
 
 // ---------------------------------------------------------------------------
@@ -279,7 +279,7 @@ function showRecipe(recipe, warnings = [], model = '', scroll = true) {
   currentRecipe = recipe;
   currentWarnings = warnings;
   currentModel = model;
-  const card = $('#scheda-ricetta');
+  const card = $('#recipe-card');
 
   // The card's headings follow the language **of the recipe**, not of the page: the same
   // choice already made for the exports in `mela.py` and `documents.py`, and for the `gaps`,
@@ -288,32 +288,32 @@ function showRecipe(recipe, warnings = [], model = '', scroll = true) {
   const lr = recipe.language || currentLanguage();
 
   const cover = recipe.images?.[0]
-    ? `<img class="scheda-copertina" src="data:image/jpeg;base64,${recipe.images[0]}" alt="" />`
+    ? `<img class="card-cover" src="data:image/jpeg;base64,${recipe.images[0]}" alt="" />`
     : '';
 
   const meta = [];
-  if (recipe.servings) meta.push(`<span>${icon('piatto', 16)} ${esc(recipe.servings)}</span>`);
-  if (recipe.total_time_min) meta.push(`<span>${icon('tempo', 16)} ${t('minutes', { how_many: recipe.total_time_min }, lr)}</span>`);
-  if (recipe.source?.author) meta.push(`<span>${icon('autore', 16)} ${esc(recipe.source.author)}</span>`);
+  if (recipe.servings) meta.push(`<span>${icon('plate', 16)} ${esc(recipe.servings)}</span>`);
+  if (recipe.total_time_min) meta.push(`<span>${icon('time', 16)} ${t('minutes', { how_many: recipe.total_time_min }, lr)}</span>`);
+  if (recipe.source?.author) meta.push(`<span>${icon('author', 16)} ${esc(recipe.source.author)}</span>`);
 
   card.innerHTML = `
     ${cover}
-    <div class="scheda-corpo">
-      <h2 class="scheda-titolo">${esc(recipe.title)}</h2>
-      <div class="scheda-meta">${meta.join('')}${model ? `<span class="badge-fonte">${icon('modello', 16)} ${esc(model)}</span>` : ''}</div>
-      ${warnings?.length ? `<div class="avviso-incertezze"><strong>${esc(t('card_note', {}, lr))}</strong> ${warnings.map(esc).join(' ')}</div>` : ''}
-      <h3 class="sezione-titolo">${esc(t('card_ingredients', {}, lr))}</h3>
+    <div class="card-body">
+      <h2 class="card-title">${esc(recipe.title)}</h2>
+      <div class="card-meta">${meta.join('')}${model ? `<span class="source-badge">${icon('model', 16)} ${esc(model)}</span>` : ''}</div>
+      ${warnings?.length ? `<div class="uncertainty-warning"><strong>${esc(t('card_note', {}, lr))}</strong> ${warnings.map(esc).join(' ')}</div>` : ''}
+      <h3 class="section-title">${esc(t('card_ingredients', {}, lr))}</h3>
       ${renderIngredients(recipe, lr)}
-      <h3 class="sezione-titolo">${esc(t('card_method', {}, lr))}</h3>
-      <ol class="lista-procedimento">${(recipe.method || []).map((p) => `<li class="passo">${esc(p)}</li>`).join('')}</ol>
+      <h3 class="section-title">${esc(t('card_method', {}, lr))}</h3>
+      <ol class="method-list">${(recipe.method || []).map((p) => `<li class="step">${esc(p)}</li>`).join('')}</ol>
       ${renderGaps(recipe, lr)}
-      <div class="scheda-azioni">
-        <button class="btn-primario" id="btn-salva-card">${icon('salva')} ${esc(t('btn_save'))}</button>
-        <button class="btn-secondario" id="btn-modifica-card">${icon('correggi')} ${esc(t('btn_edit'))}</button>
-        <button class="btn-secondario" id="btn-export-card">${icon('scarica')} ${esc(t('btn_mela'))}</button>
-        <button class="btn-secondario" id="btn-export-pdf">${icon('pdf')} ${esc(t('btn_pdf'))}</button>
-        <button class="btn-secondario" id="btn-export-md">${icon('markdown')} ${esc(t('btn_markdown'))}</button>
-        ${recipe.id ? `<button class="btn-pericolo" id="btn-elimina-card">${icon('elimina')} ${esc(t('btn_delete'))}</button>` : ''}
+      <div class="card-actions">
+        <button class="btn-primary" id="btn-save-card">${icon('save')} ${esc(t('btn_save'))}</button>
+        <button class="btn-secondary" id="btn-edit-card">${icon('edit')} ${esc(t('btn_edit'))}</button>
+        <button class="btn-secondary" id="btn-export-card">${icon('download')} ${esc(t('btn_mela'))}</button>
+        <button class="btn-secondary" id="btn-export-pdf">${icon('pdf')} ${esc(t('btn_pdf'))}</button>
+        <button class="btn-secondary" id="btn-export-md">${icon('markdown')} ${esc(t('btn_markdown'))}</button>
+        ${recipe.id ? `<button class="btn-danger" id="btn-delete-card">${icon('delete')} ${esc(t('btn_delete'))}</button>` : ''}
       </div>
     </div>`;
 
@@ -322,28 +322,28 @@ function showRecipe(recipe, warnings = [], model = '', scroll = true) {
   // it, and moving it out from under them would be a surprise.
   if (scorri) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-  $('#btn-salva-card').onclick = saveCurrentRecipe;
-  $('#btn-modifica-card').onclick = () => openEditor(currentRecipe);
+  $('#btn-save-card').onclick = saveCurrentRecipe;
+  $('#btn-edit-card').onclick = () => openEditor(currentRecipe);
   $('#btn-export-card').onclick = () => exportCurrentRecipe('mela');
   $('#btn-export-pdf').onclick = () => exportCurrentRecipe('pdf');
   $('#btn-export-md').onclick = () => exportCurrentRecipe('markdown');
   // Present only for recipes already saved: you do not delete what is not yet in the recipe
   // book — for that it is enough not to save it.
-  if ($('#btn-elimina-card')) $('#btn-elimina-card').onclick = () => deleteCurrentRecipe();
+  if ($('#btn-delete-card')) $('#btn-delete-card').onclick = () => deleteCurrentRecipe();
 }
 
 function renderIngredients(recipe, lr) {
   const groups = [...new Set((recipe.ingredients || []).map((i) => i.group))];
   const showGroups = groups.filter(Boolean).length > 0 && groups.length > 1;
-  let html = '<ul class="lista-ingredienti">';
+  let html = '<ul class="ingredient-list">';
   for (const group of groups) {
-    if (showGroups && group) html += `<li class="gruppo-titolo">${esc(group)}</li>`;
+    if (showGroups && group) html += `<li class="group-title">${esc(group)}</li>`;
     for (const ing of recipe.ingredients.filter((i) => i.group === group)) {
       const uncertain = ESTIMATE_PROVENANCES.has(ing.quantity?.provenance);
       const tag = uncertain
-        ? `<span class="tag-provenienza stima">${esc(t('tag_estimate', {}, lr))}</span>`
+        ? `<span class="tag-provenance estimate">${esc(t('tag_estimate', {}, lr))}</span>`
         : '';
-      html += `<li class="ingrediente${uncertain ? ' incerta' : ''}">
+      html += `<li class="ingredient${uncertain ? ' uncertain' : ''}">
         <span>${esc(ing.line)}</span>${tag}</li>`;
     }
   }
@@ -352,8 +352,8 @@ function renderIngredients(recipe, lr) {
 
 function renderGaps(recipe, lr) {
   if (!recipe.gaps?.length) return '';
-  return `<h3 class="sezione-titolo">${esc(t('card_to_check', {}, lr))}</h3>
-    <ul class="lista-lacune">${recipe.gaps.map((l) => `<li class="lacuna">${esc(l)}</li>`).join('')}</ul>`;
+  return `<h3 class="section-title">${esc(t('card_to_check', {}, lr))}</h3>
+    <ul class="gap-list">${recipe.gaps.map((l) => `<li class="gap">${esc(l)}</li>`).join('')}</ul>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -380,7 +380,7 @@ async function deleteCurrentRecipe() {
   if (!confirm(t('confirm_delete', { title: currentRecipe.title }))) return;
   try {
     await api(`/api/recipes/${currentRecipe.id}`, { method: 'DELETE' });
-    $('#scheda-ricetta').hidden = true;
+    $('#recipe-card').hidden = true;
     currentRecipe = null;
     toast(t('toast_deleted'));
     loadLibrary();
@@ -395,50 +395,50 @@ async function exportCurrentRecipe(format = 'mela') {
 }
 
 function openEditor(recipe) {
-  const content = $('#modale-contenuto');
+  const content = $('#modal-content');
   // Textual editing: ingredients and steps one per line. Simple and direct — someone
   // correcting wants to fix two words, not fill in a twenty-field form.
   const ingredientRows = (recipe.ingredients || []).map((i) => i.line).join('\n');
   const methodRows = (recipe.method || []).join('\n');
 
   content.innerHTML = `
-    <h2 class="scheda-titolo">${esc(t('modal_title'))}</h2>
-    <p class="suggerimento-modifica">${esc(t('modal_hint'))}</p>
-    <div class="campo-modifica">
+    <h2 class="card-title">${esc(t('modal_title'))}</h2>
+    <p class="edit-hint">${esc(t('modal_hint'))}</p>
+    <div class="edit-field">
       <label>${esc(t('field_title'))}</label>
-      <input id="mod-titolo" value="${esc(recipe.title)}" />
+      <input id="edit-title" value="${esc(recipe.title)}" />
     </div>
-    <div class="campo-modifica">
+    <div class="edit-field">
       <label>${esc(t('field_servings'))}</label>
-      <input id="mod-porzioni" value="${esc(recipe.servings || '')}" />
+      <input id="edit-servings" value="${esc(recipe.servings || '')}" />
     </div>
-    <div class="campo-modifica">
+    <div class="edit-field">
       <label>${esc(t('field_ingredients'))}</label>
-      <textarea id="mod-ingredienti">${esc(ingredientRows)}</textarea>
+      <textarea id="edit-ingredients">${esc(ingredientRows)}</textarea>
     </div>
-    <div class="campo-modifica">
+    <div class="edit-field">
       <label>${esc(t('field_method'))}</label>
-      <textarea id="mod-procedimento">${esc(methodRows)}</textarea>
+      <textarea id="edit-method">${esc(methodRows)}</textarea>
     </div>
-    <div class="scheda-azioni">
-      <button class="btn-primario" id="btn-salva-modifica">${esc(t('btn_save_edits'))}</button>
-      <button class="btn-testo" id="btn-chiudi-modale">${esc(t('cancel'))}</button>
+    <div class="card-actions">
+      <button class="btn-primary" id="btn-save-edit">${esc(t('btn_save_edits'))}</button>
+      <button class="btn-text" id="btn-close-modal">${esc(t('cancel'))}</button>
     </div>`;
 
-  $('#modale').hidden = false;
-  $('#btn-chiudi-modale').onclick = () => ($('#modale').hidden = true);
-  $('#btn-salva-modifica').onclick = () => applyEdits(recipe);
+  $('#modal').hidden = false;
+  $('#btn-close-modal').onclick = () => ($('#modal').hidden = true);
+  $('#btn-save-edit').onclick = () => applyEdits(recipe);
 }
 
 function applyEdits(recipe) {
   // The textual corrections replace the extraction: the edited lines become each
   // ingredient's "riga" text. The conversion has already happened; here the user has the
   // last word, and their word wins.
-  recipe.title = $('#mod-titolo').value.trim() || recipe.title;
-  recipe.servings = $('#mod-porzioni').value.trim() || null;
+  recipe.title = $('#edit-title').value.trim() || recipe.title;
+  recipe.servings = $('#edit-servings').value.trim() || null;
 
   let group = null;
-  recipe.ingredients = $('#mod-ingredienti').value.split('\n')
+  recipe.ingredients = $('#edit-ingredients').value.split('\n')
     .map((r) => r.trim()).filter(Boolean)
     .map((row) => {
       if (row.startsWith('#')) { group = row.replace(/^#\s*/, ''); return null; }
@@ -453,9 +453,9 @@ function applyEdits(recipe) {
     })
     .filter(Boolean);
 
-  recipe.method = $('#mod-procedimento').value.split('\n').map((r) => r.trim()).filter(Boolean);
+  recipe.method = $('#edit-method').value.split('\n').map((r) => r.trim()).filter(Boolean);
 
-  $('#modale').hidden = true;
+  $('#modal').hidden = true;
   showRecipe(recipe, [], '');
   toast(t('toast_edits'));
 }
@@ -467,9 +467,9 @@ function applyEdits(recipe) {
 async function loadLibrary(search = '') {
   try {
     const entries = await api('/api/recipes' + (search ? `?search=${encodeURIComponent(search)}` : ''));
-    const grid = $('#griglia-ricette');
-    $('#libreria-vuota').hidden = entries.length > 0;
-    $('#libreria-vuota').textContent = search
+    const grid = $('#recipe-grid');
+    $('#library-empty').hidden = entries.length > 0;
+    $('#library-empty').textContent = search
       ? t('library_no_results', { search: search })
       : t('library_empty');
 
@@ -481,13 +481,13 @@ async function loadLibrary(search = '') {
         v.servings, v.total_time_min ? t('minutes', { how_many: v.total_time_min }) : null,
         t('card_ingredient_count', { how_many: v.n_ingredients }),
       ].filter(Boolean).join(' · ');
-      return `<article class="carta-ricetta" data-id="${v.id}">
-        <div class="carta-copertina" ${cover}>${v.cover ? '' : icon('piatto', 34)}</div>
-        <div class="carta-corpo">
-          <div class="carta-titolo">${esc(v.title)}</div>
-          <div class="carta-meta">
+      return `<article class="recipe-tile" data-id="${v.id}">
+        <div class="tile-cover" ${cover}>${v.cover ? '' : icon('plate', 34)}</div>
+        <div class="tile-body">
+          <div class="tile-title">${esc(v.title)}</div>
+          <div class="tile-meta">
             <span>${esc(meta)}</span>
-            ${v.has_uncertainties ? `<span class="carta-badge-incerta">${icon('avviso', 14)} ${esc(t('card_to_review'))}</span>` : ''}
+            ${v.has_uncertainties ? `<span class="tile-badge-uncertain">${icon('warning', 14)} ${esc(t('card_to_review'))}</span>` : ''}
           </div>
         </div>
       </article>`;
@@ -530,20 +530,20 @@ function wireUp() {
   // The selector starts from the language already in use — remembered from last time or
   // deduced from the browser — and not from whichever happens to be written first in the
   // markup.
-  const languageSelector = $('#opt-lingua-ui');
+  const languageSelector = $('#opt-ui-language');
   languageSelector.value = currentLanguage();
   languageSelector.onchange = () => setLanguage(languageSelector.value);
   $('#input-url').addEventListener('keydown', (e) => { if (e.key === 'Enter') cookFromUrl(); });
 
-  $('#btn-opzioni').onclick = () => {
-    const o = $('#opzioni');
+  $('#btn-options').onclick = () => {
+    const o = $('#options');
     o.hidden = !o.hidden;
-    $('#btn-opzioni').textContent = t(o.hidden ? 'options_open' : 'options_close');
+    $('#btn-options').textContent = t(o.hidden ? 'options_open' : 'options_close');
   };
 
   $('#input-file').onchange = (e) => { if (e.target.files[0]) cookFromFile(e.target.files[0]); };
-  $('#input-cerca').addEventListener('input', (e) => searchLibrary(e.target.value));
-  $('#btn-export-tutte').onclick = () => (window.location.href = address('/api/export'));
+  $('#input-search').addEventListener('input', (e) => searchLibrary(e.target.value));
+  $('#btn-export-all').onclick = () => (window.location.href = address('/api/export'));
 
   // Drag and drop over the whole page.
   const overlay = $('#drop-overlay');
@@ -557,7 +557,7 @@ function wireUp() {
   });
 
   // Close the modal by clicking the backdrop.
-  $('#modale').addEventListener('click', (e) => { if (e.target.id === 'modale') $('#modale').hidden = true; });
+  $('#modal').addEventListener('click', (e) => { if (e.target.id === 'modale') $('#modal').hidden = true; });
 }
 
 // ---------------------------------------------------------------------------
@@ -574,10 +574,10 @@ wireUp();
 // recipe card is rebuilt only if one is on screen, and its headings stay in the recipe's
 // language: what changes is the buttons around it.
 onLanguageChange(() => {
-  $('#btn-opzioni').textContent = t($('#opzioni').hidden ? 'options_open' : 'options_close');
+  $('#btn-options').textContent = t($('#options').hidden ? 'options_open' : 'options_close');
   refreshStatus();
-  loadLibrary($('#input-cerca').value.trim());
-  if (currentRecipe && !$('#scheda-ricetta').hidden) {
+  loadLibrary($('#input-search').value.trim());
+  if (currentRecipe && !$('#recipe-card').hidden) {
     showRecipe(currentRecipe, currentWarnings, currentModel, false);
   }
 });

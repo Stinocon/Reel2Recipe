@@ -377,20 +377,45 @@ def test_every_t_call_passes_the_placeholders_the_sentence_asks_for():
 # Classes present in the markup but with no rule in `style.css`. They do no damage — an unused
 # hook breaks nothing — but they already existed before the migration, and naming them here is
 # more honest than loosening the guard until it stops firing at all.
-CLASSES_WITHOUT_STYLE = {"btn-cook-testo", "fase-testo", "libreria"}
+CLASSES_WITHOUT_STYLE = {"btn-cook-text", "stage-text", "library"}
+
+
+def test_every_custom_property_resolves():
+    """A `var(--crema)` whose definition is now `--cream` does not fail: CSS drops the whole
+    declaration and the element renders with no colour at all.
+
+    It is the same silent class as a misspelt selector, one level down, and it is precisely
+    how the rename of the palette would have gone wrong — seventeen colours, radii and shadows
+    that the page reads by name. The check runs both ways: an undefined property is a broken
+    rule, and a defined one nobody reads is a leftover from a rename that only did half the
+    file.
+    """
+    stylesheet = (WEB_FOLDER / "style.css").read_text(encoding="utf-8")
+    defined = set(re.findall(r"^\s*(--[\w-]+)\s*:", stylesheet, re.M))
+    used = set(re.findall(r"var\(\s*(--[\w-]+)", stylesheet))
+
+    assert defined and used, "no custom property found: the guard has come unplugged"
+    assert not (used - defined), (
+        f"custom properties read but never defined: {sorted(used - defined)}"
+    )
+    assert not (defined - used), (
+        f"custom properties defined but never read: {sorted(defined - used)}"
+    )
 
 
 def test_every_used_class_has_a_rule_in_the_stylesheet():
     """A misspelt class raises nothing: the element draws itself unstyled.
 
-    It is the defect the frontend makes invisible — no toolchain, no compiler — and the rename
-    of `app.js`'s identifiers fell straight into it: `'fase'` had become `'stage'`,
+    It is the defect the frontend makes invisible — no toolchain, no compiler — and an earlier
+    rename of `app.js`'s identifiers fell straight into it: `'fase'` had become `'stage'`,
     `scheda-copertina` had become `card-cover`, and `style.css` went on defining the earlier
     names. The page would have worked and been unreadable.
 
-    The class names stay Italian on purpose: they live in three files — `index.html`, `app.js`
-    and `style.css` — and moving them is a step of its own, outside this migration (see
-    docs/naming.md).
+    The class names have since moved to English across all three files at once. That step was
+    deferred exactly this long because it *is* three files at once, and this guard plus
+    `test_no_selector_points_at_nothing` are what made it safe to take: between them they hold
+    the ids against both directions and the classes against the stylesheet, so a name left
+    behind in any one of the three turns something red instead of quietly unstyling the page.
     """
     stylesheet = (WEB_FOLDER / "style.css").read_text(encoding="utf-8")
     defined = set(re.findall(r"\.([a-z][\w-]*)", stylesheet))
