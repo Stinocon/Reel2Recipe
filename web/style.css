@@ -11,36 +11,36 @@
  */
 
 :root {
-  --crema: #faf6f0;
-  --crema-scura: #f2ebe0;
-  --carta: #ffffff;
-  --inchiostro: #2b2420;
-  --inchiostro-tenue: #6b5d52;
+  --cream: #faf6f0;
+  --cream-dark: #f2ebe0;
+  --card: #ffffff;
+  --ink: #2b2420;
+  --ink-soft: #6b5d52;
   --terracotta: #d9714e;
-  --terracotta-scura: #c05a38;
-  --erba: #6a8f5f;
-  --erba-chiara: #e8f0e2;
-  --oro: #e0a458;
-  --bordo: #e6ddd0;
-  --ombra: 0 4px 20px rgba(80, 60, 40, 0.08);
-  --ombra-forte: 0 12px 40px rgba(80, 60, 40, 0.16);
-  --raggio: 16px;
-  --raggio-piccolo: 10px;
+  --terracotta-dark: #c05a38;
+  --grass: #6a8f5f;
+  --grass-light: #e8f0e2;
+  --gold: #e0a458;
+  --border: #e6ddd0;
+  --shadow: 0 4px 20px rgba(80, 60, 40, 0.08);
+  --shadow-strong: 0 12px 40px rgba(80, 60, 40, 0.16);
+  --radius: 16px;
+  --radius-small: 10px;
   --serif: 'Georgia', 'Times New Roman', serif;
   --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --crema: #1c1815;
-    --crema-scura: #16120f;
-    --carta: #26211d;
-    --inchiostro: #f0e9e0;
-    --inchiostro-tenue: #a89a8c;
-    --erba-chiara: #223020;
-    --bordo: #3a332c;
-    --ombra: 0 4px 20px rgba(0, 0, 0, 0.3);
-    --ombra-forte: 0 12px 40px rgba(0, 0, 0, 0.5);
+    --cream: #1c1815;
+    --cream-dark: #16120f;
+    --card: #26211d;
+    --ink: #f0e9e0;
+    --ink-soft: #a89a8c;
+    --grass-light: #223020;
+    --border: #3a332c;
+    --shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    --shadow-strong: 0 12px 40px rgba(0, 0, 0, 0.5);
   }
 }
 
@@ -54,22 +54,22 @@
 
 /* The `hidden` attribute has to win, always. The browser implements it with
    `[hidden] { display: none }`, which has the same specificity as a class selector: a rule
-   like `.modale { display: flex }`, coming later, would cancel it and show the element on
+   like `.modal { display: flex }`, coming later, would cancel it and show the element on
    start-up. It has already happened with the options panel and with both overlays, which
    blurred the whole page with their backdrop-filter. */
 [hidden] { display: none !important; }
 
 body {
   font-family: var(--sans);
-  color: var(--inchiostro);
-  background: var(--crema);
+  color: var(--ink);
+  background: var(--cream);
   line-height: 1.55;
   min-height: 100vh;
   position: relative;
   overflow-x: hidden;
 }
 
-.sfondo-decorativo {
+.decorative-background {
   position: fixed;
   inset: 0;
   z-index: -1;
@@ -81,7 +81,7 @@ body {
 
 /* ---------- Header ---------- */
 
-.intestazione {
+.masthead {
   max-width: 960px;
   margin: 0 auto;
   padding: 2rem 1.5rem 1rem;
@@ -92,86 +92,86 @@ body {
   flex-wrap: wrap;
 }
 
-.marchio { display: flex; align-items: center; gap: 0.9rem; }
-.marchio-icona {
+.brand { display: flex; align-items: center; gap: 0.9rem; }
+.brand-icon {
   display: flex; align-items: center; justify-content: center;
   width: 52px; height: 52px; border-radius: 14px; flex-shrink: 0;
-  background: linear-gradient(135deg, var(--terracotta), var(--terracotta-scura));
+  background: linear-gradient(135deg, var(--terracotta), var(--terracotta-dark));
   color: #fff; box-shadow: 0 4px 14px rgba(217, 113, 78, 0.3);
 }
-.marchio h1 {
+.brand h1 {
   font-family: var(--serif);
   font-size: 1.9rem;
   font-weight: 700;
   letter-spacing: -0.01em;
 }
-.sottotitolo { color: var(--inchiostro-tenue); font-size: 0.92rem; }
+.subtitle { color: var(--ink-soft); font-size: 0.92rem; }
 
 /* The interface language and the components' status sit together at the end of the header:
    they are the two things you look at before starting, not while working. */
-.strumenti-testata {
+.header-tools {
   display: flex;
   align-items: center;
   gap: 0.6rem;
   flex-wrap: wrap;
 }
 
-.scelta-lingua {
+.language-choice {
   font: inherit;
   font-size: 0.82rem;
-  color: var(--inchiostro-tenue);
-  background: var(--carta);
-  border: 1px solid var(--bordo);
+  color: var(--ink-soft);
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: 999px;
   padding: 0.45rem 0.6rem;
   cursor: pointer;
 }
-.scelta-lingua:hover { color: var(--inchiostro); border-color: var(--terracotta); }
+.language-choice:hover { color: var(--ink); border-color: var(--terracotta); }
 
-.stato-ambiente {
+.environment-status {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   font-size: 0.82rem;
-  color: var(--inchiostro-tenue);
-  background: var(--carta);
+  color: var(--ink-soft);
+  background: var(--card);
   padding: 0.45rem 0.85rem;
   border-radius: 999px;
-  border: 1px solid var(--bordo);
+  border: 1px solid var(--border);
   cursor: default;
 }
-.pallino {
+.dot {
   width: 9px; height: 9px; border-radius: 50%;
-  background: var(--inchiostro-tenue);
+  background: var(--ink-soft);
   transition: background 0.3s;
 }
-.pallino.ok { background: var(--erba); box-shadow: 0 0 0 3px var(--erba-chiara); }
-.pallino.parziale { background: var(--oro); }
-.pallino.ko { background: var(--terracotta); }
+.dot.ok { background: var(--grass); box-shadow: 0 0 0 3px var(--grass-light); }
+.dot.partial { background: var(--gold); }
+.dot.ko { background: var(--terracotta); }
 
 main { max-width: 960px; margin: 0 auto; padding: 1rem 1.5rem 4rem; }
 
 /* ---------- Cook bar ---------- */
 
-.pannello-cook {
-  background: var(--carta);
-  border: 1px solid var(--bordo);
-  border-radius: var(--raggio);
-  box-shadow: var(--ombra);
+.cook-panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
   padding: 1.75rem;
   margin-bottom: 2.5rem;
 }
 
-.cook-bara { display: flex; gap: 0.75rem; }
+.cook-bar { display: flex; gap: 0.75rem; }
 
 .cook-input {
   flex: 1;
   font-size: 1.05rem;
   padding: 0.95rem 1.15rem;
-  border: 2px solid var(--bordo);
-  border-radius: var(--raggio-piccolo);
-  background: var(--crema);
-  color: var(--inchiostro);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-small);
+  background: var(--cream);
+  color: var(--ink);
   transition: border-color 0.2s, box-shadow 0.2s;
   font-family: var(--sans);
 }
@@ -180,7 +180,7 @@ main { max-width: 960px; margin: 0 auto; padding: 1rem 1.5rem 4rem; }
   border-color: var(--terracotta);
   box-shadow: 0 0 0 4px rgba(217, 113, 78, 0.12);
 }
-.cook-input::placeholder { color: var(--inchiostro-tenue); }
+.cook-input::placeholder { color: var(--ink-soft); }
 
 .btn-cook {
   display: flex;
@@ -189,9 +189,9 @@ main { max-width: 960px; margin: 0 auto; padding: 1rem 1.5rem 4rem; }
   font-size: 1.05rem;
   font-weight: 700;
   color: #fff;
-  background: linear-gradient(135deg, var(--terracotta), var(--terracotta-scura));
+  background: linear-gradient(135deg, var(--terracotta), var(--terracotta-dark));
   border: none;
-  border-radius: var(--raggio-piccolo);
+  border-radius: var(--radius-small);
   padding: 0 1.75rem;
   cursor: pointer;
   transition: transform 0.12s, box-shadow 0.2s, opacity 0.2s;
@@ -201,11 +201,11 @@ main { max-width: 960px; margin: 0 auto; padding: 1rem 1.5rem 4rem; }
 .btn-cook:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 7px 20px rgba(217, 113, 78, 0.4); }
 .btn-cook:active:not(:disabled) { transform: translateY(0); }
 .btn-cook:disabled { opacity: 0.55; cursor: not-allowed; }
-.btn-cook-icona { display: flex; }
-.btn-cook.in-corso .btn-cook-icona { animation: sfrigola 0.8s infinite; }
+.btn-cook-icon { display: flex; }
+.btn-cook.in-progress .btn-cook-icon { animation: sfrigola 0.8s infinite; }
 @keyframes sfrigola { 0%,100% { transform: rotate(-8deg); } 50% { transform: rotate(8deg); } }
 
-.cook-alternative {
+.cook-alternatives {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -214,32 +214,32 @@ main { max-width: 960px; margin: 0 auto; padding: 1rem 1.5rem 4rem; }
   flex-wrap: wrap;
   gap: 0.5rem;
 }
-.link-file { color: var(--inchiostro-tenue); cursor: pointer; }
-.link-file .sottolineato { color: var(--terracotta); text-decoration: underline; }
-.link-opzioni {
-  background: none; border: none; color: var(--inchiostro-tenue);
+.link-file { color: var(--ink-soft); cursor: pointer; }
+.link-file .underlined { color: var(--terracotta); text-decoration: underline; }
+.link-options {
+  background: none; border: none; color: var(--ink-soft);
   cursor: pointer; font-size: 0.88rem; font-family: var(--sans);
 }
-.link-opzioni:hover { color: var(--inchiostro); }
+.link-options:hover { color: var(--ink); }
 
-.opzioni {
+.options {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1rem;
   margin-top: 1.2rem;
   padding-top: 1.2rem;
-  border-top: 1px dashed var(--bordo);
+  border-top: 1px dashed var(--border);
 }
-.opzioni label { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.82rem; color: var(--inchiostro-tenue); }
-.opzioni select {
-  padding: 0.55rem 0.7rem; border-radius: var(--raggio-piccolo);
-  border: 1px solid var(--bordo); background: var(--crema); color: var(--inchiostro);
+.options label { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.82rem; color: var(--ink-soft); }
+.options select {
+  padding: 0.55rem 0.7rem; border-radius: var(--radius-small);
+  border: 1px solid var(--border); background: var(--cream); color: var(--ink);
   font-family: var(--sans); font-size: 0.9rem;
 }
 .opt-check { flex-direction: row !important; align-items: center; gap: 0.5rem !important; grid-column: 1 / -1; }
 
-.cook-nota { margin-top: 0.9rem; font-size: 0.85rem; color: var(--inchiostro-tenue); min-height: 1.2em; }
-.cook-nota.errore { color: var(--terracotta-scura); }
+.cook-note { margin-top: 0.9rem; font-size: 0.85rem; color: var(--ink-soft); min-height: 1.2em; }
+.cook-note.error { color: var(--terracotta-dark); }
 
 /* ---------- File drop ---------- */
 
@@ -249,223 +249,223 @@ main { max-width: 960px; margin: 0 auto; padding: 1rem 1.5rem 4rem; }
   backdrop-filter: blur(4px);
   display: flex; align-items: center; justify-content: center;
 }
-.drop-messaggio {
+.drop-message {
   font-family: var(--serif); font-size: 1.6rem; text-align: center;
-  color: var(--terracotta-scura); line-height: 1.8;
+  color: var(--terracotta-dark); line-height: 1.8;
   border: 3px dashed var(--terracotta); border-radius: 24px;
-  padding: 3rem 4rem; background: var(--carta);
+  padding: 3rem 4rem; background: var(--card);
 }
 /* The icon sits on a line of its own, above the text: centred by hand because the
    `display: block` of the .ic class would anchor it to the left. */
-.drop-messaggio .ic { margin: 0 auto 0.4rem; }
+.drop-message .ic { margin: 0 auto 0.4rem; }
 
 /* ---------- Progress ---------- */
 
-.pannello-avanzamento {
-  background: var(--carta); border: 1px solid var(--bordo);
-  border-radius: var(--raggio); box-shadow: var(--ombra);
+.progress-panel {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow);
   padding: 1.5rem 1.75rem; margin-bottom: 2.5rem;
 }
-.fasi { display: flex; flex-direction: column; gap: 0.75rem; }
-.fase {
+.stages { display: flex; flex-direction: column; gap: 0.75rem; }
+.stage {
   display: flex; align-items: center; gap: 0.75rem;
-  font-size: 0.95rem; color: var(--inchiostro-tenue);
+  font-size: 0.95rem; color: var(--ink-soft);
   opacity: 0.5; transition: opacity 0.3s;
 }
-.fase.attiva { opacity: 1; color: var(--inchiostro); font-weight: 600; }
-.fase.fatta { opacity: 0.9; }
-.fase-icona {
+.stage.active { opacity: 1; color: var(--ink); font-weight: 600; }
+.stage.done { opacity: 0.9; }
+.stage-icon {
   width: 26px; height: 26px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  background: var(--crema-scura); font-size: 0.85rem; flex-shrink: 0;
+  background: var(--cream-dark); font-size: 0.85rem; flex-shrink: 0;
 }
-.fase.attiva .fase-icona {
+.stage.active .stage-icon {
   background: var(--terracotta); color: #fff;
   animation: pulsa 1.2s infinite;
 }
-.fase.fatta .fase-icona { background: var(--erba); color: #fff; }
+.stage.done .stage-icon { background: var(--grass); color: #fff; }
 @keyframes pulsa { 0%,100% { box-shadow: 0 0 0 0 rgba(217,113,78,0.4); } 50% { box-shadow: 0 0 0 6px rgba(217,113,78,0); } }
 
-.btn-annulla {
-  margin-top: 1rem; background: none; border: 1px solid var(--bordo);
-  border-radius: var(--raggio-piccolo); padding: 0.5rem 1rem;
-  color: var(--inchiostro-tenue); cursor: pointer; font-family: var(--sans);
+.btn-cancel {
+  margin-top: 1rem; background: none; border: 1px solid var(--border);
+  border-radius: var(--radius-small); padding: 0.5rem 1rem;
+  color: var(--ink-soft); cursor: pointer; font-family: var(--sans);
 }
 
 /* ---------- Recipe card ---------- */
 
-.scheda-ricetta {
-  background: var(--carta); border: 1px solid var(--bordo);
-  border-radius: var(--raggio); box-shadow: var(--ombra-forte);
+.recipe-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-strong);
   overflow: hidden; margin-bottom: 2.5rem;
   animation: entra 0.4s ease;
 }
 @keyframes entra { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 
-.scheda-copertina { width: 100%; height: 220px; object-fit: cover; background: var(--crema-scura); }
-.scheda-corpo { padding: 1.75rem; }
-.scheda-titolo { font-family: var(--serif); font-size: 1.6rem; margin-bottom: 0.4rem; }
-.scheda-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--inchiostro-tenue); font-size: 0.88rem; margin-bottom: 1.2rem; }
-.scheda-meta span { display: inline-flex; align-items: center; gap: 0.3rem; }
+.card-cover { width: 100%; height: 220px; object-fit: cover; background: var(--cream-dark); }
+.card-body { padding: 1.75rem; }
+.card-title { font-family: var(--serif); font-size: 1.6rem; margin-bottom: 0.4rem; }
+.card-meta { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--ink-soft); font-size: 0.88rem; margin-bottom: 1.2rem; }
+.card-meta span { display: inline-flex; align-items: center; gap: 0.3rem; }
 
-.badge-fonte {
+.source-badge {
   display: inline-flex; align-items: center; gap: 0.35rem;
-  background: var(--erba-chiara); color: var(--erba);
+  background: var(--grass-light); color: var(--grass);
   padding: 0.2rem 0.7rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600;
 }
 
-.avviso-incertezze {
+.uncertainty-warning {
   background: rgba(224, 164, 88, 0.14); border: 1px solid rgba(224, 164, 88, 0.35);
-  border-radius: var(--raggio-piccolo); padding: 0.85rem 1rem;
-  font-size: 0.88rem; margin-bottom: 1.4rem; color: var(--inchiostro);
+  border-radius: var(--radius-small); padding: 0.85rem 1rem;
+  font-size: 0.88rem; margin-bottom: 1.4rem; color: var(--ink);
 }
-.avviso-incertezze strong { color: var(--terracotta-scura); }
+.uncertainty-warning strong { color: var(--terracotta-dark); }
 
-.sezione-titolo {
+.section-title {
   font-family: var(--serif); font-size: 1.15rem; margin: 1.4rem 0 0.7rem;
-  padding-bottom: 0.35rem; border-bottom: 2px solid var(--crema-scura);
+  padding-bottom: 0.35rem; border-bottom: 2px solid var(--cream-dark);
 }
-.gruppo-titolo { font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--terracotta); margin: 0.8rem 0 0.4rem; font-weight: 700; }
+.group-title { font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--terracotta); margin: 0.8rem 0 0.4rem; font-weight: 700; }
 
-.lista-ingredienti { list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }
-.ingrediente {
+.ingredient-list { list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }
+.ingredient {
   display: flex; align-items: baseline; gap: 0.5rem;
-  padding: 0.35rem 0; border-bottom: 1px dotted var(--bordo); font-size: 0.96rem;
+  padding: 0.35rem 0; border-bottom: 1px dotted var(--border); font-size: 0.96rem;
 }
-.ingrediente .commento { color: var(--inchiostro-tenue); font-size: 0.85rem; }
-.ingrediente.incerta { background: rgba(224, 164, 88, 0.08); border-radius: 6px; padding-left: 0.5rem; }
-.tag-provenienza {
+.ingredient .comment { color: var(--ink-soft); font-size: 0.85rem; }
+.ingredient.uncertain { background: rgba(224, 164, 88, 0.08); border-radius: 6px; padding-left: 0.5rem; }
+.tag-provenance {
   font-size: 0.68rem; padding: 0.1rem 0.45rem; border-radius: 999px;
-  background: var(--crema-scura); color: var(--inchiostro-tenue); white-space: nowrap;
+  background: var(--cream-dark); color: var(--ink-soft); white-space: nowrap;
 }
-.tag-provenienza.stima { background: rgba(224,164,88,0.2); color: var(--terracotta-scura); }
+.tag-provenance.estimate { background: rgba(224,164,88,0.2); color: var(--terracotta-dark); }
 
-.lista-procedimento { list-style: none; counter-reset: passo; display: flex; flex-direction: column; gap: 0.7rem; }
-.passo { display: flex; gap: 0.8rem; font-size: 0.96rem; }
-.passo::before {
+.method-list { list-style: none; counter-reset: passo; display: flex; flex-direction: column; gap: 0.7rem; }
+.step { display: flex; gap: 0.8rem; font-size: 0.96rem; }
+.step::before {
   counter-increment: passo; content: counter(passo);
   flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%;
-  background: var(--erba-chiara); color: var(--erba);
+  background: var(--grass-light); color: var(--grass);
   display: flex; align-items: center; justify-content: center;
   font-weight: 700; font-size: 0.85rem;
 }
 
-.lista-lacune { list-style: none; display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.5rem; }
-.lacuna { font-size: 0.86rem; color: var(--inchiostro-tenue); padding-left: 1.2rem; position: relative; }
+.gap-list { list-style: none; display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.5rem; }
+.gap { font-size: 0.86rem; color: var(--ink-soft); padding-left: 1.2rem; position: relative; }
 /* The marker is the Material Symbols "warning" icon as a data URI: CSS cannot call the
    icons' JS function, and a data URI stays offline all the same. The colour is fixed here
    because a background image does not inherit `color`. */
-.lacuna::before {
+.gap::before {
   content: ''; position: absolute; left: 0; top: 0.15rem;
   width: 0.95rem; height: 0.95rem;
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'%3E%3Cpath fill='%23e0a458' d='m40-120 440-760 440 760H40Zm138-80h604L480-720 178-200Zm302-40q17 0 28.5-11.5T520-280q0-17-11.5-28.5T480-320q-17 0-28.5 11.5T440-280q0 17 11.5 28.5T480-240Zm-40-120h80v-200h-80v200Zm40-100Z'/%3E%3C/svg%3E") center/contain no-repeat;
 }
 
-.scheda-azioni { display: flex; gap: 0.75rem; margin-top: 1.8rem; flex-wrap: wrap; }
+.card-actions { display: flex; gap: 0.75rem; margin-top: 1.8rem; flex-wrap: wrap; }
 
 /* ---------- Buttons ---------- */
 
-.btn-primario, .btn-secondario, .btn-testo, .btn-pericolo {
+.btn-primary, .btn-secondary, .btn-text, .btn-danger {
   font-family: var(--sans); font-size: 0.92rem; font-weight: 600;
-  border-radius: var(--raggio-piccolo); padding: 0.7rem 1.2rem; cursor: pointer;
+  border-radius: var(--radius-small); padding: 0.7rem 1.2rem; cursor: pointer;
   transition: all 0.15s; border: 1px solid transparent;
   /* inline-flex because every button carries its icon next to the text: centred and with a
      gap of their own, instead of depending on the text line. */
   display: inline-flex; align-items: center; gap: 0.45rem;
 }
-.btn-primario { background: var(--erba); color: #fff; box-shadow: 0 3px 10px rgba(106,143,95,0.3); }
-.btn-primario:hover { background: #5c7d52; transform: translateY(-1px); }
-.btn-secondario { background: var(--crema); color: var(--inchiostro); border-color: var(--bordo); }
-.btn-secondario:hover { border-color: var(--terracotta); color: var(--terracotta); }
-.btn-testo { background: none; color: var(--inchiostro-tenue); padding: 0.7rem 0.5rem; }
-.btn-testo:hover { color: var(--terracotta); }
+.btn-primary { background: var(--grass); color: #fff; box-shadow: 0 3px 10px rgba(106,143,95,0.3); }
+.btn-primary:hover { background: #5c7d52; transform: translateY(-1px); }
+.btn-secondary { background: var(--cream); color: var(--ink); border-color: var(--border); }
+.btn-secondary:hover { border-color: var(--terracotta); color: var(--terracotta); }
+.btn-text { background: none; color: var(--ink-soft); padding: 0.7rem 0.5rem; }
+.btn-text:hover { color: var(--terracotta); }
 
 /* The interface's only destructive action. Sober at rest — it must not attract the finger —
    and red only on hover, once the intention has been expressed. */
-.btn-pericolo { background: none; color: var(--inchiostro-tenue); border-color: var(--bordo); }
-.btn-pericolo:hover { background: var(--terracotta-scura); border-color: var(--terracotta-scura); color: #fff; }
+.btn-danger { background: none; color: var(--ink-soft); border-color: var(--border); }
+.btn-danger:hover { background: var(--terracotta-dark); border-color: var(--terracotta-dark); color: #fff; }
 
 /* ---------- Library ---------- */
 
-.libreria-testata { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.3rem; flex-wrap: wrap; }
-.libreria-testata h2 { font-family: var(--serif); font-size: 1.5rem; }
-.libreria-azioni { display: flex; gap: 0.75rem; flex-wrap: wrap; }
-.cerca {
-  padding: 0.6rem 1rem; border: 1px solid var(--bordo); border-radius: var(--raggio-piccolo);
-  background: var(--carta); color: var(--inchiostro); font-family: var(--sans); font-size: 0.9rem; min-width: 200px;
+.library-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.3rem; flex-wrap: wrap; }
+.library-header h2 { font-family: var(--serif); font-size: 1.5rem; }
+.library-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+.search {
+  padding: 0.6rem 1rem; border: 1px solid var(--border); border-radius: var(--radius-small);
+  background: var(--card); color: var(--ink); font-family: var(--sans); font-size: 0.9rem; min-width: 200px;
 }
-.cerca:focus { outline: none; border-color: var(--terracotta); }
+.search:focus { outline: none; border-color: var(--terracotta); }
 
-.griglia-ricette { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1.2rem; }
-.carta-ricetta {
-  background: var(--carta); border: 1px solid var(--bordo); border-radius: var(--raggio);
+.recipe-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1.2rem; }
+.recipe-tile {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
   overflow: hidden; cursor: pointer; transition: transform 0.15s, box-shadow 0.2s;
   display: flex; flex-direction: column;
 }
-.carta-ricetta:hover { transform: translateY(-3px); box-shadow: var(--ombra-forte); }
-.carta-copertina {
-  height: 130px; background: var(--crema-scura); background-size: cover; background-position: center;
+.recipe-tile:hover { transform: translateY(-3px); box-shadow: var(--shadow-strong); }
+.tile-cover {
+  height: 130px; background: var(--cream-dark); background-size: cover; background-position: center;
   display: flex; align-items: center; justify-content: center;
   /* The placeholder for recipes with no cover: present but discreet, it must not compete
      with the title below. */
-  color: var(--bordo);
+  color: var(--border);
 }
-.carta-corpo { padding: 0.9rem 1rem; flex: 1; display: flex; flex-direction: column; gap: 0.35rem; }
-.carta-titolo { font-family: var(--serif); font-size: 1.05rem; line-height: 1.3; }
-.carta-meta { font-size: 0.78rem; color: var(--inchiostro-tenue); margin-top: auto; display: flex; gap: 0.6rem; flex-wrap: wrap; }
-.carta-badge-incerta { color: var(--oro); display: inline-flex; align-items: center; gap: 0.25rem; }
+.tile-body { padding: 0.9rem 1rem; flex: 1; display: flex; flex-direction: column; gap: 0.35rem; }
+.tile-title { font-family: var(--serif); font-size: 1.05rem; line-height: 1.3; }
+.tile-meta { font-size: 0.78rem; color: var(--ink-soft); margin-top: auto; display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.tile-badge-uncertain { color: var(--gold); display: inline-flex; align-items: center; gap: 0.25rem; }
 
-.libreria-vuota { text-align: center; color: var(--inchiostro-tenue); padding: 3rem 1rem; font-size: 0.95rem; }
+.library-empty { text-align: center; color: var(--ink-soft); padding: 3rem 1rem; font-size: 0.95rem; }
 
 /* ---------- Modal ---------- */
 
-.modale {
+.modal {
   position: fixed; inset: 0; z-index: 200; background: rgba(43, 36, 32, 0.5);
   backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 1.5rem;
 }
-.modale-contenuto {
-  background: var(--carta); border-radius: var(--raggio); box-shadow: var(--ombra-forte);
+.modal-content {
+  background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow-strong);
   max-width: 640px; width: 100%; max-height: 88vh; overflow-y: auto; padding: 1.75rem;
 }
-.campo-modifica { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.9rem; }
-.campo-modifica label { font-size: 0.8rem; color: var(--inchiostro-tenue); font-weight: 600; }
-.campo-modifica input, .campo-modifica textarea {
-  padding: 0.6rem 0.75rem; border: 1px solid var(--bordo); border-radius: var(--raggio-piccolo);
-  background: var(--crema); color: var(--inchiostro); font-family: var(--sans); font-size: 0.92rem; resize: vertical;
+.edit-field { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.9rem; }
+.edit-field label { font-size: 0.8rem; color: var(--ink-soft); font-weight: 600; }
+.edit-field input, .edit-field textarea {
+  padding: 0.6rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius-small);
+  background: var(--cream); color: var(--ink); font-family: var(--sans); font-size: 0.92rem; resize: vertical;
 }
-.campo-modifica textarea { min-height: 140px; line-height: 1.6; }
-.suggerimento-modifica { font-size: 0.78rem; color: var(--inchiostro-tenue); margin-bottom: 1rem; }
+.edit-field textarea { min-height: 140px; line-height: 1.6; }
+.edit-hint { font-size: 0.78rem; color: var(--ink-soft); margin-bottom: 1rem; }
 
 /* ---------- Toast ---------- */
 
 .toast {
   position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%);
-  background: var(--inchiostro); color: var(--crema);
-  padding: 0.75rem 1.4rem; border-radius: 999px; box-shadow: var(--ombra-forte);
+  background: var(--ink); color: var(--cream);
+  padding: 0.75rem 1.4rem; border-radius: 999px; box-shadow: var(--shadow-strong);
   font-size: 0.9rem; z-index: 300; animation: entra 0.3s ease;
 }
-.toast.errore { background: var(--terracotta-scura); }
+.toast.error { background: var(--terracotta-dark); }
 
 /* ---------- Footer ---------- */
 
-.pie-pagina {
-  text-align: center; padding: 2rem 1.5rem 3rem; color: var(--inchiostro-tenue);
+.page-footer {
+  text-align: center; padding: 2rem 1.5rem 3rem; color: var(--ink-soft);
   font-size: 0.82rem; display: flex; flex-direction: column; gap: 0.7rem;
   max-width: 640px; margin: 0 auto;
 }
-.pie-pagina strong { color: var(--terracotta); }
+.page-footer strong { color: var(--terracotta); }
 /* The warning is the thing that matters most in here: whoever takes the recipe into the
    kitchen has to know the extraction is automatic. Readable, not hidden in legal-note grey. */
-.pie-avvertenza { font-size: 0.8rem; line-height: 1.6; opacity: 0.9; }
-.pie-collegamenti a { color: var(--inchiostro-tenue); text-decoration: underline; text-underline-offset: 2px; }
-.pie-collegamenti a:hover { color: var(--terracotta); }
+.footer-warning { font-size: 0.8rem; line-height: 1.6; opacity: 0.9; }
+.footer-links a { color: var(--ink-soft); text-decoration: underline; text-underline-offset: 2px; }
+.footer-links a:hover { color: var(--terracotta); }
 
 /* ---------- Responsive ---------- */
 
 @media (max-width: 600px) {
-  .cook-bara { flex-direction: column; }
+  .cook-bar { flex-direction: column; }
   .btn-cook { padding: 0.85rem; justify-content: center; }
-  .opzioni { grid-template-columns: 1fr; }
-  .marchio h1 { font-size: 1.6rem; }
+  .options { grid-template-columns: 1fr; }
+  .brand h1 { font-size: 1.6rem; }
   main { padding: 0.5rem 1rem 3rem; }
 }
