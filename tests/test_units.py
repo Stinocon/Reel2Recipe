@@ -313,6 +313,24 @@ def test_the_name_is_not_repeated_with_the_counting_unit(t):
     assert i.mela_line() == "2 uova"
 
 
+def test_a_whole_name_copied_into_the_unit_field_is_dropped(t):
+    """A model does not only repeat one word: it copies the whole name into the unit field.
+    "2 cipolle piccole cipolle piccole" came out of a real reel, with a gap complaining about
+    an unrecognised unit that had never been a unit."""
+    i = normalise_ingredient("cipolle piccole", "2", "cipolle piccole", tables=t)
+    assert i.mela_line() == "2 cipolle piccole"
+    assert i.quantity.provenance is Provenance.COUNT
+    assert i.gap is None
+
+
+def test_a_real_unknown_unit_is_still_kept_and_declared(t):
+    """The counterpart: a unit that says something the name does not is kept as it was, and
+    the gap stays. Dropping it would be losing the reel's own words."""
+    i = normalise_ingredient("cipolle", "2", "mazzetti", tables=t)
+    assert i.mela_line() == "2 mazzetti cipolle"
+    assert i.gap is not None
+
+
 def test_qb_is_recognised_inside_a_string_too(t):
     """A model may put "burro q.b." entirely into unita_raw: it has to be recognised anyway."""
     i = normalise_ingredient("burro", None, "burro q.b.", tables=t)
