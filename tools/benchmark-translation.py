@@ -1,4 +1,4 @@
-"""A repeatable measurement of extraction + translation, in every language combination.
+"""A repeatable measurement of extraction + translation, over every language combination.
 
 It exists because "the translation is unreliable" is not a number, and without a number no
 change to the pipeline can be claimed as an improvement. Run it **before** a change and
@@ -9,24 +9,39 @@ change to the pipeline can be claimed as an improvement. Run it **before** a cha
 It is not a gate and does not belong on `./check.sh`'s path: it prints numbers, it does not
 pass or fail. The pass/fail half lives in `tests/test_modello.py`, which holds the outcomes
 this measurement established. Reach for this one when touching `extract.py`'s prompts, the
-translation pass, or the default model — the three things that move these numbers.
+translation pass, the glossary, or the default model.
 
-It is also the reason the two-pass split exists at all. The first version of this file scored
-100% on both directions and measured a problem that was not there: the caption it used was
-rich prose, and the failure only appears on **list-shaped** captions. Adding `CAPTION_IT_LIST`
-turned a vague complaint into 0%, which is a thing you can fix and then show fixed.
+**Every case here exists because something real got it wrong.** The material is authored — no
+third-party text enters this repository (AGENTS.md §7) — but the *shapes* are taken from
+reels that produced a defect, and each was added the day the defect was found:
 
-What it scores, per case:
+  it            rich Italian prose. The easy case, and the one that made the first version of
+                this file useless: it scored 100% and measured a problem that was not there.
+  it-list       short, list-shaped, most ingredients with no amount. Translation towards
+                English used to score **0%** here — not degraded, nothing at all.
+  it-section    a named section holding ingredients, and a preparation paragraph that is NOT a
+                section. A real reel lost a whole five-ingredient section from the list while
+                still describing it in the method, and invented a section out of a method
+                heading. The recipe knew; the shopping list did not.
+                **It still fails, and it is meant to.** The section is lost and the group
+                invented, on this material as on the reel it came from. Kept red on purpose:
+                a case removed because it fails is a defect removed from view.
+  en            plain English, with sections.
+  en-bilingual  English followed by German, and amounts in Tbsp/Tsp. The hardest case the
+                README names, and the one that produced the worst defect this project has
+                seen: asked for Italian, the model reported **`2 Tbsp` as `2 cucchiaini`** —
+                a threefold error, provenance `declared`. THE UNITS AXIS EXISTS FOR THIS.
 
-  language   how many of the terms that MUST change language actually did. Each term carries
-             the forms that count as correct, so "eggs" -> "uova" passes and "eggs" fails.
-             This is the axis the two-pass change is meant to move.
-  amounts    the stated amounts are still there and still raw. This is the axis that must NOT
-             move: it is the project's central promise, and a translation change that improves
-             the words while disturbing the numbers is a regression, not a win.
-  groups     the ingredient groups survived, and their names are in the target language.
+The axes, in the order they matter:
 
-Usage:  uv run python benchmark.py [runs]
+  units      the unit the model reports must be the one the material used. This is the axis
+             the whole project rests on (AGENTS.md §3): the code converts faithfully whatever
+             unit it is given, so a unit changed before the code sees it is a wrong number
+             presented as a right one, and nothing downstream can catch it.
+  sections   every ingredient under a named section reaches the ingredient list, and no
+             section is invented out of a method heading.
+  language   how many of the terms that must change language actually did.
+  amounts    the stated numbers survive.
 """
 from __future__ import annotations
 
@@ -37,11 +52,14 @@ import time
 from reel2recipe import extract
 
 # --------------------------------------------------------------------------------------
-# Material. Written in the shape captions really have — amounts inline, groups by colon,
-# promotional noise — but authored here, so no third-party text enters the repo.
+# The material and what each case demands of the pipeline
 # --------------------------------------------------------------------------------------
 
-CAPTION_IT = """\
+CASES: dict[str, dict] = {
+    "it": {
+        "language": "it",
+        "title": "Tiramisu della nonna",
+        "caption": """\
 Tiramisu della nonna, pronto in 20 minuti!
 
 INGREDIENTI:
@@ -54,9 +72,109 @@ Per la copertura: cacao amaro
 PROCEDIMENTO:
 Monta i tuorli con lo zucchero, aggiungi il mascarpone. Bagna i savoiardi nel caffe'.
 Alterna gli strati e spolvera di cacao. Riposa in frigo un'ora.
-"""
+""",
+        "amounts": ["250", "100", "200", "3"],
+        "units": ["g"],
+        # Both languages: the output is translated, so looking for the Italian word alone
+        # reported the section as lost when it was there under its English name.
+        "sections": {"base": ["savoiardi", "ladyfinger", "sponge"],
+                     "copertura": ["cacao", "cocoa"]},
+        "terms": {"en": [("mascarpone", ["mascarpone"]), ("uova", ["egg", "eggs"]),
+                         ("zucchero", ["sugar"]), ("cacao", ["cocoa", "cacao"]),
+                         ("caffe", ["coffee"])]},
+        "group_words": {"it": ["base", "copertura"], "en": ["base", "topping", "coating"]},
+    },
+    "it-list": {
+        "language": "it",
+        "title": "Yaki Udon",
+        "caption": """\
+Yaki Udon, pronti in 10 minuti netti!
 
-CAPTION_EN = """\
+INGREDIENTI:
+Udon precotti
+80g di Maiale (fettina grassa)
+Verdure: Cipolla, Carote e Cavolo Cappuccio
+Salsa: Soia, Mirin e Dashi in polvere
+
+PROCEDIMENTO:
+Taglia le verdure, rosola il maiale, aggiungi gli udon e la salsa. Salta tutto.
+""",
+        "amounts": ["80"],
+        "units": [],
+        "sections": {"verdur": ["cipoll", "onion"], "salsa|sauce": ["soia", "soy"]},
+        "terms": {"en": [("maiale", ["pork"]), ("cipolla", ["onion"]),
+                         ("carote", ["carrot", "carrots"]), ("cavolo", ["cabbage"]),
+                         ("soia", ["soy"]), ("verdure", ["vegetable", "vegetables"])]},
+        "group_words": {"it": ["verdur", "salsa"], "en": ["vegetable", "sauce"]},
+    },
+    "it-section": {
+        "language": "it",
+        "title": "Burger ripieni",
+        # A named section, a preparation paragraph that only looks like one, a method line
+        # naming the section's own ingredients again — and a **transcript**, which is what
+        # finally made it fail the way the real reel does.
+        #
+        # The first version of this case was shorter, and it **passed** while the real reel it
+        # was drawn from kept failing: a benchmark easier than the thing it stands for measures
+        # nothing, which is the same lesson the very first version of this file taught. Made
+        # faithful — the full ingredient list, the promotional opening, and above all the
+        # "Per la salsa: mescola yogurt, maionese..." line in the method — it reproduces.
+        "caption": """\
+BURGER RIPIENI FACILI in friggitrice ad aria o forno
+
+Viralissimi nel web, questi panini sono assurdi, con un ripieno che conquista morso dopo
+morso! Ecco la mia versione semplificata per chi non vuole fare l'impasto.
+
+INGREDIENTI (6 burger):
+1 rotolo di pasta per pizza
+6 hamburger di manzo
+12 fette di formaggio
+2 cipolle piccole
+3 cetrioli sottaceto
+1 tuorlo
+1 pizzico di sale
+Mezzo cucchiaino di zucchero
+Semi di sesamo q.b.
+Olio q.b.
+
+Salsa burger:
+2 cucchiai yogurt greco
+3 cucchiai maionese
+2 cucchiai ketchup
+Paprika affumicata q.b.
+
+Per le cipolle caramellate: scalda un filo di olio, aggiungi le cipolle tagliate ad anelli
+e rosolale per 2 minuti; aggiungi sale e zucchero e cuoci per altri 5 minuti.
+Intanto cuoci gli hamburger a 180 gradi per 15 minuti, girandoli a meta cottura.
+Per la salsa: mescola yogurt greco, maionese, ketchup e paprika.
+Taglia la pasta in 6 parti, farcisci con formaggio, hamburger e salsa, richiudi e cuoci.
+""",
+        # The spoken half. It narrates the assembly and names "salsa" as one component rather
+        # than as a set of ingredients — and that is the whole difference: with the caption
+        # alone the section survives about half the time, with the speech added it never does,
+        # and the model invents "cipolle caramellate" out of the method paragraph every time.
+        #
+        # The prompt already says the caption wins when the two disagree. It evidently wins on
+        # **values** and not on **structure**, which is the shape of the next fix and not of
+        # this one.
+        "transcript": (
+            "Scommetto che non sai che se metti la pasta per pizza su una ciotola, riempi con "
+            "formaggio, hamburger, salsa, cetrioli e cipolla caramellata, richiudi e cuoci in "
+            "friggitrice ad aria, ottieni dei burger ripieni veramente pazzeschi."
+        ),
+        "amounts": ["6", "12", "3", "2"],
+        "units": ["cucchiai"],
+        "sections": {"salsa": ["yogurt", "yoghurt", "maionese", "mayo", "ketchup"]},
+        "terms": {"en": [("maionese", ["mayonnaise", "mayo"]), ("cipolle", ["onion", "onions"]),
+                         ("zucchero", ["sugar"]), ("sale", ["salt"])]},
+        "group_words": {"it": ["salsa"], "en": ["sauce"]},
+        # Headings that must NOT appear: they are method paragraphs, not sections.
+        "not_sections": ["caramellat"],
+    },
+    "en": {
+        "language": "en",
+        "title": "Weeknight Carbonara",
+        "caption": """\
 Weeknight Carbonara, 15 minutes flat!
 
 INGREDIENTS:
@@ -69,91 +187,69 @@ For the garnish: fresh parsley
 METHOD:
 Fry the pancetta until crisp. Whisk the eggs with the pecorino and plenty of pepper.
 Drain the pasta, combine off the heat so the eggs do not scramble.
-"""
-
-# The terms that have to change language, with what counts as a correct rendering. Kept small
-# and unambiguous on purpose: a word with three plausible translations measures the scorer's
-# taste rather than the model's behaviour.
-TERMS = {
-    ("it", "en"): [           # Italian material asked for in English
-        ("mascarpone", ["mascarpone"]),                 # stays: it is the ingredient's name
-        ("uova", ["egg", "eggs"]),
-        ("zucchero", ["sugar"]),
-        ("savoiardi", ["ladyfinger", "ladyfingers", "savoiardi", "sponge finger"]),
-        ("cacao", ["cocoa", "cacao"]),
-        ("caffe", ["coffee"]),
-    ],
-    # The list-shaped Italian caption, asked for in English. This is the case that used to
-    # score 0%.
-    #
-    # `cavolo` is the interesting row: the model renders "cavolo cappuccio" as "cabbage only
-    # sometimes, and otherwise leaves it in Italian. It is scored as a **miss**, and that is
-    # deliberate — it did not change language. But the alternative is worse and was what
-    # happened before the prompt forbade it: "chinese broccoli", a different vegetable stated
-    # with confidence. A miss here means a legible Italian word on an English card; the score
-    # this row does not give is the price of not buying the wrong thing.
-    ("it-list", "en"): [
-        ("maiale", ["pork"]),
-        ("cipolla", ["onion"]),
-        ("carote", ["carrot", "carrots"]),
-        ("cavolo", ["cabbage"]),
-        ("soia", ["soy"]),
-        ("verdure", ["vegetable", "vegetables"]),
-    ],
-    ("en", "it"): [           # English material asked for in Italian
-        ("spaghetti", ["spaghetti"]),
-        ("eggs", ["uovo", "uova"]),
-        ("pancetta", ["pancetta"]),
-        ("pecorino", ["pecorino"]),
-        ("black pepper", ["pepe"]),
-        ("parsley", ["prezzemolo"]),
-    ],
+""",
+        "amounts": ["200", "100", "2"],
+        "units": ["g"],
+        "sections": {"sauce|salsa": ["pecorino"], "garnish|guarni": ["parsley", "prezzemolo"]},
+        "terms": {"it": [("spaghetti", ["spaghetti"]), ("eggs", ["uovo", "uova"]),
+                         ("pancetta", ["pancetta"]), ("pecorino", ["pecorino"]),
+                         ("black pepper", ["pepe"]), ("parsley", ["prezzemolo"])]},
+        "group_words": {"en": ["sauce", "garnish"], "it": ["salsa", "guarni"]},
+    },
+    "en-bilingual": {
+        "language": "en",
+        "title": "Overnight Oats",
+        # English then German, and amounts in spoons. This is the shape that produced
+        # `2 Tbsp` -> `2 cucchiaini`: a threefold error, reported as declared.
+        "caption": """\
+OVERNIGHT OATS
+Prep breakfast for a week in 15 minutes with these jars!
+RECIPE (5 jars, 15min prep time):
+-200g oats or spelt flakes
+-2 Tbsp peanut butter
+-5 Tbsp vanilla protein powder
+-a pinch of salt
+-550ml plant milk
+Mix well and set aside.
+Fruit part:
+-300g frozen berries
+-2 Tsp ground flax seeds
+Heat the berries and stir in the flax seeds. Layer and refrigerate.
+-
+OVERNIGHT OATS. Bereite Fruehstueck fuer eine Woche in 15 Minuten vor!
+REZEPT (5 Glaeser): -200g Haferflocken -2 EL Erdnussmus -5 EL Proteinpulver
+-eine Prise Salz -550ml Pflanzenmilch. Fruchtteil: -300g TK-Beeren -2 TL Leinsamen.
+""",
+        "amounts": ["200", "550", "300", "2", "5"],
+        # The heart of it. `tbsp` must survive as a tablespoon and not become a teaspoon,
+        # whatever language the recipe comes out in.
+        "units": ["tbsp", "tsp"],
+        "sections": {"fruit|frutta|frutt": ["berries", "frutti", "bosco", "fragole"]},
+        "terms": {"it": [("oats", ["avena", "fiocchi"]), ("peanut butter", ["arachidi"]),
+                         ("salt", ["sale"]), ("plant milk", ["latte"]),
+                         ("flax seeds", ["lino"]), ("berries", ["frutti di bosco", "bosco"])]},
+        "group_words": {"en": ["fruit"], "it": ["frutt"]},
+    },
 }
 
-# Groups: the label the pipeline should produce, in the target language.
-#
-# These are matched as substrings, and they have to track what `data/ingredients.yaml`
-# actually emits — not what seems a reasonable translation. "For the garnish" comes out as
-# "Per guarnire", and a list expecting "guarnizione" scored it a miss and reported a defect
-# that was not there. A benchmark that under-reports is as misleading as one that over-reports.
-GROUPS = {
-    ("it-list", "it"): ["verdure", "salsa"],
-    ("it-list", "en"): ["vegetable", "vegetables", "sauce"],
-    ("it", "it"): ["base", "copertura"],
-    ("it", "en"): ["base", "topping", "coating", "cover"],
-    ("en", "en"): ["sauce", "garnish"],
-    ("en", "it"): ["salsa", "sugo", "guarnire", "guarnizione", "decorazione"],
-}
 
-# The amounts stated in the caption. They must survive unconverted, whatever the language.
-AMOUNTS = {"it": ["250", "100", "200", "3"], "it-list": ["80"], "en": ["200", "100", "2"]}
+def _units_of(draft: dict) -> str:
+    """Both raw fields, because the model does not reliably separate the two.
 
-# The caption that actually breaks it. Short, list-shaped, most ingredients with no amount at
-# all. The tiramisu one above translates cleanly every time; this one translates nothing —
-# not the names, not the groups, not even the method. The failure is not gradual, it is
-# all-or-nothing, and which way it goes depends on the material. A benchmark built only on
-# the material that works would have measured a problem that does not exist.
-CAPTION_IT_LIST = """\
-Yaki Udon, pronti in 10 minuti netti!
-
-INGREDIENTI:
-Udon precotti
-80g di Maiale (fettina grassa)
-Verdure: Cipolla, Carote e Cavolo Cappuccio
-Salsa: Soia, Mirin e Dashi in polvere
-
-PROCEDIMENTO:
-Taglia le verdure, rosola il maiale, aggiungi gli udon e la salsa. Salta tutto.
-"""
-
-CAPTIONS = {"it": CAPTION_IT, "it-list": CAPTION_IT_LIST, "en": CAPTION_EN}
-TITLES = {"it": "Tiramisu della nonna", "it-list": "Yaki Udon", "en": "Weeknight Carbonara"}
-# Which real language each caption is in, for scoring: "it-list" is Italian material.
-LANGUAGE_OF = {"it": "it", "it-list": "it", "en": "en"}
+    `units.py` documents it: `quantity_raw` arrives as "80g" or "1 1/2 cup" with `unit_raw`
+    empty often enough that the recovery step exists. Reading only `unit_raw` scored a
+    faithful "200 g" as a lost unit — a scorer that measures the wrong field reports defects
+    that are not there, which is how a benchmark starts costing more than it gives.
+    """
+    return " ".join(f"{i.get('quantity_raw') or ''} {i.get('unit_raw') or ''}"
+                    for i in (draft.get("ingredients") or [])).lower()
 
 
-def _text_of(draft: dict) -> str:
-    """Every text field of the draft, lowercased, as one string."""
+def _names_of(draft: dict) -> str:
+    return " ".join(str(i.get("name") or "") for i in (draft.get("ingredients") or [])).lower()
+
+
+def _all_text(draft: dict) -> str:
     parts = [str(draft.get(k) or "") for k in ("title", "description", "servings")]
     for i in draft.get("ingredients") or []:
         parts += [str(i.get(k) or "") for k in ("name", "notes", "group")]
@@ -162,77 +258,80 @@ def _text_of(draft: dict) -> str:
     return " ".join(parts).lower()
 
 
-def score(draft: dict, source: str, target: str) -> dict:
-    text = _text_of(draft)
-    names = " ".join(str(i.get("name") or "") for i in (draft.get("ingredients") or [])).lower()
+def score(draft: dict, case: dict, target: str) -> dict:
+    text, names = _all_text(draft), _names_of(draft)
+    units = _units_of(draft)
+    groups = {(i.get("group") or "").strip().lower() for i in (draft.get("ingredients") or [])}
+    groups.discard("")
 
-    if LANGUAGE_OF[source] == target:
-        language = None          # nothing has to change language: the axis does not apply
-        missed: list[str] = []
-    else:
-        # Searched across every text field, not just the names: a term like "verdure" is a
-        # group heading, and scoring it against the ingredient names only would mark a correct
-        # translation as a miss.
-        pairs = TERMS[(source, target)]
-        hits = [src for src, accepted in pairs if any(a in text for a in accepted)]
-        missed = [src for src, accepted in pairs if not any(a in text for a in accepted)]
-        language = len(hits) / len(pairs)
+    # Units: the axis the project rests on. A unit that changed before the code saw it is a
+    # wrong number that no later stage can catch.
+    wanted_units = case.get("units") or []
+    units_kept = sum(1 for u in wanted_units if u in units)
 
-    wanted = GROUPS[(source, target)]
-    groups = {str(i.get("group") or "").lower() for i in (draft.get("ingredients") or [])}
-    groups_ok = sum(1 for g in groups if g and any(w in g for w in wanted))
+    # Sections: every ingredient under a named heading has to be in the list.
+    sections = case.get("sections") or {}
+    listed = 0
+    for members in sections.values():
+        if any(m in names for m in members):
+            listed += 1
 
-    raw = " ".join(
-        f"{i.get('quantity_raw') or ''} {i.get('unit_raw') or ''}"
-        for i in (draft.get("ingredients") or [])
-    )
-    amounts_found = sum(1 for a in AMOUNTS[source] if a in raw)
+    invented = [g for g in groups
+                if any(bad in g for bad in (case.get("not_sections") or []))]
+
+    pairs = (case.get("terms") or {}).get(target, [])
+    missed = [src for src, ok in pairs if not any(a in text for a in ok)]
+    language = (len(pairs) - len(missed)) / len(pairs) if pairs else None
+
+    raw = " ".join(f"{i.get('quantity_raw') or ''} {i.get('unit_raw') or ''}"
+                   for i in (draft.get("ingredients") or []))
+    amounts = sum(1 for a in case["amounts"] if a in raw)
 
     return {
-        "language": language,
-        "missed": missed,
-        "groups_found": groups_ok,
-        "groups_expected": 2,
-        "amounts_found": amounts_found,
-        "amounts_expected": len(AMOUNTS[source]),
-        "n_ingredients": len(draft.get("ingredients") or []),
-        "gaps": len(draft.get("gaps") or []),
+        "units_kept": units_kept, "units_wanted": len(wanted_units),
+        "sections_listed": listed, "sections_wanted": len(sections),
+        "invented": invented,
+        "language": language, "missed": missed,
+        "amounts": amounts, "amounts_wanted": len(case["amounts"]),
+        "n": len(draft.get("ingredients") or []),
     }
 
 
 def main() -> int:
-    runs = int(sys.argv[1]) if len(sys.argv) > 1 else 1
+    rounds = int(sys.argv[1]) if len(sys.argv) > 1 else 1
     results = []
-    for run in range(runs):
-        for source in ("it", "it-list", "en"):
+    for _ in range(rounds):
+        for name, case in CASES.items():
             for target in ("it", "en"):
                 started = time.time()
-                draft = extract.extract_draft(
-                    caption=CAPTIONS[source], transcript="", title=TITLES[source],
-                    language=target,
-                ).draft
-                # The same decision the pipeline makes, from the same function.
-                if extract.needs_translation(CAPTIONS[source], draft, target):
+                draft = extract.extract_draft(caption=case["caption"],
+                                              transcript=case.get("transcript", ""),
+                                              title=case["title"], language=target).draft
+                if extract.needs_translation(case["caption"], draft, target):
                     draft = extract.translate_draft(draft, language=target)
-                s = score(draft, source, target)
-                s.update(run=run, source=source, target=target,
-                         seconds=round(time.time() - started, 1))
+                s = score(draft, case, target)
+                s.update(case=name, target=target, seconds=round(time.time() - started, 1))
                 results.append(s)
-                lang = "n/a " if s["language"] is None else f"{s['language']:.0%}"
-                print(f"  {source}->{target}  language={lang}  "
-                      f"groups={s['groups_found']}/2  amounts={s['amounts_found']}/{s['amounts_expected']}  "
-                      f"ingr={s['n_ingredients']}  {s['seconds']}s"
-                      + (f"   missed: {', '.join(s['missed'])}" if s["missed"] else ""))
+                lang = " n/a" if s["language"] is None else f"{s['language']:>4.0%}"
+                print(f"  {name:13}->{target}  units={s['units_kept']}/{s['units_wanted']}"
+                      f"  sections={s['sections_listed']}/{s['sections_wanted']}"
+                      f"  lang={lang}  amounts={s['amounts']}/{s['amounts_wanted']}"
+                      f"  ingr={s['n']}  {s['seconds']}s"
+                      + (f"  INVENTATI:{s['invented']}" if s["invented"] else "")
+                      + (f"  missed:{','.join(s['missed'])}" if s["missed"] else ""))
     print()
-    for source, target in (("it", "it"), ("it-list", "it"), ("en", "en"),
-                           ("en", "it"), ("it", "en"), ("it-list", "en")):
-        rows = [r for r in results if r["source"] == source and r["target"] == target]
-        langs = [r["language"] for r in rows if r["language"] is not None]
-        amounts = sum(r["amounts_found"] for r in rows) / sum(r["amounts_expected"] for r in rows)
-        groups = sum(r["groups_found"] for r in rows) / (2 * len(rows))
-        label = f"{source}->{target}"
-        lang = "n/a" if not langs else f"{sum(langs)/len(langs):.0%}"
-        print(f"{label:8} language={lang:>5}  groups={groups:.0%}  amounts={amounts:.0%}")
+    def pct(rows, a, b):
+        want = sum(r[b] for r in rows)
+        return "n/a" if not want else f"{sum(r[a] for r in rows) / want:.0%}"
+    for name in CASES:
+        for target in ("it", "en"):
+            rows = [r for r in results if r["case"] == name and r["target"] == target]
+            langs = [r["language"] for r in rows if r["language"] is not None]
+            print(f"{name:13}->{target}  units={pct(rows,'units_kept','units_wanted'):>4}"
+                  f"  sections={pct(rows,'sections_listed','sections_wanted'):>4}"
+                  f"  lang={'n/a' if not langs else f'{sum(langs)/len(langs):.0%}':>4}"
+                  f"  amounts={pct(rows,'amounts','amounts_wanted'):>4}"
+                  f"  invented={sum(len(r['invented']) for r in rows)}")
     print(json.dumps(results), file=sys.stderr)
     return 0
 
