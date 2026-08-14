@@ -9,10 +9,11 @@
 // interface.
 //
 // THREE AXES, NOT TWO. To the pair that already exists (the recipe's language, the system of
-// measurement) one is added that comes before them: the language **of the interface**. The
-// three form a chain, each with the previous one as its fallback — the interface decides the
-// recipe's language, which decides the system — so anyone who touches nothing gets a coherent
-// set, and anyone who wants to cross them still can.
+// measurement) one is added that comes before them: the language **of the interface**, which
+// decides the recipe's unless the recipe's is chosen. The **system follows neither**: it is
+// metric by default and chosen otherwise. It used to follow the language — English meaning
+// cups and ounces — which was wrong for most people who read recipes in English and cook in
+// grams.
 
 // The keys are English; the values obviously are not. It is the same split as the Python
 // catalogues (`units.MESSAGES`, `pipeline.TEXTS`): the key is code, the value is what a
@@ -62,7 +63,7 @@ const TEXTS = {
     lbl_recipe_language: 'Lingua della ricetta',
     language_as_interface: 'Come l’interfaccia',
     lbl_measures: 'Misure',
-    measures_as_language: 'Come la lingua',
+    measures_default: 'Metriche (predefinito)',
     measures_metric: 'Metriche (g, ml)',
     measures_imperial: 'Imperiali (cup, oz)',
     opt_no_audio: 'Usa solo la didascalia (salta l’audio)',
@@ -176,7 +177,7 @@ const TEXTS = {
     lbl_recipe_language: 'Recipe language',
     language_as_interface: 'Same as the interface',
     lbl_measures: 'Measurements',
-    measures_as_language: 'Same as the language',
+    measures_default: 'Metric (default)',
     measures_metric: 'Metric (g, ml)',
     measures_imperial: 'Imperial (cup, oz)',
     opt_no_audio: 'Use the caption only (skip the audio)',

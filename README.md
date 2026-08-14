@@ -169,25 +169,29 @@ the PDF uses `reportlab`, which `./install.sh` installs by itself (by hand:
 **The interface is bilingual**, Italian and English. The switch sits in the header, top
 right: the choice is remembered, and on first open it starts from your browser's language.
 
-From that choice a chain of three links descends, each falling back to the one before it: the
-**interface** decides the **recipe**'s language, which decides the **measurement system**.
-Change nothing and you get a coherent set; cross them at any link if you want to — an English
-interface with Italian recipes is a legitimate combination, and for someone who cooks in one
-language and lives in another it is the right one.
+The **interface**'s language decides the **recipe**'s, unless you say otherwise: change
+nothing and you get a coherent pair, and an English interface with Italian recipes is a
+legitimate combination — for someone who cooks in one language and lives in another it is the
+right one.
+
+The **measurement system is a third choice and does not follow either of them.** It defaults
+to metric whatever the language, and imperial is one flag away. It used to follow the
+language, English meaning cups and ounces, and that was wrong for most of the people it
+applied to: recipes are read in English in the United Kingdom, Ireland, Australia, Canada and
+India, and cooked in grams in all of them.
 
 There is no interface on the command line, so there the axes are two and start from the
 recipe:
 
 ```bash
-uv run r2r cook <url> --language en                    # recipe in English, imperial units
-uv run r2r cook <url> --language en --system metric    # English, but grams and ml
-uv run r2r cook <url> --system imperial                # Italian, but cups and ounces
+uv run r2r cook <url> --language en                      # recipe in English, grams and ml
+uv run r2r cook <url> --language en --system imperial    # English, with cups and ounces
+uv run r2r cook <url> --system imperial                  # Italian, with cups and ounces
 ```
 
-In the web interface the same two selectors live under *Options*, and by default follow the
-link above them. The system, if you do not choose one, follows the language (Italian →
-metric, English → imperial), but you can cross them: an English or Australian cook reads in
-English and weighs in grams.
+In the web interface the same two selectors live under *Options*: the recipe's language
+follows the interface unless you choose one, and the system is metric unless you choose
+otherwise.
 
 Then there is a further axis with nothing to do with those two, because it concerns the
 **input**: the language *spoken* in the reel, which Whisper needs in order to transcribe. By

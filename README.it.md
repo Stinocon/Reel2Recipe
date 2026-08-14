@@ -168,24 +168,27 @@ richiede nulla; il PDF usa `reportlab`, che `./install.sh` installa da sé (a ma
 **L'interfaccia è bilingue**, italiano e inglese. Il selettore sta in testata, in alto a
 destra: la scelta viene ricordata, e alla prima apertura si parte dalla lingua del browser.
 
-Da quella scelta scende una catena di tre anelli, ciascuno con il precedente come ripiego:
-l'**interfaccia** decide la lingua della **ricetta**, che decide il **sistema di misura**.
-Chi non tocca nulla ottiene un insieme coerente; chi vuole incrociarli può farlo a ogni
-anello — interfaccia in inglese e ricette in italiano è una combinazione legittima, e per
-chi cucina in una lingua e vive in un'altra è anzi quella giusta.
+La lingua dell'**interfaccia** decide quella della **ricetta**, se non dici altro: chi non
+tocca nulla ottiene una coppia coerente, e interfaccia in inglese con ricette in italiano è una
+combinazione legittima — per chi cucina in una lingua e vive in un'altra è anzi quella giusta.
+
+Il **sistema di misura è una terza scelta e non segue né l'una né l'altra.** Di base è
+metrico, qualunque sia la lingua, e l'imperiale è a un'opzione di distanza. Seguiva la lingua,
+inglese voleva dire cup e once, ed era sbagliato per la maggior parte delle persone a cui si
+applicava: le ricette si leggono in inglese nel Regno Unito, in Irlanda, in Australia, in
+Canada e in India, e in tutti questi posti si cucina in grammi.
 
 Da riga di comando l'interfaccia non c'è, quindi gli assi sono due e partono dalla ricetta:
 
 ```bash
-uv run r2r cook <url> --language en                    # ricetta in inglese, misure imperiali
-uv run r2r cook <url> --language en --system metric    # inglese, ma con grammi e ml
-uv run r2r cook <url> --system imperial                # italiano, ma con cup e once
+uv run r2r cook <url> --language en                      # ricetta in inglese, grammi e ml
+uv run r2r cook <url> --language en --system imperial    # inglese, con cup e once
+uv run r2r cook <url> --system imperial                  # italiano, con cup e once
 ```
 
-Nell'interfaccia web gli stessi due selettori stanno nelle *Opzioni*, e di base seguono
-l'anello che li precede. Il sistema, se non lo scegli, segue la lingua (italiano → metrico,
-inglese → imperiale), ma puoi incrociarli: un inglese o un australiano legge in inglese e
-cucina in grammi.
+Nell'interfaccia web gli stessi due selettori stanno nelle *Opzioni*: la lingua della ricetta
+segue quella dell'interfaccia finché non ne scegli una, e il sistema è metrico finché non
+scegli altro.
 
 C'è poi un terzo asse che non c'entra con questi due, perché riguarda l'**ingresso**: la
 lingua *parlata* nel reel, che serve a Whisper per trascrivere. Di base non gliela si dichiara
