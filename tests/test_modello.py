@@ -81,10 +81,32 @@ def draft() -> dict:
     ).draft
 
 
+def _reading_something(draft: dict) -> list[dict]:
+    """The ingredients, with a hard stop if the key is not the one the schema writes.
+
+    Almost every assertion in this module is of the form "the model did **not** do the wrong
+    thing", and that shape passes for free over an empty list. So a schema field renamed on
+    one side only would not turn this gate red — it would make it green while checking
+    nothing, which is the worst outcome available to a test that exists to protect the
+    project's central promise.
+
+    It nearly happened: when `ingredienti` became `ingredients` in `extract.py`, every
+    `draft.get("ingredienti")` in here started returning `None`, and
+    `test_it_does_not_invent_the_missing_amounts` would have passed on an empty list.
+    """
+    ingredients = draft.get("ingredients")
+    assert ingredients, (
+        f"the draft has no «ingredients»: the keys it does have are {sorted(draft)}. "
+        "Either the extraction failed or the schema's field names moved and this module was "
+        "not moved with them — in which case every assertion below is passing on nothing."
+    )
+    return ingredients
+
+
 def _ingredients_without_amount(draft: dict) -> list[dict]:
     return [
-        i for i in (draft.get("ingredienti") or [])
-        if any(word in (i.get("nome") or "").lower() for word in WITHOUT_AMOUNT)
+        i for i in _reading_something(draft)
+        if any(word in (i.get("name") or "").lower() for word in WITHOUT_AMOUNT)
     ]
 
 
@@ -92,7 +114,7 @@ def test_it_does_not_invent_the_missing_amounts(draft):
     """The test that matters. A list with no amounts has to stay with no amounts.
 
     What is checked is the appearance of a **number**, which is the real damage: a plausible
-    weight the cook does not know was invented. A word that ended up in `unita_raw` by mistake
+    weight the cook does not know was invented. A word that ended up in `unit_raw` by mistake
     (the 14b sends "polvere" for "Dashi in polvere") is not this problem, and is already
     neutralised downstream by `units.py`, which renders it as a note in brackets rather than
     as a unit.
@@ -101,9 +123,9 @@ def test_it_does_not_invent_the_missing_amounts(draft):
     change model or strengthen the prompt.
     """
     invented = [
-        (i.get("nome"), i.get("quantita_raw"), i.get("unita_raw"))
+        (i.get("name"), i.get("quantity_raw"), i.get("unit_raw"))
         for i in _ingredients_without_amount(draft)
-        if any(c.isdigit() for c in f"{i.get('quantita_raw') or ''} {i.get('unita_raw') or ''}")
+        if any(c.isdigit() for c in f"{i.get('quantity_raw') or ''} {i.get('unit_raw') or ''}")
     ]
     assert not invented, (
         "the model invented quantities for ingredients that had none in the caption: "
@@ -114,9 +136,9 @@ def test_it_does_not_invent_the_missing_amounts(draft):
 def test_it_reports_the_amount_that_was_there(draft):
     """The mirror of the previous one: caution must not become blindness. The pork's 80 g are
     written down, and they have to come out — raw, not converted."""
-    pork = [i for i in (draft.get("ingredienti") or []) if "maiale" in (i.get("nome") or "").lower()]
+    pork = [i for i in _reading_something(draft) if "maiale" in (i.get("name") or "").lower()]
     assert pork, "the pork has vanished from the extraction"
-    raw = f"{pork[0].get('quantita_raw') or ''} {pork[0].get('unita_raw') or ''}".lower()
+    raw = f"{pork[0].get('quantity_raw') or ''} {pork[0].get('unit_raw') or ''}".lower()
     assert "80" in raw, f"the stated amount was not reported: {raw!r}"
     # The model must not convert: 80 g do not become cups, ounces or anything else (§3).
     assert not any(u in raw for u in ("cup", "oz", "once")), f"the model converted: {raw!r}"
@@ -125,13 +147,13 @@ def test_it_reports_the_amount_that_was_there(draft):
 def test_it_declares_the_gaps(draft):
     """Inventing nothing is not enough: the hole also has to be declared, or the user does not
     know it is there."""
-    assert (draft.get("lacune") or []), "no gap declared despite three groups without amounts"
+    assert (draft.get("gaps") or []), "no gap declared despite three groups without amounts"
 
 
 def test_it_recognises_the_groups_written_with_a_colon(draft):
     """"Verdure:", "Salsa:" are how captions really group things. Less critical than the
     previous ones — a missed group is a degradation, not a danger."""
-    groups = {(i.get("gruppo") or "").strip().lower() for i in (draft.get("ingredienti") or [])}
+    groups = {(i.get("group") or "").strip().lower() for i in _reading_something(draft)}
     assert {"verdure", "salsa"} & groups, f"no group recognised: {groups}"
 
 
@@ -164,8 +186,8 @@ def italian_draft_from_english() -> dict:
 def test_it_translates_towards_italian(italian_draft_from_english):
     """An English reel asked for in Italian has to come out in Italian: it is the case of the
     Italian user watching an American video, the commonest one for this project."""
-    names = " ".join((i.get("nome") or "").lower()
-                     for i in (italian_draft_from_english.get("ingredienti") or []))
+    names = " ".join((i.get("name") or "").lower()
+                     for i in (italian_draft_from_english.get("ingredients") or []))
     # At least one clearly translated term: "eggs" -> "uova", "black pepper" -> "pepe".
     assert "uova" in names or "pepe" in names, f"names not translated into Italian: {names}"
 
@@ -250,8 +272,8 @@ def test_the_preparation_time_is_not_invented(ambiguous_recipe):
 
 
 def _raw(draft: dict, word: str) -> dict | None:
-    for i in draft.get("ingredienti") or []:
-        if word in (i.get("nome") or "").lower():
+    for i in _reading_something(draft):
+        if word in (i.get("name") or "").lower():
             return i
     return None
 
@@ -274,7 +296,7 @@ def test_a_vague_measure_received_does_not_become_a_false_gap(ambiguous_recipe, 
     raw = _raw(draft, word)
     assert raw, f"«{word}» has vanished from the extraction"
 
-    fields = " ".join(str(raw.get(c) or "") for c in ("nome", "quantita_raw", "unita_raw", "note"))
+    fields = " ".join(str(raw.get(c) or "") for c in ("name", "quantity_raw", "unit_raw", "notes"))
     # The dots are stripped from BOTH sides: "q.b." is impossible to tokenise reliably, and
     # normalising only the text being searched for produced a false skip.
     if expression.replace(".", "") not in fields.lower().replace(".", ""):

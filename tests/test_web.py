@@ -193,11 +193,11 @@ def _sample_recipe():
     from reel2recipe.recipe import Source, from_draft
 
     return from_draft(
-        {"titolo": "Torta di mele", "porzioni": "6 persone",
-         "ingredienti": [{"nome": "farina 00", "quantita_raw": "1", "unita_raw": "cup",
-                          "gruppo": "Per l'impasto"}],
-         "procedimento": ["Inforna a 180 °C."], "categorie": ["Dolci"],
-         "tempo_preparazione_min": 20, "tempo_cottura_min": 45, "lacune": []},
+        {"title": "Torta di mele", "servings": "6 persone",
+         "ingredients": [{"name": "farina 00", "quantity_raw": "1", "unit_raw": "cup",
+                          "group": "Per l'impasto"}],
+         "method": ["Inforna a 180 °C."], "categories": ["Dolci"],
+         "prep_time_min": 20, "cook_time_min": 45, "gaps": []},
         source=Source.now(url="https://x/y", author="nonna", platform="instagram"),
         images=["Zm90bw=="],
     )

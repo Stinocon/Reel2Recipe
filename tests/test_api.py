@@ -58,9 +58,9 @@ def _minimal_recipe() -> dict:
     from reel2recipe.recipe import Source, from_draft
 
     return from_draft(
-        {"titolo": "Pane", "porzioni": "2 persone",
-         "ingredienti": [{"nome": "farina 00", "quantita_raw": "250", "unita_raw": "g"}],
-         "procedimento": ["Impasta."], "lacune": []},
+        {"title": "Pane", "servings": "2 persone",
+         "ingredients": [{"name": "farina 00", "quantity_raw": "250", "unit_raw": "g"}],
+         "method": ["Impasta."], "gaps": []},
         source=Source.now(url="https://x/y", author="tester"),
     ).to_dict()
 
