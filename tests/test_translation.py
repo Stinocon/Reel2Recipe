@@ -508,3 +508,34 @@ def test_the_glossary_keeps_the_capitalisation_it_was_given(offline, original, e
     draft = {"ingredients": [{"name": original, "quantity_raw": "", "unit_raw": ""}]}
     out = extract.translate_draft(draft, language="en")
     assert out["ingredients"][0]["name"] == expected
+
+
+# ----------------------------------------------------------------------------------
+# The words a model writes when it means nothing
+# ----------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("written", ["null", "None", "NULL", "n/a", "nessuno", "  none  "])
+def test_a_word_meaning_nothing_becomes_nothing(written):
+    """Seen on qwen2.5:14b: `servings` came back as the string "null".
+
+    The schema types it as a string and tells the model that a missing yield is the empty
+    string — but `prep_time_min` sits right next to it accepting a real `null`, and the model
+    sometimes reaches for the word. `from_draft` does `draft.get("servings") or None`, and
+    "null" is truthy, so it reached the card: a recipe announcing it serves "null".
+
+    It is a small thing that makes the whole card untrustworthy, which is the category this
+    project cares about most.
+    """
+    cleaned = extract._clean_up({"title": "X", "servings": written, "method": [], "notes": [],
+                                 "ingredients": []})
+    assert cleaned["servings"] is None
+
+
+@pytest.mark.parametrize("kept", ["q.b.", "2 persone", "Nessuno di questi", "None pizza"])
+def test_a_real_value_that_merely_contains_such_a_word_survives(kept):
+    """Matched whole and case-insensitively, never as a substring. "q.b." is a real answer,
+    and a phrase that happens to start with "nessuno" is a phrase, not an absence."""
+    cleaned = extract._clean_up({"title": "X", "servings": kept, "method": [], "notes": [],
+                                 "ingredients": []})
+    assert cleaned["servings"] == kept

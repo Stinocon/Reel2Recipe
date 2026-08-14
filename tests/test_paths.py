@@ -41,3 +41,30 @@ def test_the_library_follows_the_variable(monkeypatch, tmp_path):
     with Library() as lib:
         assert Path(lib.path).is_file()
         assert Path(lib.path).parent == tmp_path / "dati"
+
+
+def test_the_suite_never_writes_into_the_real_workspace():
+    """The guard on the fixture in `conftest.py`, and the reason it exists.
+
+    `workspace/` holds two things that are not ours to touch: third-party material and the
+    user's own recipe library (AGENTS.md §7). The suite was writing into it anyway — the API's
+    export tests resolve `paths.export_folder()` for real, and `free_path()` adds `-2`, `-3`…
+    rather than overwrite, so **286 files named `pane-N.*`** had accumulated next to the user's
+    actual exports, one set per run.
+
+    A fixture that stops firing is worse than no fixture, and this one is autouse and silent,
+    which is the shape that stops firing without anybody noticing. So it is checked here: the
+    paths this run resolves must not be under the repository's own `workspace/`.
+    """
+    from reel2recipe import paths
+
+    real = paths.REPO_ROOT / "workspace"
+    for name, resolved in (("workspace", paths.workspace_folder()),
+                           ("export", paths.export_folder()),
+                           ("media", paths.media_folder()),
+                           ("database", paths.database_path())):
+        assert real not in resolved.parents and resolved != real, (
+            f"the suite is resolving the real {name} folder ({resolved}): the conftest fixture "
+            "that redirects R2R_WORKSPACE is not doing its job, and a test run is writing into "
+            "the user's own data"
+        )
