@@ -175,8 +175,8 @@ def test_with_a_number_the_unknown_unit_is_kept(t):
      ("una tazza", "latte")],
 )
 def test_the_split_off_leaves_counts_and_eyeball_measures_alone(t, quantity_raw, name):
-    """The unit recovery has to stay blind to anything that is not a unit of `unita.yaml`:
-    "tazza" and "pizzico" live in `vaghe.yaml` and are handled from there, not converted
+    """The unit recovery has to stay blind to anything that is not a unit of `units.yaml`:
+    "tazza" and "pizzico" live in `vague.yaml` and are handled from there, not converted
     here."""
     i = normalise_ingredient(name, quantity_raw, None, tables=t)
     assert i.quantity.provenance in {
@@ -247,7 +247,7 @@ def test_a_teaspoon_stays_a_teaspoon(t):
 def test_tbsp_becomes_cucchiai_in_the_plural(t):
     """2 tbsp = 2 × 14.787 = 29.57 ml → rounded to 30 ml.
 
-    Oil is marked `liquid` in `densita.yaml`, so the equivalent is expressed as a volume and
+    Oil is marked `liquid` in `densities.yaml`, so the equivalent is expressed as a volume and
     not as a weight: nobody weighs oil, they pour it.
     """
     i = normalise_ingredient("olio di oliva", "2", "tbsp", tables=t)
@@ -497,7 +497,7 @@ def test_the_imperial_system(t, name, quantity_raw, unit_raw, expected):
 
 
 def test_the_system_does_not_cross_density_towards_imperial(t):
-    """Towards metric a dry volume becomes a weight: that is why `densita.yaml` exists.
+    """Towards metric a dry volume becomes a weight: that is why `densities.yaml` exists.
     Towards imperial it does NOT, and that is not an oversight: "200 g di farina" rendered in
     cups would give 1.67 cup, a number no measuring cup can make."""
     metric = normalise_ingredient("farina 00", "1", "cup", tables=t)
@@ -711,7 +711,7 @@ def test_the_italian_message_has_balanced_brackets(t):
 def test_an_eyeball_measure_in_brackets_within_the_name(t, name, value, unit):
     """"1 bel pizzico di sale" arrives from the model as nome="sale (un pizzico)" with an empty
     quantity. Declaring "quantity not given" would be false: the measure is there, it is by
-    eye, and `vaghe.yaml` knows what it weighs. The third variant of the same pattern, from a
+    eye, and `vague.yaml` knows what it weighs. The third variant of the same pattern, from a
     real reel."""
     ingr = normalise_ingredient(name, "", "", tables=t)
     assert (ingr.quantity.value, ingr.quantity.unit) == (value, unit)
@@ -741,7 +741,7 @@ def test_a_name_made_only_of_the_parenthetical_stays_intact(t):
 
 @pytest.mark.parametrize("apostrophe", ["'", "’", "‘"])
 def test_the_typographic_apostrophe_does_not_hide_a_vague_measure(t, apostrophe):
-    """iOS keyboards and Instagram captions write the curly apostrophe, and `vaghe.yaml`'s
+    """iOS keyboards and Instagram captions write the curly apostrophe, and `vague.yaml`'s
     entries are written with the ASCII one. Without normalising them, "bicchiere d'acqua" came
     out as "1 bicchiere d'acqua acqua" with provenance `dichiarato`: a meaningless line
     presented as certain data, which is the failure this project exists to prevent."""
@@ -810,7 +810,7 @@ def test_a_real_unit_in_brackets_does_not_become_a_note(t, unit_raw, value, unit
 
 @pytest.mark.parametrize("name", ["frutta secca (noce)", "cioccolato (tazza)", "vino (bicchiere)"])
 def test_a_one_word_parenthetical_qualifies_the_ingredient(t, name):
-    """Many `vaghe.yaml` entries have single-word aliases — noce, tazza, bicchiere — which in
+    """Many `vague.yaml` entries have single-word aliases — noce, tazza, bicchiere — which in
     brackets after a name indicate its variety or its container, not its dose."""
     ingr = normalise_ingredient(name, "", "", tables=t)
     assert ingr.quantity.provenance is Provenance.ABSENT, ingr.mela_line()

@@ -23,7 +23,7 @@ that holds.
                translate  (second LLM call, ONLY when the material is not already in the
                      │     requested language — and the amounts are not in its payload)
                      ▼   RecipeDraft, its words in the requested language
-                  units    ← data/unita.yaml + densita.yaml + vaghe.yaml (language × system)
+                  units    ← data/units.yaml + densities.yaml + vague.yaml (language × system)
                      │
                      ▼   Recipe — metric quantities + provenance + gaps
               ┌──────┴──────┬─────────────┐
@@ -78,7 +78,7 @@ know is wrong does real damage. `extract.py`'s prompt imposes it on the model, `
 `recipe.py` honour it in code, and `tests/test_modello.py` verifies it against the local model
 actually installed — it is the gate protecting the project's central promise.
 
-The tables follow the same discipline: **every density in `data/densita.yaml` declares its
+The tables follow the same discipline: **every density in `data/densities.yaml` declares its
 `source`**, and a test demands it. A number without a provenance is a number you cannot trust.
 
 **Two axes, not one: `system` and `language`.** The product works in Italian/English and in
@@ -139,11 +139,11 @@ What the wrapper straightens out:
   brackets within the name ("sale (un pizzico)") and — when it really does not know where to put
   it — in the `note`. In all three the quantity arrived empty and the recipe declared "quantity
   not given in the reel": **a false gap**. They become an open-ended quantity or a declared
-  estimate. The criterion is that the text be a measure **known** to `vaghe.yaml`, not that it
+  estimate. The criterion is that the text be a measure **known** to `vague.yaml`, not that it
   sit in a particular field: "burro (a temperatura ambiente)" stays a note. And the comparison
   is **exact and anchored at the end**, never by containment, or "pomodori poco maturi" would
   become an open-ended quantity because a vague word appears in the middle. In brackets, **at
-  least two words** are also required: many `vaghe.yaml` entries have single-word aliases —
+  least two words** are also required: many `vague.yaml` entries have single-word aliases —
   noce, tazza, bicchiere, filo — which after a name indicate its variety or its container, not
   its dose. "frutta secca (noce)" is not ten grams of nuts.
 

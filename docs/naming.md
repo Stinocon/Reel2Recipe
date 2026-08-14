@@ -212,7 +212,7 @@ one cost is in the git history and in the modules themselves.
 
 | stays as it is | where it lives | why |
 |---|---|---|
-| `unita.yaml`, `densita.yaml`, `vaghe.yaml`, `ricette.db` | file names | `ricette.db` is a file on the user's disk; the three tables are in the repo and could move cheaply, but renaming them buys nothing the contents did not already buy |
+| `ricette.db` | the library's file name | it is a file on the **user's disk**, so renaming it means moving their library. The three conversion tables were on this row and came off it: they live in the repo, and once a fourth was about to join them the consistency was worth more than the churn — `units.yaml`, `densities.yaml`, `vague.yaml`, `ingredients.yaml` |
 | the kitchen vocabulary in `data/*.yaml` | `cucchiaio`, `farina 00`, `q.b.` | it is **data**, not naming: it is what the model writes and what the lookup matches against. The English aliases sit next to it, not instead of it |
 | the injection patterns in `tools/check-injection.sh` | the incoming boundary | they detect attempts written in Italian; translating them would be translating the thing being looked for |
 | the prompt **prose** and the delimiters in `extract.py` | the model contract | a local model follows the language it is spoken to in, so the Italian prompt is Italian and the English one English. The delimiters are a security boundary tuned as it is (`.claude/rules/input-non-fidato.md`). The schema's **field names** are English: they are structure |

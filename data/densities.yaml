@@ -1,4 +1,4 @@
-# densita.yaml — density per ingredient, for converting a VOLUME into a WEIGHT.
+# densities.yaml — density per ingredient, for converting a VOLUME into a WEIGHT.
 #
 # Why this file exists. "1 cup di farina" and "1 cup di zucchero" occupy the same volume but
 # weigh 120 g and 200 g: a difference of 67%. No volume→weight conversion is possible without
@@ -12,7 +12,7 @@
 # The **keys are English, the ingredient names are not**: they are what the model writes and
 # what the cook reads, and the lookup matches against them. `g_per_ml` is the only operative
 # value. The weight per cup quoted in `source` is the documentation it derives from:
-# g_per_ml = g_per_cup / 236.5882365 (the US cup, in unita.yaml). It is not read by the code:
+# g_per_ml = g_per_cup / 236.5882365 (the US cup, in units.yaml). It is not read by the code:
 # one datum, one place.
 #
 # The values for dry ingredients are for the ingredient poured and levelled, not packed, unless

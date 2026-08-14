@@ -1,15 +1,15 @@
-# unita.yaml — EXACT conversions between units of measurement.
+# units.yaml — EXACT conversions between units of measurement.
 #
 # There are no estimates in here. Every value is an official definition or a standard
 # equivalence (US customary → SI). The culinary approximations — "un pizzico", "q.b.",
-# "un filo d'olio" — live in `vaghe.yaml` and are labelled as estimates.
+# "un filo d'olio" — live in `vague.yaml` and are labelled as estimates.
 #
 # The keys of this file are English, the unit names are not: "cucchiaio" and "cucchiaino" are
 # the kitchen vocabulary the model produces and the cook reads, exactly like the ingredient
-# names in `densita.yaml`. The keys are code, the names are data.
+# names in `densities.yaml`. The keys are code, the names are data.
 #
 # Volume is always brought back to millilitres, weight always to grams. The volume→weight step
-# does NOT happen here: it needs the specific ingredient's density and lives in `densita.yaml`.
+# does NOT happen here: it needs the specific ingredient's density and lives in `densities.yaml`.
 # With no known density, nothing is converted (see units.py).
 #
 # updated: 2026-07-23
