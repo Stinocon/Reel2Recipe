@@ -159,13 +159,13 @@ destructive migration this migration is avoiding.
 
 | stays as it is | where it lives |
 |---|---|
-| `"metrico"`, `"imperiale"` | `System` values, `data/vaghe.yaml` and `unita.yaml` keys, stored recipes |
-| `"assente"`, `"dichiarato"`, `"convertito:unita"`, `"convertito:densita"`, `"conteggio"`, `"stimato:vaghe"`, `"indeterminato"` | `Provenance` values, stored recipes, `web/app.js` |
+| ~~`"metrico"`, `"imperiale"`~~ | **moved since**, to `"metric"`/`"imperial"`. `data/` lives in the repo so its keys were free; the stored recipes needed `LEGACY_SYSTEMS` and `system_from_stored` in `units.py` |
+| ~~`"assente"`, `"dichiarato"`, …~~ | **moved since**, to `"absent"`, `"declared"`, `"converted:unit"`, `"converted:density"`, `"count"`, `"estimated:vague"`, `"indeterminate"`. The net is `LEGACY_PROVENANCES` and `provenance_from_stored`, which falls back to `absent` rather than raising: `Provenance("dichiarato")` on the new enum raises `ValueError` **inside `from_dict`**, i.e. while the library is opening |
 | `quantita_raw`, `unita_raw` | the JSON schema the local model answers with (`extract.py`) — changing it means re-running the model gate |
 | `unita.yaml`, `densita.yaml`, `vaghe.yaml`, `ricette.db` | file names |
 | the keys inside `data/*.yaml` | renamed in their own step, together with their loader |
 | ~~the SQL table and column names in `store.py`~~ | **moved since.** They really were format, and the way out was the `ALTER TABLE` this table was avoiding — done once, in place, by `_migrate_italian_schema`. The lesson is narrower than "never rename format": a rename over stored data needs a migration and the tests to prove it, not a permanent exemption |
-| the **nested** keys of an ingredient and its quantity — `nome`, `note`, `gruppo`, `lacuna`, `riga`, `quantita`, and inside it `valore`, `valore_max`, `unita`, `provenienza`, `testo_originale`, `nota`, `sistema`, `incerta` | inside every stored recipe and read by `web/app.js`; `to_dict()` writes them as string literals, which is precisely what let `Ingredient` and `Quantity` be renamed for free |
+| ~~the **nested** keys of an ingredient and its quantity~~ | **moved since.** They are `name`, `notes`, `group`, `gap`, `line`, `quantity`, and inside it `value`, `value_max`, `unit`, `provenance`, `original_text`, `note`, `system`, `uncertain`. `LEGACY_KEYS` grew to cover them; being built from string literals was what let them stay, never a reason they had to |
 | the keys of the *draft* read by `from_draft` — `titolo`, `ingredienti`, `procedimento`, `porzioni`, `categorie`, `lacune`, `confidenza`, `descrizione`, `tempo_*_min` | the same JSON schema as `quantita_raw` above: it is `extract.py`'s output format, and it moves when `extract.py` does, with the model gate |
 
 One row that did **not** stay: the keys of the dictionary `Library.list_` returns. They looked

@@ -178,8 +178,8 @@ recipe:
 
 ```bash
 uv run r2r cook <url> --language en                    # recipe in English, imperial units
-uv run r2r cook <url> --language en --system metrico   # English, but grams and ml
-uv run r2r cook <url> --system imperiale               # Italian, but cups and ounces
+uv run r2r cook <url> --language en --system metric    # English, but grams and ml
+uv run r2r cook <url> --system imperial                # Italian, but cups and ounces
 ```
 
 In the web interface the same two selectors live under *Options*, and by default follow the
@@ -356,13 +356,15 @@ Technical documentation: [`docs/architecture.md`](docs/architecture.md).
 architecture document. The Italian you will still meet is deliberate, and it falls into four
 groups:
 
-- **Format that already exists on disk.** The nested keys of a stored recipe (`nome`,
-  `quantita`, `provenienza`) and the values of `Provenance` and `System` (`dichiarato`,
-  `metrico`). Renaming them means migrating every user's library, so `Recipe.from_dict` reads
-  both spellings. The SQL table and columns used to be in this group; they are English now,
-  and getting there took a real migration rather than a rename — `_migrate_italian_schema`
-  runs the `ALTER TABLE` once, in place, and the full-text index is rebuilt from the recipes
-  because a virtual table's columns cannot be renamed.
+- **Format that already exists on disk — now read, not written.** The nested keys of a
+  stored recipe (`nome`, `quantita`, `provenienza`) and the values of `Provenance` and
+  `System` (`dichiarato`, `metrico`) were the last Italian left in the stored shape. They are
+  English now at every level, keys and values alike, and the Italian survives only in the
+  **compatibility net** that keeps reading it: `LEGACY_KEYS` and `LEGACY_PROVENANCES` in
+  `recipe.py` and `units.py`. A recipe saved years ago still opens; it is rewritten in English
+  only when it is next saved, so the library is never half migrated at any moment. The SQL
+  table and columns went the same way one release earlier, with `_migrate_italian_schema`
+  doing the `ALTER TABLE` once, in place.
 - **The contract with the local model.** `extract.py`'s system prompts, its JSON schema and the
   delimiters that fence off untrusted input. They were tuned against a real model on real
   reels, and they move only together with a re-run of the model gate.

@@ -25,7 +25,7 @@ const STAGES = {
   done: { icon: 'fatto', key: 'stage_done' },
 };
 
-const ESTIMATE_PROVENANCES = new Set(['stimato:vaghe', 'indeterminato', 'assente']);
+const ESTIMATE_PROVENANCES = new Set(['estimated:vague', 'indeterminate', 'absent']);
 
 let currentRecipe = null;   // the freshly extracted recipe, not yet reviewed
 // These are needed to redraw the card when the language changes: without them the switch
@@ -339,12 +339,12 @@ function renderIngredients(recipe, lr) {
   for (const group of groups) {
     if (showGroups && group) html += `<li class="gruppo-titolo">${esc(group)}</li>`;
     for (const ing of recipe.ingredients.filter((i) => i.group === group)) {
-      const incerta = ESTIMATE_PROVENANCES.has(ing.quantita?.provenienza);
-      const tag = incerta
+      const uncertain = ESTIMATE_PROVENANCES.has(ing.quantity?.provenance);
+      const tag = uncertain
         ? `<span class="tag-provenienza stima">${esc(t('tag_estimate', {}, lr))}</span>`
         : '';
-      html += `<li class="ingrediente${incerta ? ' incerta' : ''}">
-        <span>${esc(ing.row)}</span>${tag}</li>`;
+      html += `<li class="ingrediente${uncertain ? ' incerta' : ''}">
+        <span>${esc(ing.line)}</span>${tag}</li>`;
     }
   }
   return html + '</ul>';
@@ -398,7 +398,7 @@ function openEditor(recipe) {
   const content = $('#modale-contenuto');
   // Textual editing: ingredients and steps one per line. Simple and direct — someone
   // correcting wants to fix two words, not fill in a twenty-field form.
-  const ingredientRows = (recipe.ingredients || []).map((i) => i.row).join('\n');
+  const ingredientRows = (recipe.ingredients || []).map((i) => i.line).join('\n');
   const methodRows = (recipe.method || []).join('\n');
 
   content.innerHTML = `
@@ -442,11 +442,13 @@ function applyEdits(recipe) {
     .map((r) => r.trim()).filter(Boolean)
     .map((row) => {
       if (row.startsWith('#')) { group = row.replace(/^#\s*/, ''); return null; }
+      // The shape has to be the one `to_dict()` writes, key for key: what comes out of the
+      // editor goes straight to `PUT /api/recipes/{id}` and is stored as it stands.
       return {
         name: row, group,
-        note: null, lacuna: null, row,
-        quantita: { provenienza: 'dichiarato', valore: null, unita: null,
-                    testo_originale: row, nota: null, uncertain: false },
+        notes: null, gap: null, line: row,
+        quantity: { provenance: 'declared', value: null, value_max: null, unit: null,
+                    original_text: row, note: null, system: 'metric', uncertain: false },
       };
     })
     .filter(Boolean);

@@ -64,8 +64,8 @@ class System(str, Enum):
     There are two axes because in reality they do not coincide.
     """
 
-    METRIC = "metrico"
-    IMPERIAL = "imperiale"
+    METRIC = "metric"
+    IMPERIAL = "imperial"
 
 
 # Messages addressed to whoever is cooking. They live here and not in the `data/` tables
@@ -109,7 +109,7 @@ def code_of(value) -> str:
     """The textual value of an enum, or the string as it is.
 
     Needed because `str()` on an enum that inherits from `str` does NOT give the value but
-    the qualified name: `str(System.IMPERIAL)` is "System.IMPERIAL", not "imperiale". It is a
+    the qualified name: `str(System.IMPERIAL)` is "System.IMPERIAL", not "imperial". It is a
     classic trip-up, and here it cost dearly: the comparison always failed silently and the
     imperial branch was never taken.
     """
@@ -142,19 +142,74 @@ def message(language: str, key: str, **data) -> str:
 
 
 class Provenance(str, Enum):
-    ABSENT = "assente"                        # the reel gave no quantity at all
-    DECLARED = "dichiarato"                   # already in the right unit, no conversion
-    CONVERTED_UNIT = "convertito:unita"       # exact conversion (oz→g, cup→ml, °F→°C)
-    CONVERTED_DENSITY = "convertito:densita"  # volume→weight via densita.yaml
-    COUNT = "conteggio"                       # counted pieces: 2 eggs, 3 cloves
-    ESTIMATED_VAGUE = "stimato:vaghe"         # estimate from vaghe.yaml — declared as such
-    INDETERMINATE = "indeterminato"           # "q.b.", "qualche": quantity not expressible
+    ABSENT = "absent"                        # the reel gave no quantity at all
+    DECLARED = "declared"                    # already in the right unit, no conversion
+    CONVERTED_UNIT = "converted:unit"        # exact conversion (oz→g, cup→ml, °F→°C)
+    CONVERTED_DENSITY = "converted:density"  # volume→weight via density.yaml
+    COUNT = "count"                          # counted pieces: 2 eggs, 3 cloves
+    ESTIMATED_VAGUE = "estimated:vague"      # estimate from vague.yaml — declared as such
+    INDETERMINATE = "indeterminate"          # "q.b.", "qualche": quantity not expressible
 
 
 # Provenances the interface must highlight, because they are not certain data.
 UNCERTAIN_PROVENANCES = frozenset(
     {Provenance.ESTIMATED_VAGUE, Provenance.INDETERMINATE, Provenance.ABSENT}
 )
+
+
+# --------------------------------------------------------------------------------------
+# The compatibility net over the stored values
+# --------------------------------------------------------------------------------------
+
+# The two enums above are not only code: their *values* are written inside every recipe in
+# the library — a quantity carries its `provenance`, a recipe and each of its quantities carry
+# their `system`. So the rename to English needed the same net the stored keys have, for the
+# same reason and with the same absence of an expiry date.
+#
+# The failure without it is worse than a wrong label. `Provenance("dichiarato")` on an enum
+# that no longer has that value raises `ValueError`, and it raises it inside `from_dict` —
+# while the library is being opened, which is the one operation that must never fail. A
+# missing translation shows an odd word; a missing net loses the library.
+LEGACY_PROVENANCES: dict[str, str] = {
+    "assente": Provenance.ABSENT.value,
+    "dichiarato": Provenance.DECLARED.value,
+    "convertito:unita": Provenance.CONVERTED_UNIT.value,
+    "convertito:densita": Provenance.CONVERTED_DENSITY.value,
+    "conteggio": Provenance.COUNT.value,
+    "stimato:vaghe": Provenance.ESTIMATED_VAGUE.value,
+    "indeterminato": Provenance.INDETERMINATE.value,
+}
+
+LEGACY_SYSTEMS: dict[str, str] = {
+    "metrico": System.METRIC.value,
+    "imperiale": System.IMPERIAL.value,
+}
+
+
+def provenance_from_stored(value) -> Provenance:
+    """The `Provenance` of a stored quantity, in either spelling.
+
+    Unknown values fall back to `ABSENT` rather than raising. That is not indulgence: the
+    honest answer to "I cannot tell where this number came from" is the one that makes the
+    interface flag it as uncertain, and `ABSENT` is in `UNCERTAIN_PROVENANCES`. Raising here
+    would refuse to open the library over one unreadable field.
+    """
+    raw = code_of(value) if value is not None else Provenance.ABSENT.value
+    try:
+        return Provenance(LEGACY_PROVENANCES.get(raw, raw))
+    except ValueError:
+        return Provenance.ABSENT
+
+
+def system_from_stored(value) -> str:
+    """The system of a stored recipe or quantity, in either spelling.
+
+    Falls back to metric, which is this project's default and the system every table is
+    complete in — an unrecognised value must not silently produce imperial numbers.
+    """
+    raw = code_of(value) if value is not None else System.METRIC.value
+    raw = LEGACY_SYSTEMS.get(raw, raw)
+    return raw if raw in {s.value for s in System} else System.METRIC.value
 
 
 # --------------------------------------------------------------------------------------

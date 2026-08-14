@@ -23,7 +23,6 @@ from .units import (
     UNCERTAIN_PROVENANCES,
     Ingredient,
     Language,
-    Provenance,
     Quantity,
     System,
     Tables,
@@ -31,6 +30,8 @@ from .units import (
     convert_temperatures_in_text,
     load_tables,
     normalise_ingredient,
+    provenance_from_stored,
+    system_from_stored,
     text_from,
 )
 
@@ -47,9 +48,18 @@ from .units import (
 # itself because `to_dict()` always emits the new spelling: lazy, non-destructive, and with no
 # moment where the library is half migrated.
 #
-# Only the top level needs this. The nested ingredient and quantity dictionaries are built by
-# `to_dict()` from string literals, so their keys were deliberately left in Italian and have
-# never changed — the rename of `Ingredient` and `Quantity` did not touch a single stored file.
+# It covers the **whole** recipe, nested dictionaries included. That was not always true: the
+# ingredient and quantity dictionaries are built by `to_dict()` from string literals rather
+# than from `asdict`, which decoupled them from the Python attributes and let `Ingredient` and
+# `Quantity` be renamed for free — so their keys stayed Italian for a release after everything
+# around them had moved. The decoupling was the reason they *could* stay, never a reason they
+# had to; when they moved, the literals changed on one side and this map grew on the other.
+#
+# The map is flat although the data is not, and that is deliberate: the English names do not
+# collide across levels. `notes` is the recipe's and `note` the quantity's, `gaps` the
+# recipe's and `gap` the ingredient's — different words, and `test_store.py` asserts that no
+# two levels ever claim the same one, because the day they did, one of them would silently
+# read the other's value.
 LEGACY_KEYS: dict[str, str] = {
     # Recipe
     "title": "titolo",
@@ -75,6 +85,20 @@ LEGACY_KEYS: dict[str, str] = {
     "platform": "piattaforma",
     "original_title": "titolo_originale",
     "acquired_at": "acquisita_il",
+    # Ingredient, nested inside "ingredients"
+    "name": "nome",
+    "group": "gruppo",
+    "gap": "lacuna",
+    "line": "riga",
+    "quantity": "quantita",
+    # Quantity, nested inside "quantity"
+    "value": "valore",
+    "value_max": "valore_max",
+    "unit": "unita",
+    "provenance": "provenienza",
+    "original_text": "testo_originale",
+    "note": "nota",
+    "uncertain": "incerta",
 }
 
 
@@ -200,26 +224,28 @@ class Recipe:
 
     def to_dict(self) -> dict:
         d = asdict(self)
-        # The ingredient dictionaries are rebuilt by hand rather than left to `asdict`, and the
-        # keys are Italian string literals on purpose: they are *format*, written inside every
-        # recipe in the library and read by `web/app.js`. Keeping them decoupled from the Python
-        # attribute names is what let `Ingredient` and `Quantity` be renamed without a migration.
+        # The ingredient dictionaries are rebuilt by hand rather than left to `asdict`. That
+        # decoupling is what let `Ingredient` and `Quantity` be renamed without touching a
+        # single stored recipe, and it is worth keeping for the same reason — but it is not a
+        # licence for the two sides to disagree in *language*. These literals are the stored
+        # format: writing them means every recipe saved from here on is English, and
+        # `from_dict` reads the old spelling through `LEGACY_KEYS` for the ones that are not.
         d["ingredients"] = [
             {
-                "nome": i.name,
-                "note": i.notes,
-                "gruppo": i.group,
-                "lacuna": i.gap,
-                "riga": i.mela_line(),
-                "quantita": {
-                    "valore": i.quantity.value,
-                    "valore_max": i.quantity.value_max,
-                    "unita": i.quantity.unit,
-                    "provenienza": i.quantity.provenance.value,
-                    "testo_originale": i.quantity.original_text,
-                    "nota": i.quantity.note,
-                    "sistema": i.quantity.system,
-                    "incerta": i.quantity.provenance in UNCERTAIN_PROVENANCES,
+                "name": i.name,
+                "notes": i.notes,
+                "group": i.group,
+                "gap": i.gap,
+                "line": i.mela_line(),
+                "quantity": {
+                    "value": i.quantity.value,
+                    "value_max": i.quantity.value_max,
+                    "unit": i.quantity.unit,
+                    "provenance": i.quantity.provenance.value,
+                    "original_text": i.quantity.original_text,
+                    "note": i.quantity.note,
+                    "system": i.quantity.system,
+                    "uncertain": i.quantity.provenance in UNCERTAIN_PROVENANCES,
                 },
             }
             for i in self.ingredients
@@ -241,21 +267,24 @@ class Recipe:
         """
         ingredients = []
         for i in stored_field(d, "ingredients", []) or []:
-            q = i.get("quantita") or {}
+            q = stored_field(i, "quantity") or {}
             ingredients.append(
                 Ingredient(
-                    name=i.get("nome", ""),
-                    notes=i.get("note"),
-                    group=i.get("gruppo"),
-                    gap=i.get("lacuna"),
+                    name=stored_field(i, "name", ""),
+                    notes=stored_field(i, "notes"),
+                    group=stored_field(i, "group"),
+                    gap=stored_field(i, "gap"),
                     quantity=Quantity(
-                        value=q.get("valore"),
-                        unit=q.get("unita"),
-                        provenance=Provenance(q.get("provenienza", "assente")),
-                        original_text=q.get("testo_originale", ""),
-                        value_max=q.get("valore_max"),
-                        note=q.get("nota"),
-                        system=q.get("sistema", System.METRIC.value),
+                        value=stored_field(q, "value"),
+                        unit=stored_field(q, "unit"),
+                        # Both of these go through the value net as well as the key net. A
+                        # stored quantity carries `"provenienza": "dichiarato"`, and the key
+                        # being readable is no use if the value it holds then raises.
+                        provenance=provenance_from_stored(stored_field(q, "provenance")),
+                        original_text=stored_field(q, "original_text", ""),
+                        value_max=stored_field(q, "value_max"),
+                        note=stored_field(q, "note"),
+                        system=system_from_stored(stored_field(q, "system")),
                     ),
                 )
             )
@@ -276,7 +305,7 @@ class Recipe:
             images=list(stored_field(d, "images") or []),
             transcript=stored_field(d, "transcript"),
             language=stored_field(d, "language", Language.IT.value),
-            system=stored_field(d, "system", System.METRIC.value),
+            system=system_from_stored(stored_field(d, "system")),
         )
 
 
@@ -352,10 +381,10 @@ def from_draft(
         # The direction depends on the system: towards metric you arrive at Celsius, towards
         # imperial at Fahrenheit. Saying it the wrong way round would be worse than not saying it.
         headings = {
-            "it": {"metrico": "Temperature convertite in Celsius: ",
-                   "imperiale": "Temperature convertite in Fahrenheit: "},
-            "en": {"metrico": "Temperatures converted to Celsius: ",
-                   "imperiale": "Temperatures converted to Fahrenheit: "},
+            "it": {"metric": "Temperature convertite in Celsius: ",
+                   "imperial": "Temperature convertite in Fahrenheit: "},
+            "en": {"metric": "Temperatures converted to Celsius: ",
+                   "imperial": "Temperatures converted to Fahrenheit: "},
         }
         notes.append(text_from(headings, language, code_of(system))
                      + ", ".join(dict.fromkeys(temperature_notes)))

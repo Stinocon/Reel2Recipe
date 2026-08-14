@@ -21,6 +21,7 @@ import sys
 from pathlib import Path
 
 from . import __version__
+from .units import LEGACY_SYSTEMS, System
 
 # ANSI colour codes, switched off when the output is not a terminal (a pipe, a log file).
 _TTY = sys.stdout.isatty()
@@ -233,19 +234,34 @@ def delete_command(args) -> int:
     return 0
 
 
+# Both spellings are accepted, for the same reason `--sistema` still is: a script written
+# before the rename keeps running. English first, because argparse prints `choices` in order
+# and the first one reads as the answer.
+#
+# The alternative was to refuse `metrico` outright. It would fail loudly — argparse exits 2 —
+# so it is not the silent kind of breakage, but it would break the one user this library
+# belongs to for nothing. `output_axes` normalises whichever arrives, so nothing downstream
+# ever sees the Italian value.
+SYSTEM_CHOICES = [s.value for s in System] + list(LEGACY_SYSTEMS)
+
+
 def output_axes(args) -> dict:
     """The language and system to pass to the pipeline.
 
     The system, when not asked for, follows the language: someone producing in English
     usually wants cups and ounces, someone producing in Italian wants grams. They stay
-    independent, though — an Australian writes `--lingua en --sistema metrico` and gets
+    independent, though — an Australian writes `--language en --system metric` and gets
     English with grams, which is the combination they would really use.
     """
     language = getattr(args, "language", "it")
     system = getattr(args, "system", None)
     if system is None:
-        system = "imperiale" if language == "en" else "metrico"
-    return {"language": language, "system": system}
+        system = System.IMPERIAL.value if language == "en" else System.METRIC.value
+    # `--system metrico` is still accepted, like every other Italian spelling on this command
+    # line, and is normalised here rather than at the twenty places downstream that compare
+    # against `System.METRIC`. Accepting a value and then never matching it would be worse
+    # than refusing it.
+    return {"language": language, "system": LEGACY_SYSTEMS.get(system, system)}
 
 
 def spoken_language(args) -> str | None:
@@ -410,7 +426,7 @@ def _parser() -> argparse.ArgumentParser:
                    default="it", choices=["it", "en"],
                    help="language of the recipe produced (default: it)")
     c.add_argument("--system", "--sistema", dest="system",
-                   default=None, choices=["metrico", "imperiale"],
+                   default=None, choices=SYSTEM_CHOICES,
                    help="measurement system (default: metric with --language it, imperial with en)")
     c.add_argument("--no-save", "--no-salva", dest="no_save", action="store_true",
                    help="do not save to the library")
@@ -427,7 +443,7 @@ def _parser() -> argparse.ArgumentParser:
     b.add_argument("--language", "--lingua", dest="language",
                    default="it", choices=["it", "en"])
     b.add_argument("--system", "--sistema", dest="system",
-                   default=None, choices=["metrico", "imperiale"])
+                   default=None, choices=SYSTEM_CHOICES)
     b.add_argument("--export", metavar="PATH", help="export everything to a single .melarecipes")
     b.set_defaults(func=batch_command)
 

@@ -49,8 +49,8 @@ remembering rather than calculating. So:
 - With no known density for an ingredient, the volume→weight conversion **is not done**: the
   volume is kept and the gap declared. Never an invented density.
 
-Every quantity carries its **provenance** (`dichiarato`, `convertito:densita`,
-`stimato:vaghe`, `indeterminato`, …), which the interface and the exports use to tell data
+Every quantity carries its **provenance** (`declared`, `converted:density`,
+`estimated:vague`, `indeterminate`, …), which the interface and the exports use to tell data
 from an estimate at a glance.
 
 **The golden rule: invent nothing.** It holds for the model and for the code, and not only for
@@ -103,7 +103,7 @@ What the wrapper straightens out:
 
 - **Quantity and unit contradicting each other.** Captions often write the same amount twice —
   "1¼ cups (300 ml) water" — and the model mixes the pieces. Out came "1 ml" of water instead of
-  300, with provenance `dichiarato`: a wrong number presented as certain. **The internally
+  300, with provenance `declared`: a wrong number presented as certain. **The internally
   coherent pair wins** ("1¼" and "cups" sit in the same piece of text, the "ml" comes from
   elsewhere in the sentence) and **the discrepancy is declared anyway**, even when the choice
   gets the value right: the source was ambiguous there and the cook has to know. Outside this

@@ -4,7 +4,7 @@
 # they are conventions of language. They have no exact value, but they do have a *typical*
 # one, and ignoring them would mean throwing away half a reel's ingredients.
 #
-# Every entry in here produces a quantity with provenance `stimato:vaghe`, which the interface
+# Every entry in here produces a quantity with provenance `estimated:vague`, which the interface
 # and the exports flag as an estimate. They are never presented as certain data: they are a
 # help, not a measurement.
 #
@@ -54,24 +54,24 @@ expressions:
       it: "un pizzico"
       en: "a pinch"
     value:
-      metrico: {quantity: 0.5, unit: g}
-      imperiale: {quantity: 0.125, unit: tsp}
+      metric: {quantity: 0.5, unit: g}
+      imperial: {quantity: 0.125, unit: tsp}
     alias: [pizzico, un pizzico di, a pinch, pinch]
   "una presa":
     name:
       it: "una presa"
       en: "a pinch"
     value:
-      metrico: {quantity: 1.0, unit: g}
-      imperiale: {quantity: 0.25, unit: tsp}
+      metric: {quantity: 1.0, unit: g}
+      imperial: {quantity: 0.25, unit: tsp}
     alias: [presa, una presa di]
   "una punta":
     name:
       it: "una punta"
       en: "a knife tip"
     value:
-      metrico: {quantity: 0.5, unit: g}
-      imperiale: {quantity: 0.125, unit: tsp}
+      metric: {quantity: 0.5, unit: g}
+      imperial: {quantity: 0.125, unit: tsp}
     alias: [punta di coltello, una punta di, knife tip]
 
   # ---- fats and liquids poured by eye ---------------------------------------
@@ -80,40 +80,40 @@ expressions:
       it: "un filo"
       en: "a drizzle"
     value:
-      metrico: {quantity: 5.0, unit: ml}
-      imperiale: {quantity: 1.0, unit: tsp}
+      metric: {quantity: 5.0, unit: ml}
+      imperial: {quantity: 1.0, unit: tsp}
     alias: [filo, un filo di, un giro, un giro di, a drizzle, drizzle]
   "una noce":
     name:
       it: "una noce"
       en: "a knob"
     value:
-      metrico: {quantity: 10.0, unit: g}
-      imperiale: {quantity: 2.0, unit: tsp}
+      metric: {quantity: 10.0, unit: g}
+      imperial: {quantity: 2.0, unit: tsp}
     alias: [noce, una noce di, noce di burro, a knob, knob of butter]
   "un bicchiere":
     name:
       it: "un bicchiere"
       en: "a glass"
     value:
-      metrico: {quantity: 200.0, unit: ml}
-      imperiale: {quantity: 0.75, unit: cup}
+      metric: {quantity: 200.0, unit: ml}
+      imperial: {quantity: 0.75, unit: cup}
     alias: [bicchiere, un bicchiere di, bicchiere d'acqua, a glass, glass]
   "mezzo bicchiere":
     name:
       it: "mezzo bicchiere"
       en: "half a glass"
     value:
-      metrico: {quantity: 100.0, unit: ml}
-      imperiale: {quantity: 0.375, unit: cup}
+      metric: {quantity: 100.0, unit: ml}
+      imperial: {quantity: 0.375, unit: cup}
     alias: [mezzo bicchiere di, half a glass]
   "una tazza":
     name:
       it: "una tazza"
       en: "a mug"
     value:
-      metrico: {quantity: 240.0, unit: ml}
-      imperiale: {quantity: 1.0, unit: cup}
+      metric: {quantity: 240.0, unit: ml}
+      imperial: {quantity: 1.0, unit: cup}
     alias: [tazza, una tazza di, tazzina, a mug, mug]
 
   # ---- quantities by the handful ---------------------------------------------
@@ -122,16 +122,16 @@ expressions:
       it: "una manciata"
       en: "a handful"
     value:
-      metrico: {quantity: 30.0, unit: g}
-      imperiale: {quantity: 0.25, unit: cup}
+      metric: {quantity: 30.0, unit: g}
+      imperial: {quantity: 0.25, unit: cup}
     alias: [manciata, una manciata di, a handful, handful]
   "un mazzetto":
     name:
       it: "un mazzetto"
       en: "a bunch"
     value:
-      metrico: {quantity: 20.0, unit: g}
-      imperiale: {quantity: 0.75, unit: oz}
+      metric: {quantity: 20.0, unit: g}
+      imperial: {quantity: 0.75, unit: oz}
     alias: [mazzetto, un mazzetto di, un ciuffo, ciuffo, un mazzo, a bunch, bunch]
 
   # ---- counted pieces --------------------------------------------------------
@@ -140,16 +140,16 @@ expressions:
       it: "uno spicchio"
       en: "a clove"
     value:
-      metrico: {quantity: 5.0, unit: g}
-      imperiale: {quantity: 1.0, unit: tsp}
+      metric: {quantity: 5.0, unit: g}
+      imperial: {quantity: 1.0, unit: tsp}
     alias: [spicchio, uno spicchio di, clove, a clove]
   "una fetta":
     name:
       it: "una fetta"
       en: "a slice"
     value:
-      metrico: {quantity: 25.0, unit: g}
-      imperiale: {quantity: 1.0, unit: oz}
+      metric: {quantity: 25.0, unit: g}
+      imperial: {quantity: 1.0, unit: oz}
     alias: [fetta, una fetta di, slice, a slice]
 
   # ---- counting multipliers (they produce no weight) -------------------------

@@ -47,7 +47,7 @@ from .mela import write_melarecipe, write_melarecipes, to_melarecipe
 from .paths import REPO_ROOT, export_folder
 from .recipe import Recipe
 from .store import Library
-from .units import Catalogue, text_from
+from .units import Catalogue, System, text_from
 
 WEB_FOLDER = REPO_ROOT / "web"
 
@@ -164,7 +164,8 @@ class CookRequest(BaseModel):
 
     def axes(self) -> dict:
         return {"language": self.language,
-                "system": self.system or ("imperiale" if self.language == "en" else "metrico")}
+                "system": self.system or (System.IMPERIAL.value if self.language == "en"
+                                          else System.METRIC.value)}
 
 
 # --------------------------------------------------------------------------------------
