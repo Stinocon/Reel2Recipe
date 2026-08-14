@@ -12,12 +12,18 @@ The database lives in `workspace/`, so outside git: it holds third-party materia
 `workspace/` actually is, is `paths.py`'s decision — in the add-on's container it is a
 persistent volume, not a folder next to the repo.
 
-**The SQL below stays in Italian, deliberately.** Table and column names are not code, they
-are *format*: they are written inside every database already on a user's disk. Renaming them
-would mean an `ALTER TABLE` over live data, which is exactly the destructive migration this
-rename is built to avoid (see docs/naming.md). The same goes for the keys of the dictionary
-`list_` returns: they mirror the stored JSON, and they change when `Recipe`'s fields do, in
-one commit together with the frontend that reads them.
+**The SQL is English, and getting there needed a migration rather than a rename.** Table and
+column names are not code, they are *format*: they are written inside every database already
+on a user's disk, so `ricette`/`titolo`/`dati` could not simply be retyped as
+`recipes`/`title`/`data` — a database written by an older version would have stopped opening,
+which for a library whose whole point is finding a recipe six months later is the worst
+failure available. `_migrate_italian_schema` below does the `ALTER TABLE` once, in place.
+
+The migration reads the **schema itself** rather than a `user_version` stamp. A version
+number is a second source of truth that can disagree with the thing it describes — restore a
+backup, copy a file between machines, and it lies — whereas `sqlite_master` cannot be wrong
+about what the tables are actually called. It also means the migration is idempotent by
+construction: it looks for `ricette`, and after it has run there is none.
 """
 
 from __future__ import annotations
@@ -33,30 +39,45 @@ from . import paths
 from .recipe import Recipe, stored_field
 
 SCHEMA = """
-CREATE TABLE IF NOT EXISTS ricette (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    titolo        TEXT NOT NULL,
-    dati          TEXT NOT NULL,          -- the whole Recipe as JSON
-    url           TEXT,                   -- source, used for deduplication
-    autore        TEXT,
-    piattaforma   TEXT,
-    ha_incertezze INTEGER NOT NULL DEFAULT 0,
-    creata_il     TEXT NOT NULL,
-    aggiornata_il TEXT NOT NULL
+CREATE TABLE IF NOT EXISTS recipes (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    title             TEXT NOT NULL,
+    data              TEXT NOT NULL,      -- the whole Recipe as JSON
+    url               TEXT,               -- source, used for deduplication
+    author            TEXT,
+    platform          TEXT,
+    has_uncertainties INTEGER NOT NULL DEFAULT 0,
+    created_at        TEXT NOT NULL,
+    updated_at        TEXT NOT NULL
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_ricette_url
-    ON ricette(url) WHERE url IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_recipes_url
+    ON recipes(url) WHERE url IS NOT NULL;
 
 -- Full-text index. A standard FTS5 table (not "contentless"): it keeps its own copy of the
 -- text and in exchange supports DELETE and UPDATE by rowid, which are needed when a recipe
 -- is corrected or removed. Duplicating the text is irrelevant for a personal library.
 -- `remove_diacritics 2` makes the search insensitive to accents.
-CREATE VIRTUAL TABLE IF NOT EXISTS ricette_fts USING fts5(
-    titolo, ingredienti, procedimento, categorie,
+CREATE VIRTUAL TABLE IF NOT EXISTS recipes_fts USING fts5(
+    title, ingredients, method, categories,
     tokenize='unicode61 remove_diacritics 2'
 );
 """
+
+# The Italian schema, as written by every version up to this one. The values are the columns
+# it becomes; the table itself goes `ricette` -> `recipes` and the index with it.
+#
+# `url` and `id` are absent because they never changed — listing them would suggest they are
+# part of the rename and invite the next reader to "complete" the map.
+LEGACY_COLUMNS = {
+    "titolo": "title",
+    "dati": "data",
+    "autore": "author",
+    "piattaforma": "platform",
+    "ha_incertezze": "has_uncertainties",
+    "creata_il": "created_at",
+    "aggiornata_il": "updated_at",
+}
 
 
 class LibraryError(RuntimeError):
@@ -81,33 +102,72 @@ class Library:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(self.path)
         self._conn.row_factory = sqlite3.Row
+        # The rename comes **before** the schema is applied, and the order is not cosmetic:
+        # `CREATE TABLE IF NOT EXISTS recipes` on an Italian database would create a second,
+        # empty table next to the full `ricette`, and the rename would then fail against a
+        # name already taken — leaving a library that opens and shows nothing.
+        self._migrate_italian_schema()
         self._conn.executescript(SCHEMA)
         self._conn.commit()
-        self._migrate_contentless_fts()
+        self._rebuild_index_if_stale()
 
-    def _migrate_contentless_fts(self) -> None:
-        """Rebuilds the full-text index if it is still in the old "contentless" shape.
+    def _migrate_italian_schema(self) -> None:
+        """Renames the table and its columns from Italian to English, once, in place.
 
-        Early versions created `ricette_fts` with `content=''`, which does not allow
-        DELETE: removing or correcting a recipe raised `cannot DELETE from contentless
-        fts5 table`. The schema was fixed, but `CREATE VIRTUAL TABLE IF NOT EXISTS` does
-        not touch a table that already exists — so databases created before stayed broken
-        silently, and only someone trying to delete something would find out.
-
-        The index is rebuilt, not the recipes: the real data is in `ricette` and is not
-        touched. It costs one reindex, once.
+        `ALTER TABLE ... RENAME COLUMN` keeps the rows where they are: nothing is copied and
+        nothing is rewritten, so a library of a thousand recipes costs the same as an empty
+        one. The full-text index is the exception — a virtual table's columns cannot be
+        renamed — so it is dropped here and rebuilt by `_rebuild_index_if_stale`, which finds
+        it empty against a full `recipes` and refills it. Dropping the index is safe in a way
+        that dropping the table would not be: it holds a *copy* of text whose original is in
+        `recipes`.
         """
-        row = self._conn.execute(
-            "SELECT sql FROM sqlite_master WHERE type='table' AND name='ricette_fts'"
-        ).fetchone()
-        if not row or "content=''" not in (row["sql"] or ""):
+        names = {r["name"] for r in self._conn.execute("SELECT name FROM sqlite_master")}
+        if "ricette" not in names or "recipes" in names:
             return
 
         with self._transaction() as c:
-            c.execute("DROP TABLE ricette_fts")
+            c.execute("DROP INDEX IF EXISTS idx_ricette_url")
+            c.execute("DROP TABLE IF EXISTS ricette_fts")
+            c.execute("ALTER TABLE ricette RENAME TO recipes")
+            present = {r["name"] for r in c.execute("PRAGMA table_info(recipes)")}
+            for old, new in LEGACY_COLUMNS.items():
+                # A column at a time, and only if it is there: a database from a version
+                # halfway through this history is a real possibility, and the alternative
+                # is a migration that raises on the one library it was written for.
+                if old in present:
+                    c.execute(f"ALTER TABLE recipes RENAME COLUMN {old} TO {new}")
+
+    def _rebuild_index_if_stale(self) -> None:
+        """Rebuilds the full-text index when it does not match the recipes.
+
+        Two different histories end up here, and they need the same repair. **The old
+        contentless index:** early versions created the FTS table with `content=''`, which
+        does not allow DELETE — removing or correcting a recipe raised `cannot DELETE from
+        contentless fts5 table`. The schema was fixed, but `CREATE VIRTUAL TABLE IF NOT
+        EXISTS` does not touch a table that already exists, so databases created before
+        stayed broken silently and only someone trying to delete something found out. **The
+        rename above:** it drops the index, so it comes back empty against a full table.
+
+        Comparing the two counts covers both without either having to know about the other,
+        and it is the honest question anyway — an index that disagrees with the data is stale
+        whatever made it so. Only the index is rebuilt; the recipes themselves are never
+        touched.
+        """
+        row = self._conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='recipes_fts'"
+        ).fetchone()
+        contentless = bool(row) and "content=''" in (row["sql"] or "")
+        if not contentless:
+            indexed = self._conn.execute("SELECT COUNT(*) AS n FROM recipes_fts").fetchone()["n"]
+            if indexed == self.count():
+                return
+
+        with self._transaction() as c:
+            c.execute("DROP TABLE IF EXISTS recipes_fts")
             c.executescript(SCHEMA)
-            for r in c.execute("SELECT id, dati FROM ricette").fetchall():
-                self._index(c, r["id"], Recipe.from_dict(json.loads(r["dati"])))
+            for r in c.execute("SELECT id, data FROM recipes").fetchall():
+                self._index(c, r["id"], Recipe.from_dict(json.loads(r["data"])))
 
     # ---- lifecycle ----------------------------------------------------------------
 
@@ -149,8 +209,8 @@ class Library:
         now = _now()
         with self._transaction() as c:
             cursor = c.execute(
-                """INSERT INTO ricette (titolo, dati, url, autore, piattaforma,
-                                        ha_incertezze, creata_il, aggiornata_il)
+                """INSERT INTO recipes (title, data, url, author, platform,
+                                       has_uncertainties, created_at, updated_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     recipe.title, data, url,
@@ -168,8 +228,8 @@ class Library:
         ingredient by hand in the interface."""
         with self._transaction() as c:
             changed = c.execute(
-                """UPDATE ricette
-                      SET titolo = ?, dati = ?, autore = ?, ha_incertezze = ?, aggiornata_il = ?
+                """UPDATE recipes
+                      SET title = ?, data = ?, author = ?, has_uncertainties = ?, updated_at = ?
                     WHERE id = ?""",
                 (
                     recipe.title, recipe.to_json(indent=None),
@@ -179,19 +239,19 @@ class Library:
             ).rowcount
             if not changed:
                 raise LibraryError(f"No recipe with id {identifier}")
-            c.execute("DELETE FROM ricette_fts WHERE rowid = ?", (identifier,))
+            c.execute("DELETE FROM recipes_fts WHERE rowid = ?", (identifier,))
             self._index(c, identifier, recipe)
 
     def delete(self, identifier: int) -> bool:
         with self._transaction() as c:
-            deleted = c.execute("DELETE FROM ricette WHERE id = ?", (identifier,)).rowcount
-            c.execute("DELETE FROM ricette_fts WHERE rowid = ?", (identifier,))
+            deleted = c.execute("DELETE FROM recipes WHERE id = ?", (identifier,)).rowcount
+            c.execute("DELETE FROM recipes_fts WHERE rowid = ?", (identifier,))
         return bool(deleted)
 
     @staticmethod
     def _index(c: sqlite3.Connection, identifier: int, recipe: Recipe) -> None:
         c.execute(
-            "INSERT INTO ricette_fts (rowid, titolo, ingredienti, procedimento, categorie) "
+            "INSERT INTO recipes_fts (rowid, title, ingredients, method, categories) "
             "VALUES (?, ?, ?, ?, ?)",
             (
                 identifier,
@@ -206,12 +266,12 @@ class Library:
 
     def read(self, identifier: int) -> Recipe | None:
         row = self._conn.execute(
-            "SELECT dati FROM ricette WHERE id = ?", (identifier,)
+            "SELECT data FROM recipes WHERE id = ?", (identifier,)
         ).fetchone()
-        return Recipe.from_dict(json.loads(row["dati"])) if row else None
+        return Recipe.from_dict(json.loads(row["data"])) if row else None
 
     def id_for_url(self, url: str) -> int | None:
-        row = self._conn.execute("SELECT id FROM ricette WHERE url = ?", (url,)).fetchone()
+        row = self._conn.execute("SELECT id FROM recipes WHERE url = ?", (url,)).fetchone()
         return int(row["id"]) if row else None
 
     def list_(self, search: str | None = None, limit: int = 200, offset: int = 0) -> list[dict]:
@@ -221,9 +281,9 @@ class Library:
         ingredients and whether there are uncertainties to review.
 
         The keys of what comes out are English, and they moved in the same commit as
-        `Recipe`'s fields and `web/app.js`, which is the only thing that reads them. They are
-        not *format*: nothing on disk is keyed this way — the SQL columns just above and the
-        stored JSON are, and both of those stayed as they were.
+        `Recipe`'s fields and `web/app.js`, which is the only thing that reads them. They were
+        never *format* — nothing on disk was ever keyed this way — which is why they could
+        move on their own, a release before the SQL columns above needed a migration to.
 
         What is read out of the stored JSON goes through `stored_field`, for the same reason
         `Recipe.from_dict` does: a recipe saved before the migration still has Italian keys in
@@ -232,33 +292,33 @@ class Library:
         """
         if search and search.strip():
             rows = self._conn.execute(
-                """SELECT r.id, r.titolo, r.autore, r.url, r.piattaforma,
-                          r.ha_incertezze, r.creata_il, r.dati
-                     FROM ricette_fts f
-                     JOIN ricette r ON r.id = f.rowid
-                    WHERE ricette_fts MATCH ?
+                """SELECT r.id, r.title, r.author, r.url, r.platform,
+                          r.has_uncertainties, r.created_at, r.data
+                     FROM recipes_fts f
+                     JOIN recipes r ON r.id = f.rowid
+                    WHERE recipes_fts MATCH ?
                     ORDER BY rank
                     LIMIT ? OFFSET ?""",
                 (_fts_query(search), limit, offset),
             ).fetchall()
         else:
             rows = self._conn.execute(
-                """SELECT id, titolo, autore, url, piattaforma, ha_incertezze, creata_il, dati
-                     FROM ricette ORDER BY creata_il DESC LIMIT ? OFFSET ?""",
+                """SELECT id, title, author, url, platform, has_uncertainties, created_at, data
+                     FROM recipes ORDER BY created_at DESC LIMIT ? OFFSET ?""",
                 (limit, offset),
             ).fetchall()
 
         result = []
         for row in rows:
-            data = json.loads(row["dati"])
+            data = json.loads(row["data"])
             result.append({
                 "id": row["id"],
-                "title": row["titolo"],
-                "author": row["autore"],
+                "title": row["title"],
+                "author": row["author"],
                 "url": row["url"],
-                "platform": row["piattaforma"],
-                "has_uncertainties": bool(row["ha_incertezze"]),
-                "created_at": row["creata_il"],
+                "platform": row["platform"],
+                "has_uncertainties": bool(row["has_uncertainties"]),
+                "created_at": row["created_at"],
                 "servings": stored_field(data, "servings"),
                 "total_time_min": stored_field(data, "total_time_min"),
                 "categories": stored_field(data, "categories") or [],
@@ -268,11 +328,11 @@ class Library:
         return result
 
     def all_recipes(self) -> list[Recipe]:
-        rows = self._conn.execute("SELECT dati FROM ricette ORDER BY creata_il DESC").fetchall()
-        return [Recipe.from_dict(json.loads(r["dati"])) for r in rows]
+        rows = self._conn.execute("SELECT data FROM recipes ORDER BY created_at DESC").fetchall()
+        return [Recipe.from_dict(json.loads(r["data"])) for r in rows]
 
     def count(self) -> int:
-        return int(self._conn.execute("SELECT COUNT(*) AS n FROM ricette").fetchone()["n"])
+        return int(self._conn.execute("SELECT COUNT(*) AS n FROM recipes").fetchone()["n"])
 
 
 def _fts_query(search: str) -> str:

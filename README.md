@@ -356,10 +356,13 @@ Technical documentation: [`docs/architecture.md`](docs/architecture.md).
 architecture document. The Italian you will still meet is deliberate, and it falls into four
 groups:
 
-- **Format that already exists on disk.** The SQL column names in `store.py`, the nested keys
-  of a stored recipe (`nome`, `quantita`, `provenienza`), the values of `Provenance` and
-  `System` (`dichiarato`, `metrico`). Renaming them would mean migrating every user's library.
-  `Recipe.from_dict` reads both spellings for exactly this reason.
+- **Format that already exists on disk.** The nested keys of a stored recipe (`nome`,
+  `quantita`, `provenienza`) and the values of `Provenance` and `System` (`dichiarato`,
+  `metrico`). Renaming them means migrating every user's library, so `Recipe.from_dict` reads
+  both spellings. The SQL table and columns used to be in this group; they are English now,
+  and getting there took a real migration rather than a rename — `_migrate_italian_schema`
+  runs the `ALTER TABLE` once, in place, and the full-text index is rebuilt from the recipes
+  because a virtual table's columns cannot be renamed.
 - **The contract with the local model.** `extract.py`'s system prompts, its JSON schema and the
   delimiters that fence off untrusted input. They were tuned against a real model on real
   reels, and they move only together with a re-run of the model gate.

@@ -148,9 +148,9 @@ def test_the_migration_keeps_the_recipes_and_the_search(tmp_path):
     # The index is put back into the old shape, simulating a database born before the fix.
     conn = sqlite3.connect(path)
     conn.executescript("""
-        DROP TABLE ricette_fts;
-        CREATE VIRTUAL TABLE ricette_fts USING fts5(
-            titolo, ingredienti, procedimento, categorie,
+        DROP TABLE recipes_fts;
+        CREATE VIRTUAL TABLE recipes_fts USING fts5(
+            title, ingredients, method, categories,
             content='', tokenize='unicode61 remove_diacritics 2');
     """)
     conn.commit()
@@ -303,20 +303,7 @@ def test_the_library_opens_and_lists_an_old_recipe(tmp_path):
     import sqlite3
 
     path = tmp_path / "vecchia.db"
-    with Library(path):
-        pass        # let the Library itself create the schema
-
-    conn = sqlite3.connect(path)
-    conn.execute(
-        """INSERT INTO ricette (titolo, dati, url, autore, piattaforma, ha_incertezze,
-                                creata_il, aggiornata_il)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-        ("Torta di mele della nonna", json.dumps(OLD_RECIPE, ensure_ascii=False),
-         OLD_RECIPE["fonte"]["url"], "nonna", "instagram", 1,
-         "2025-01-01T10:00:00+00:00", "2025-01-01T10:00:00+00:00"),
-    )
-    conn.commit()
-    conn.close()
+    _italian_database(path, [("Torta di mele della nonna", OLD_RECIPE)])
 
     with Library(path) as library:
         entry = library.list_()[0]
@@ -331,3 +318,142 @@ def test_the_library_opens_and_lists_an_old_recipe(tmp_path):
         reread = library.read(entry["id"])
         assert reread.title == "Torta di mele della nonna"
         assert reread.source.author == "nonna"
+
+
+# ----------------------------------------------------------------------------------
+# The Italian -> English schema migration
+# ----------------------------------------------------------------------------------
+
+# The schema exactly as every version up to the rename wrote it. It is written out by hand
+# and not generated: the point of these tests is a database this code can no longer produce,
+# so deriving it from the current `SCHEMA` would make them agree with themselves and prove
+# nothing.
+ITALIAN_SCHEMA = """
+CREATE TABLE ricette (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    titolo        TEXT NOT NULL,
+    dati          TEXT NOT NULL,
+    url           TEXT,
+    autore        TEXT,
+    piattaforma   TEXT,
+    ha_incertezze INTEGER NOT NULL DEFAULT 0,
+    creata_il     TEXT NOT NULL,
+    aggiornata_il TEXT NOT NULL
+);
+CREATE UNIQUE INDEX idx_ricette_url ON ricette(url) WHERE url IS NOT NULL;
+CREATE VIRTUAL TABLE ricette_fts USING fts5(
+    titolo, ingredienti, procedimento, categorie,
+    tokenize='unicode61 remove_diacritics 2');
+"""
+
+
+def _italian_database(path, recipes) -> None:
+    """Builds a database in the pre-migration shape, with its full-text index populated."""
+    import json
+    import sqlite3
+
+    conn = sqlite3.connect(path)
+    conn.executescript(ITALIAN_SCHEMA)
+    for title, payload in recipes:
+        cursor = conn.execute(
+            """INSERT INTO ricette (titolo, dati, url, autore, piattaforma, ha_incertezze,
+                                    creata_il, aggiornata_il)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (title, json.dumps(payload, ensure_ascii=False),
+             (payload.get("fonte") or {}).get("url"), "nonna", "instagram", 1,
+             "2025-01-01T10:00:00+00:00", "2025-01-01T10:00:00+00:00"),
+        )
+        conn.execute(
+            "INSERT INTO ricette_fts (rowid, titolo, ingredienti, procedimento, categorie) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (cursor.lastrowid, title,
+             " ".join(i["nome"] for i in payload.get("ingredienti", [])),
+             " ".join(payload.get("procedimento", [])),
+             " ".join(payload.get("categorie", []))),
+        )
+    conn.commit()
+    conn.close()
+
+
+def test_an_italian_database_migrates_and_keeps_everything(tmp_path):
+    """The library written by every previous version has to keep opening, with its recipes.
+
+    This is the whole reason the columns needed a migration instead of a rename: they are
+    written inside a file on the user's disk. A retyped `SELECT title FROM recipes` against
+    a database holding `ricette` does not degrade gracefully — it raises `no such table`
+    while the library is being opened, which is the one operation that must never fail.
+    """
+    path = tmp_path / "italiana.db"
+    _italian_database(path, [("Torta di mele della nonna", OLD_RECIPE)])
+
+    with Library(path) as library:
+        assert library.count() == 1
+        recipe = library.all_recipes()[0]
+        assert recipe.title == "Torta di mele della nonna"
+        assert [i.name for i in recipe.ingredients] == ["farina 00", "cannella"]
+        # The full-text index was dropped by the migration and refilled from the recipes:
+        # if the refill had been skipped, the rows would be there and the search would be
+        # blind, which is the failure that looks like an empty library.
+        assert [v["title"] for v in library.list_(search="mele")] == \
+               ["Torta di mele della nonna"]
+
+
+def test_the_migrated_schema_is_the_current_one(tmp_path):
+    """Not just "it opens": the tables have to end up with the names the code now writes, or
+    the next version migrates a database that only looks migrated."""
+    import sqlite3
+
+    path = tmp_path / "italiana.db"
+    _italian_database(path, [("Torta di mele della nonna", OLD_RECIPE)])
+    with Library(path):
+        pass
+
+    conn = sqlite3.connect(path)
+    names = {r[0] for r in conn.execute("SELECT name FROM sqlite_master")}
+    columns = {r[1] for r in conn.execute("PRAGMA table_info(recipes)")}
+    conn.close()
+
+    assert "recipes" in names and "recipes_fts" in names
+    assert not {"ricette", "ricette_fts", "idx_ricette_url"} & names
+    assert columns == {"id", "title", "data", "url", "author", "platform",
+                       "has_uncertainties", "created_at", "updated_at"}
+
+
+def test_the_migration_is_idempotent_and_leaves_a_new_database_alone(tmp_path):
+    """Opening twice must not migrate twice, and a database born English must not be touched.
+
+    The guard is the schema itself rather than a stored version number: after the migration
+    there is no `ricette` to find, so the second open does nothing without having to remember
+    that the first one happened.
+    """
+    path = tmp_path / "italiana.db"
+    _italian_database(path, [("Torta di mele della nonna", OLD_RECIPE)])
+
+    for _ in range(3):
+        with Library(path) as library:
+            assert library.count() == 1
+
+    fresh = tmp_path / "nuova.db"
+    with Library(fresh) as library:
+        id = library.save(_recipe("Focaccia", ingredients=["farina"]))
+    with Library(fresh) as library:
+        assert library.read(id) is not None
+        assert [v["title"] for v in library.list_(search="focaccia")] == ["Focaccia"]
+
+
+def test_a_half_migrated_database_still_migrates(tmp_path):
+    """A column already renamed by hand, or by a version caught halfway, must not stop the
+    rest. The alternative is a migration that raises on the single library it exists for."""
+    import sqlite3
+
+    path = tmp_path / "meta.db"
+    _italian_database(path, [("Torta di mele della nonna", OLD_RECIPE)])
+
+    conn = sqlite3.connect(path)
+    conn.execute("ALTER TABLE ricette RENAME COLUMN titolo TO title")
+    conn.commit()
+    conn.close()
+
+    with Library(path) as library:
+        assert library.count() == 1
+        assert library.all_recipes()[0].title == "Torta di mele della nonna"

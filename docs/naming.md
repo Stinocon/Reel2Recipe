@@ -56,8 +56,9 @@ axis, and the second one is what to plan around.
 2. **Left in Italian on purpose**, each with its reason in the module that holds it:
    `extract.py`'s prompts, schema and delimiters (the model contract); the URL paths and the
    export's `?formato=` (external surface — the rule is *add a synonym*, as the CLI does with
-   `--porta`); the SQL columns, the nested ingredient keys, the draft's keys and the file
-   names (format); every user-facing Italian string.
+   `--porta`); the nested ingredient keys, the draft's keys and the file names (format);
+   every user-facing Italian string. The SQL columns were on this list and came off it — see
+   the table below.
 3. **Done since:** the `data/*.yaml` keys with their loader (the tables live in the repo, so
    nothing on a user's disk is keyed that way), and the frontend — `web/i18n.js`'s catalogue
    keys and placeholders, `web/app.js`'s identifiers and prose, and `icone.js` → `icons.js`
@@ -163,15 +164,15 @@ destructive migration this migration is avoiding.
 | `quantita_raw`, `unita_raw` | the JSON schema the local model answers with (`extract.py`) — changing it means re-running the model gate |
 | `unita.yaml`, `densita.yaml`, `vaghe.yaml`, `ricette.db` | file names |
 | the keys inside `data/*.yaml` | renamed in their own step, together with their loader |
-| the SQL table and column names in `store.py` | written inside every database on disk; renaming them means `ALTER TABLE` over live data |
+| ~~the SQL table and column names in `store.py`~~ | **moved since.** They really were format, and the way out was the `ALTER TABLE` this table was avoiding — done once, in place, by `_migrate_italian_schema`. The lesson is narrower than "never rename format": a rename over stored data needs a migration and the tests to prove it, not a permanent exemption |
 | the **nested** keys of an ingredient and its quantity — `nome`, `note`, `gruppo`, `lacuna`, `riga`, `quantita`, and inside it `valore`, `valore_max`, `unita`, `provenienza`, `testo_originale`, `nota`, `sistema`, `incerta` | inside every stored recipe and read by `web/app.js`; `to_dict()` writes them as string literals, which is precisely what let `Ingredient` and `Quantity` be renamed for free |
 | the keys of the *draft* read by `from_draft` — `titolo`, `ingredienti`, `procedimento`, `porzioni`, `categorie`, `lacune`, `confidenza`, `descrizione`, `tempo_*_min` | the same JSON schema as `quantita_raw` above: it is `extract.py`'s output format, and it moves when `extract.py` does, with the model gate |
 
 One row that did **not** stay: the keys of the dictionary `Library.list_` returns. They looked
 like format and are not — nothing on disk is keyed that way, only `web/app.js` reads them — so
 they moved to English in the same commit as `Recipe`'s fields and the frontend. `store.py`'s
-docstring said so before the move; the SQL columns just above it are the part that is real
-format, and those did stay.
+docstring said so before the move; the SQL columns just above it *were* real format, and they
+stayed for one more release — until they got the migration that being real format calls for.
 
 The Python *names* around them change; the strings do not. Where a value is user-facing, add
 the English spelling as a synonym rather than replacing it — as the CLI does with `--porta`
@@ -294,7 +295,7 @@ Migrated, with `LEGACY_KEYS` reading the left column for good.
 | `adesso` (costruttore) | `now` |
 | `n_ingredienti` | `n_ingredients` (chiave dell'elenco) |
 | `copertina` | `cover` (chiave dell'elenco) |
-| `creata_il` | `created_at` (chiave dell'elenco; la colonna SQL resta) |
+| `creata_il` | `created_at` (chiave dell'elenco e, dalla migrazione dello schema, anche la colonna SQL) |
 | `sigla` | `code_of` |
 | `testo_da` | `text_from` |
 | `conteggio` | `count` |
