@@ -172,7 +172,7 @@ def _warnings(recipe: Recipe) -> list[str]:
 def _source_line(recipe: Recipe) -> str:
     """The attribution. Not a courtesy detail: the recipe belongs to whoever made it, and the
     reworded method only makes sense while the pointer back to the original stays
-    (docs/legale.md)."""
+    (docs/legal.md)."""
     if not recipe.source:
         return ""
     author, url = recipe.source.author, recipe.source.url

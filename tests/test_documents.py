@@ -84,7 +84,7 @@ def test_markdown_without_groups_invents_no_headings(simple):
 
 def test_markdown_cites_the_source(recipe):
     """The method is reworded in our own words: without the pointer back to the original the
-    attribution to the author would be lost (docs/legale.md)."""
+    attribution to the author would be lost (docs/legal.md)."""
     md = to_markdown(recipe)
     assert "## Fonte" in md
     assert "cucina_test" in md

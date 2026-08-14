@@ -50,7 +50,7 @@ fi
 # ------------------------------------------------------------ 3. anti-leak guard
 section "Anti-leak guard (third-party material outside git)"
 # workspace/ holds third-party videos, audio and captions: it must NEVER be tracked.
-# See docs/legale.md.
+# See docs/legal.md.
 if git rev-parse --git-dir >/dev/null 2>&1; then
   TRACKED="$(git ls-files 'workspace/' 2>/dev/null)"
   if [ -z "$TRACKED" ]; then
