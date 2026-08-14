@@ -934,8 +934,20 @@ def _clean_up(draft: dict) -> dict:
     reaches the disk, which is why they could move to English without the compatibility net
     the stored keys needed.
     """
+    # The words a model writes when it means "nothing", in a field typed as a string. The
+    # schema tells it a missing `servings` is the empty string; asked in English, and with
+    # `prep_time_min` right next to it accepting a real `null`, it sometimes writes the word
+    # instead. `from_draft` does `draft.get("servings") or None`, and "null" is truthy — so it
+    # reached the card as the yield, and a recipe announced it served "null".
+    #
+    # Matched whole and case-insensitively, never as a substring: "none" is a word, and an
+    # ingredient called "none pizza with left beef" is a stranger thing than this bug.
+    NOTHING = {"null", "none", "nil", "n/a", "na", "nessuno", "nessuna", "niente"}
+
     def empty_to_none(v):
-        return None if isinstance(v, str) and not v.strip() else v
+        if isinstance(v, str) and (not v.strip() or v.strip().lower() in NOTHING):
+            return None
+        return v
 
     ingredients = []
     for raw in draft.get("ingredients") or []:
