@@ -233,12 +233,18 @@ ed è la parte meno solida — vedi la nota qui sotto.
 > tiene i pesi fuori dalla sua portata.
 >
 > Misurato, in ogni combinazione di lingue: **i termini sono al 100% e ci restano giro dopo
-> giro, e così le quantità.** Le **intestazioni dei gruppi** sono quasi sempre giuste e non
-> sempre, e la ragione sta a monte della traduzione — è l'estrazione che ogni tanto perde
-> un'intestazione, o ne conia una che non è proprio una parola (`Garnitura` per una
-> guarnizione). Il glossario acchiappa i conii che ha già incontrato; non può acchiappare
-> un'intestazione che non è mai arrivata. I numeri di adesso, non questi, li fai tu: `uv run
-> python tools/benchmark-translation.py`.
+> giro, e così le quantità.**
+>
+> Le **intestazioni dei gruppi** sono state l'ultima cosa a cedere, e la causa stava a monte di
+> qualsiasi traduzione: una sezione con un solo ingrediente — «Per la copertura: cacao amaro» —
+> perdeva quell'ingrediente, e l'intestazione se ne andava con lui. Il cacao compariva lo stesso
+> nel procedimento, quindi la ricetta lo sapeva e la lista della spesa no: la forma peggiore che
+> un difetto possa prendere qui. È risolto, e le intestazioni sono ora anche normalizzate a una
+> sola grafia per lingua, così due ricette nella tua libreria non intitolano la stessa sezione
+> in modi diversi.
+>
+> I numeri di adesso, non questi, li fai tu: `uv run python tools/benchmark-translation.py` —
+> questi sono quel che una macchina ha misurato un giorno.
 >
 > **Cosa resta.** Un ingrediente che la tabella non ha va ancora al modello, e lì vale il
 > vecchio avvertimento: gli è vietato sostituire e gli è imposto di **tenere la parola

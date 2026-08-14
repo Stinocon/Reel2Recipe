@@ -158,6 +158,80 @@ def test_it_recognises_the_groups_written_with_a_colon(draft):
 
 
 # ----------------------------------------------------------------------------------
+# A section with a single ingredient
+# ----------------------------------------------------------------------------------
+
+# The caption that exposed it: two sections, and the second holds exactly one thing. Written
+# here because a real one behaved the same way and this reproduces it without bringing
+# third-party text into the repo.
+CAPTION_SINGLE = """\
+Tiramisu della nonna, pronto in 20 minuti!
+INGREDIENTI:
+250 g mascarpone
+3 uova
+100 g zucchero semolato
+Per la base: 200 g savoiardi, caffe' amaro q.b.
+Per la copertura: cacao amaro
+PROCEDIMENTO: Monta i tuorli, bagna i savoiardi, alterna gli strati.
+"""
+
+
+@pytest.fixture(scope="module")
+def tiramisu() -> dict:
+    return extract.extract_draft(
+        caption=CAPTION_SINGLE, transcript="", title="Tiramisu della nonna",
+        model=os.environ.get("R2R_MODELLO"), language="it",
+    ).draft
+
+
+def test_a_section_with_one_ingredient_still_puts_it_in_the_list(tiramisu):
+    """The defect this test exists for: **the cocoa never reached the ingredients.**
+
+    "Per la copertura: cacao amaro" is a section holding one item, and qwen2.5:14b dropped
+    that item — reproducibly, three runs out of three. Not lost from the recipe's meaning: it
+    turned up in the method ("spolvera con cacao amaro") and even in a declared gap. Lost from
+    the **list**, which is the part somebody reads at the shop. A recipe that knows about the
+    cocoa and a shopping list that does not is the worst version of this, because nothing
+    looks wrong.
+
+    It also looked like a schema problem and was not. `group` was made required — the medicine
+    that fixed `servings` — and the numbers did not move at all: the field was not missing, the
+    **row** was. A rule in the prompt naming the case fixed it, 6 of 6, in both languages.
+    """
+    names = " ".join((i.get("name") or "").lower() for i in _reading_something(tiramisu))
+    assert "cacao" in names or "cocoa" in names, (
+        f"the single-ingredient section did not reach the list: {names}"
+    )
+
+
+def test_both_sections_survive(tiramisu):
+    """The heading follows the ingredient: lose the one item and the section goes with it."""
+    groups = {(i.get("group") or "").strip().lower() for i in _reading_something(tiramisu)}
+    groups.discard("")
+    assert len(groups) >= 2, f"a section was lost: {sorted(groups)}"
+
+
+def test_a_flat_list_does_not_acquire_sections():
+    """The mirror, and the reason the prompt rule is safe to have.
+
+    Insisting on sections is how a model starts inventing them, which is the same family of
+    error as an invented amount (§4). On a caption with no sections at all there must be none
+    in the output — measured at zero before the rule and zero after.
+    """
+    draft = extract.extract_draft(
+        caption=(
+            "Pane fatto in casa, facilissimo!\n"
+            "INGREDIENTI:\n500 g farina 00\n300 ml acqua\n10 g sale\n7 g lievito secco\n"
+            "PROCEDIMENTO: Impasta, lascia lievitare due ore, inforna a 220 gradi."
+        ),
+        transcript="", title="Pane fatto in casa",
+        model=os.environ.get("R2R_MODELLO"), language="it",
+    ).draft
+    invented = {(i.get("group") or "").strip() for i in _reading_something(draft)} - {""}
+    assert not invented, f"sections invented on a flat list: {sorted(invented)}"
+
+
+# ----------------------------------------------------------------------------------
 # The model's output language
 # ----------------------------------------------------------------------------------
 
