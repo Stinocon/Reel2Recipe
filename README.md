@@ -352,22 +352,16 @@ Technical documentation: [`docs/architecture.md`](docs/architecture.md).
 
 ### If you are reading the code
 
-**The codebase is in English** — identifiers, comments, tests, the build scripts and the
-architecture document. The Italian you will still meet is deliberate, and it falls into four
+**The codebase is in English** — identifiers, comments, tests, the JSON keys on disk, the SQL
+schema, the frontend's ids and classes, the build scripts, the add-on's runtime log and the
+architecture document. The Italian you will still meet is deliberate, and it falls into three
 groups:
 
-- **Format that already exists on disk — now read, not written.** The nested keys of a
-  stored recipe (`nome`, `quantita`, `provenienza`) and the values of `Provenance` and
-  `System` (`dichiarato`, `metrico`) were the last Italian left in the stored shape. They are
-  English now at every level, keys and values alike, and the Italian survives only in the
-  **compatibility net** that keeps reading it: `LEGACY_KEYS` and `LEGACY_PROVENANCES` in
-  `recipe.py` and `units.py`. A recipe saved years ago still opens; it is rewritten in English
-  only when it is next saved, so the library is never half migrated at any moment. The SQL
-  table and columns went the same way one release earlier, with `_migrate_italian_schema`
-  doing the `ALTER TABLE` once, in place.
-- **The contract with the local model.** `extract.py`'s system prompts, its JSON schema and the
-  delimiters that fence off untrusted input. They were tuned against a real model on real
-  reels, and they move only together with a re-run of the model gate.
+- **The prompts the local model reads.** `extract.py`'s two system prompts stay each in
+  their own language, because a local model follows the language it is spoken to in — and the
+  delimiters that fence off untrusted input stay Italian too, being a security boundary tuned
+  as it is. The schema's **field names** are English: they are structure, not prose. Anything
+  in that file moves only together with a re-run of the model gate.
 - **Kitchen vocabulary, which is data.** Unit names (`cucchiaio`), ingredient names
   (`farina 00`) and the eyeball measures (`q.b.`) in `data/*.yaml`. These are what the model
   writes and what the lookup matches against; the English aliases sit next to them
@@ -379,9 +373,16 @@ groups:
   the only client is `web/app.js`, which ships in the same commit. Nor does the add-on depend
   on them any longer — its start-up line uses `--port`.
 
+A compatibility net keeps the old spelling readable **for good**: a recipe saved before any
+of this still opens, and is rewritten in English only when it is next saved, so the library is
+never half migrated at any moment. `LEGACY_KEYS` in `recipe.py`, `LEGACY_PROVENANCES` and
+`LEGACY_SYSTEMS` in `units.py`. The SQL schema is the exception — there a one-off `ALTER TABLE`
+migration replaced the need for a net.
+
 [`docs/naming.md`](docs/naming.md) is the map: what moved, what did not, and why. It also
-records the four defects the migration produced and the guards added to catch their kind —
-worth ten minutes before a large rename in this repo.
+records the six defects the migration produced and the guards added to catch their kind, the
+last two of which were an assertion that passed on an empty list and a guard with an exemption
+written into its own docstring — worth ten minutes before a large rename in this repo.
 
 ---
 
