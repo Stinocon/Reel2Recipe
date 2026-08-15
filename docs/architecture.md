@@ -112,6 +112,22 @@ first two live in `data/`, indexed by language and by system; the messages live 
 (they are program strings, not data). Temperatures follow the system in both directions
 (°F↔°C).
 
+**The split runs down to the writing of a single number, and that is where the two axes had
+been welded.** The system decides the number's *shape*, since that is about the measuring cup;
+the language decides its *separator*, since that is about reading. Read off the system alone it
+was wrong in both directions: metric was treated as Italian, so an English reader cooking in
+grams — the default this project ships — got "0,5 g", and an Italian asking for cups got "1.33"
+wherever no kitchen fraction was close. The **plural** goes with the shape and not the
+language: "1/2 cup" is a part of one cup and takes the singular, "0,5 cucchiai" is a decimal
+away from one and takes the plural, in both languages alike.
+
+**A label is only half a table until it can be read back.** `labels` and `plural` write,
+`alias` reads, and nothing forced the two halves to agree — `labels.it` printed "once liquide"
+while `alias` had never heard of it, so our own export came back as an unrecognised unit. The
+same gap ran the other way: `labels.en` turned `spicchio` into "clove" on the way out while
+"cloves" coming in was not a unit at all. Both directions are now held by tests rather than by
+care.
+
 Translation is the least deterministic piece of the path, and it is split accordingly: the
 ingredient names and group headings that `data/ingredients.yaml` holds are settled by the code,
 and only what the table does not hold — the prose, and the unusual ingredients — reaches the
@@ -208,6 +224,27 @@ say about a row that never gets written at all. One rule in the prompt naming th
 it: 6 of 6, both languages, and zero sections invented on a flat list.
 
 The original lesson stands unchanged for what it covers. What is added is its boundary.
+
+**And a third episode, where the two contradicted each other in the plainest way there is: they
+were in different languages.** There was one schema, written in Italian, and it went out with
+the English prompt too. So an English extraction was told by the prompt to write English and
+told by the schema to shape `servings` like "4 persone" — and by this section's own rule the
+schema is the half that binds. The fix is `SCHEMA_PROSE`, keyed by language *and by level*
+over a single structure. Keyed by level because `notes` exists at both and means different
+things at each: flat, the first attempt handed the recipe's `notes` the ingredient's
+description, which is a contradiction introduced in the very change that existed to remove one.
+
+**The boundary has a second half, learnt from a failure rather than a fix.** The rule above
+worked because the prompt was the right instrument for that defect: a case the model had never
+been told about. Its neighbour — a named section vanishing from the list when the reel is
+spoken as well as captioned — is not that. The prompt has now been told twice, once about
+single-ingredient sections and once about the caption's precedence extending to structure, and
+the second time the number did not move at all: sections stayed at 0% over two runs, with the
+same group invented both times. Measured before and after, so it is not an impression. The
+cause is not a rule the model is missing; it is that the speech reorganises the recipe around
+the narration, and no sentence added to the prompt has reached that. **When two rounds on the
+same instrument leave a number untouched, the instrument is the thing to change** — the next
+attempt belongs upstream, at what of the transcript reaches the model and with what weight.
 
 
 
