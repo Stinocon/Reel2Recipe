@@ -52,9 +52,10 @@ indovinarne una simile. I numeri non si muovono in nessun caso.
 > inglese e in italiano, due copie che si muovono insieme. Tutto il resto sta in una lingua
 > sola, decisa dal suo pubblico: [`docs/architecture.md`](docs/architecture.md) è in inglese,
 > perché spiega un codice i cui identificatori e commenti sono in inglese. I due documenti
-> legali restano **facenti fede in italiano**, con un riassunto inglese non vincolante in
-> testa: due versioni legali entrambe pubblicate che divergono sono un problema vero, non
-> una questione di stile.
+> legali sono l'eccezione: esistono per intero in tutte e due le lingue, con una **clausola di
+> prevalenza** che dichiara facente fede l'italiano. Due versioni legali entrambe pubblicate
+> che divergono restano un problema vero, e la clausola non lo nega: gli dà una risoluzione
+> definita, che è quello che fanno i testi legali bilingui.
 
 ---
 
@@ -178,6 +179,14 @@ inglese voleva dire cup e once, ed era sbagliato per la maggior parte delle pers
 applicava: le ricette si leggono in inglese nel Regno Unito, in Irlanda, in Australia, in
 Canada e in India, e in tutti questi posti si cucina in grammi.
 
+La separazione arriva fino a come si scrive un numero. Il sistema ne decide la **forma** — in
+imperiale una frazione, perché «3/4 cup» sta su un misurino e «0,75 cup» no — e la lingua ne
+decide il **separatore**, perché una virgola o un punto servono a leggere. I due erano una cosa
+sola: il metrico era trattato come italiano, quindi chi legge in inglese e cucina in grammi si
+trovava «0,5 g» sulla scheda, e un italiano che chiedeva le cup si trovava «1.33» dove nessuna
+frazione da cucina era vicina. Il plurale segue la forma e non la lingua: per questo «1/2 cup»
+è singolare e «0,5 cucchiai» no.
+
 Da riga di comando l'interfaccia non c'è, quindi gli assi sono due e partono dalla ricetta:
 
 ```bash
@@ -227,7 +236,7 @@ ed è la parte meno solida — vedi la nota qui sotto.
 > straniera si vede che è straniera; un ingrediente sbagliato con sicurezza no, e andresti a
 > comprare la cosa sbagliata.
 >
-> Così i nomi che sbaglia non sono più affare suo. `data/ingredients.yaml` li tiene — 156
+> Così i nomi che sbaglia non sono più affare suo. `data/ingredients.yaml` li tiene — 158
 > ingredienti e 14 intestazioni di gruppo, in tutte e due le lingue — e quelli che conosce li
 > traduce il codice senza che il modello veda la parola, esattamente come `densities.yaml`
 > tiene i pesi fuori dalla sua portata.

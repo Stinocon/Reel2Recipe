@@ -213,12 +213,18 @@ class Recipe:
         It lives here and not in the export modules because every format has to call the same
         recipe the same thing: `yaki-udon.melarecipe`, `yaki-udon.md`, `yaki-udon.pdf` are the
         same thing in three outfits.
+
+        The fallback follows the recipe's language. It is reached whenever the title leaves
+        nothing usable behind — a title written in a non-Latin script, or none at all — and it
+        is the one word of this file name we choose rather than derive, so an English library
+        should not acquire an Italian file in it.
         """
         base = unicodedata.normalize("NFKD", self.title)
         base = base.encode("ascii", "ignore").decode("ascii")
         base = re.sub(r"[^\w\s-]", "", base).strip()
         base = re.sub(r"[\s_]+", "-", base).lower()
-        return (base or "ricetta")[:60]
+        fallback = "recipe" if code_of(self.language) == Language.EN.value else "ricetta"
+        return (base or fallback)[:60]
 
     # ---- serialisation ------------------------------------------------------------
 
@@ -236,7 +242,7 @@ class Recipe:
                 "notes": i.notes,
                 "group": i.group,
                 "gap": i.gap,
-                "line": i.mela_line(),
+                "line": i.mela_line(self.language),
                 "quantity": {
                     "value": i.quantity.value,
                     "value_max": i.quantity.value_max,

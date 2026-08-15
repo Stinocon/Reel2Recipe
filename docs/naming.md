@@ -215,7 +215,7 @@ one cost is in the git history and in the modules themselves.
 | `ricette.db` | the library's file name | it is a file on the **user's disk**, so renaming it means moving their library. The three conversion tables were on this row and came off it: they live in the repo, and once a fourth was about to join them the consistency was worth more than the churn — `units.yaml`, `densities.yaml`, `vague.yaml`, `ingredients.yaml` |
 | the kitchen vocabulary in `data/*.yaml` | `cucchiaio`, `farina 00`, `q.b.` | it is **data**, not naming: it is what the model writes and what the lookup matches against. The English aliases sit next to it, not instead of it |
 | the injection patterns in `tools/check-injection.sh` | the incoming boundary | they detect attempts written in Italian; translating them would be translating the thing being looked for |
-| the prompt **prose** and the delimiters in `extract.py` | the model contract | a local model follows the language it is spoken to in, so the Italian prompt is Italian and the English one English. The delimiters are a security boundary tuned as it is (`.claude/rules/input-non-fidato.md`). The schema's **field names** are English: they are structure |
+| the prompt **prose** and the delimiters in `extract.py` | the model contract | a local model follows the language it is spoken to in, so the Italian prompt is Italian and the English one English. The delimiters are a security boundary tuned as it is (`.claude/rules/input-non-fidato.md`). The schema's **field names** are English: they are structure. Its `description` strings are prose and follow the prompt — they were the one place still Italian in both, so an English extraction was told to shape `servings` like "4 persone" while the prompt beside it asked for English. `SCHEMA_PROSE` holds them per language over the single structure |
 | the CLI's Italian option names and values | `--porta`, `--lingua`, `elimina`, `metrico` | *synonyms*, never the only spelling, for anyone with them in a script. `output_axes` normalises the values so nothing downstream sees them |
 | the add-on's three configuration keys | `modello_llm`, `scarica_modello`, `file_cookie` | Home Assistant has them saved in the user's add-on configuration. Renaming them silently resets the chosen model and the cookie path to the defaults, and no migration inside the add-on can prevent that |
 | every user-facing Italian string | the catalogues | they are read, not called. They live next to their English counterpart and `test_web.py` refuses a half-translated language |
@@ -386,11 +386,17 @@ Comments and docstrings in **English**, keeping the register they have in Italia
 explain the *why*, in plain words, and they name the real incident when there was one. British
 spelling, to match the interface catalogue and the READMEs.
 
-**The test modules are a separate step, declared here so it is not forgotten.** When a module
-is migrated, its tests are updated as *callers* — the names they import, the attributes they
-read, the keyword arguments they pass — and nothing more. Their own function names and
-docstrings stay Italian for now. That is deliberate, not an oversight: those docstrings carry
-the incident behind each regression ("visto su un reel vero"), which is exactly the reasoning
-this migration must not lose, and translating them is careful prose work rather than a rename.
-Doing it inside the module's own commit would mix a mechanical change with a judgement-heavy
-one in the same diff. The tests get one pass of their own, at the end, together with `docs/`.
+**The test modules were a separate step, and taking them separately is what made them cheap.**
+While a module was being migrated, its tests were updated as *callers* only — the names they
+import, the attributes they read, the keyword arguments they pass — and nothing more. Their
+own function names and docstrings stayed Italian until the end, then moved in one pass of
+their own together with `docs/` (step 5 of the order above). The reason to split them is that
+those docstrings carry the incident behind each regression ("visto su un reel vero"), which is
+exactly the reasoning this migration must not lose: translating them is careful prose work,
+not a rename, and doing it inside a module's own commit would have mixed a mechanical change
+with a judgement-heavy one in the same diff.
+
+It held after the migration too, which is the part that was not obvious in advance: the one
+test module written *since* — `tests/test_translation.py`, born with the translation pass —
+came out in English without anyone deciding again. A convention that survives the arrival of a
+new file is a convention and not a cleanup.

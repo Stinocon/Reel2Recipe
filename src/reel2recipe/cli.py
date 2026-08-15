@@ -135,7 +135,7 @@ def _print_recipe(recipe) -> None:
             print(dim(f"    — {group} —"))
         for i in recipe.ingredients:
             if i.group == group:
-                line = f"    {i.mela_line()}"
+                line = f"    {i.mela_line(recipe.language)}"
                 print(warn(line) if i.quantity.provenance in UNCERTAIN_PROVENANCES else line)
 
     print("\n  " + _c(heading("method"), "1"))

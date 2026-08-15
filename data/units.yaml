@@ -69,6 +69,7 @@ labels:
     tbsp: cucchiaio
     tsp: cucchiaino
     fl_oz: oncia liquida
+    oz: oncia
     lb: libbra
   en:
     cucchiaio: tbsp
@@ -103,6 +104,7 @@ plural:
     confezione: confezioni
     bustina: bustine
     uovo: uova
+    oncia: once
     oncia liquida: once liquide
     libbra: libbre
   en:
@@ -186,6 +188,11 @@ alias:
   "fl oz": fl_oz
   floz: fl_oz
   fluidounce: fl_oz
+  # The Italian labels, read back. Whatever we write we have to be able to read again: these
+  # are what `labels.it` prints, and without them an exported "4 once liquide" came back as an
+  # unrecognised unit — our own output, unreadable to us.
+  oncia liquida: fl_oz
+  once liquide: fl_oz
   pints: pint
   quarts: quart
   gallons: gallon
@@ -208,6 +215,33 @@ alias:
   confezioni: confezione
   bustine: bustina
   uova: uovo
+  # counting, as English captions write them. The `labels` table above turns `spicchio` into
+  # "clove" on the way out; until these were here, the same word coming IN was not a unit at
+  # all — "2 cloves garlic" fell through to the unknown-unit branch and was reported as a
+  # measure we could not read, with no typical weight attached. A table that translates one
+  # way only is half a table.
+  piece: pz
+  pieces: pz
+  clove: spicchio
+  cloves: spicchio
+  leaf: foglia
+  leaves: foglia
+  sprig: rametto
+  sprigs: rametto
+  slice: fetta
+  slices: fetta
+  stalk: gambo
+  stalks: gambo
+  pod: baccello
+  pods: baccello
+  can: barattolo
+  cans: barattolo
+  pack: confezione
+  packs: confezione
+  sachet: bustina
+  sachets: bustina
+  egg: uovo
+  eggs: uovo
 
 # Units denoting a "by the spoon" measure: if the conversion to weight gives a very small
 # value, it is better to keep the original unit (more useful to the cook) and put the weight

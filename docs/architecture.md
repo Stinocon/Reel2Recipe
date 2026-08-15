@@ -211,7 +211,7 @@ The original lesson stands unchanged for what it covers. What is added is its bo
 
 
 
-`porzioni` and the times always came out empty, even from sources saying "Serves 2" or "180° per
+`servings` and the times always came out empty, even from sources saying "Serves 2" or "180° per
 25'-30'". The prompt insisted, the mapping was right: the culprit was the **JSON schema**, where
 those fields were optional. With schema-constrained output the model is free to omit an optional
 field, and `qwen2.5:14b` omitted it systematically. The prompt asks, the schema permits: **the
@@ -220,11 +220,11 @@ schema is the mechanical constraint on the decoding, the prompt is a prayer.**
 But the remedy has a symmetric cost. Made required, `prep_time_min` was **invented** —
 15 and 30 minutes on sources that stated no prep time at all, splitting a cooking range across
 the two fields. So a field is made required only where the datum is normally present in the
-sources: `porzioni` and `tempo_cottura_min` yes, `tempo_preparazione_min` no. A few genuinely
+sources: `servings` and `cook_time_min` yes, `prep_time_min` no. A few genuinely
 stated prep times are lost, and that is fine: **a missing time is less harmful than an invented
 one.**
 
-**Requiring a field is not enough: you also have to tell it what shape to take.** `porzioni`
+**Requiring a field is not enough: you also have to tell it what shape to take.** `servings`
 became required but the prompts said nothing about it, and the model improvised a whole sentence
 — "These ingredients make 6 burgers." instead of "6 burgers", in a field recipe apps show next
 to the title. One line of instruction with three examples closed the matter on five sources out

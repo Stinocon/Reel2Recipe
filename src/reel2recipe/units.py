@@ -238,13 +238,18 @@ class Quantity:
     def is_range(self) -> bool:
         return self.value_max is not None and self.value_max != self.value
 
-    def text(self) -> str:
-        """Textual rendering of the quantity alone, e.g. "200 g", "2-3 cucchiai", "3/4 cup"."""
+    def text(self, language: str = Language.IT) -> str:
+        """Textual rendering of the quantity alone, e.g. "200 g", "2-3 cucchiai", "3/4 cup".
+
+        The system travels with the quantity; the language does not, because it belongs to the
+        recipe and every caller has one. Duplicating it into each stored quantity would put the
+        same fact in two places, and the pair that can disagree is the pair that will.
+        """
         if self.value is None:
             return self.unit or ""
-        num = format_number(self.value, self.system)
+        num = format_number(self.value, self.system, language)
         if self.is_range:
-            num = f"{num}-{format_number(self.value_max, self.system)}"
+            num = f"{num}-{format_number(self.value_max, self.system, language)}"
         return f"{num} {self.unit}".strip() if self.unit else num
 
 
@@ -258,7 +263,7 @@ class Ingredient:
     group: str | None = None
     gap: str | None = None
 
-    def mela_line(self) -> str:
+    def mela_line(self, language: str = Language.IT) -> str:
         """A line in the format Mela's parser can read.
 
         Mela natively recognises quantities and units in Italian, so the right shape is the
@@ -277,11 +282,13 @@ class Ingredient:
         # Models sometimes repeat the counting unit inside the name ("2 uova" with name
         # "uova"): "2 uova uova" is both ugly and wrong. If the unit is already in the name,
         # only the number is kept.
-        quantity_text = self.quantity.text()
+        quantity_text = self.quantity.text(language)
         if self.quantity.unit and _repeated_in_name(self.quantity.unit, self.name):
-            quantity_text = format_number(self.quantity.value)
+            system = self.quantity.system
+            quantity_text = format_number(self.quantity.value, system, language)
             if self.quantity.is_range:
-                quantity_text = f"{quantity_text}-{format_number(self.quantity.value_max)}"
+                quantity_text = (f"{quantity_text}-"
+                                 f"{format_number(self.quantity.value_max, system, language)}")
 
         if not quantity_text:
             return f"{self.name}{tail}".strip()
@@ -295,11 +302,17 @@ class Ingredient:
 
 def _singular_plural(word: str) -> set[str]:
     """Trivial Italian singular/plural variants, for tolerant comparisons ("uovo"/"uova",
-    "spicchio"/"spicchi"). Not full morphology, only the frequent cases."""
+    "spicchio"/"spicchi"). Not full morphology, only the frequent cases.
+
+    The two directions have to generate the same endings, and they did not: `-i` already
+    produced `-o`, `-a` and `-e`, while `-o` produced only `-i` and `-e`. So "uovo" never
+    reached "uova" — the very pair this docstring names — and "1 uovo" against the name "uova"
+    printed "1 uovo uova". Generating `-a` costs a form like "pomodora", which matches nothing
+    because the comparison is against the words actually in the name.
+    """
     forms = {word}
     if word.endswith(("a", "o", "e")):
-        forms.add(word[:-1] + "i")
-        forms.add(word[:-1] + "e")
+        forms.update({word[:-1] + "i", word[:-1] + "e", word[:-1] + "a"})
     if word.endswith("i"):
         forms.update({word[:-1] + "o", word[:-1] + "a", word[:-1] + "e"})
     return forms
@@ -382,17 +395,27 @@ class Tables:
     groups: dict[str, dict[str, str]]
 
     def label(self, unit: str | None, value: float | None,
-              language: str = Language.IT) -> str | None:
+              language: str = Language.IT, system: str = System.METRIC) -> str | None:
         """The label to show: in the current form of the requested language, plural if the
         number calls for it. "2 tbsp" becomes "2 cucchiai" in Italian, and "2 cucchiai"
-        becomes "2 tbsp" in English — the table is symmetric."""
+        becomes "2 tbsp" in English — the table is symmetric.
+
+        The plural needs the **system** and not only the number, because the two systems write
+        the same value differently and the writing is what governs agreement. Metric writes
+        0,5 and takes the plural ("0,5 cucchiai"); imperial writes the same value as 1/2, a
+        part of one unit, and takes the singular ("1/2 cup", never "1/2 cups"). So a proper
+        fraction is plural in metric and singular in imperial, and the rule is not the
+        language's — it holds in both.
+        """
         if not unit:
             return None
         l = code_of(language)
         u = self.labels.get(l, {}).get(unit, unit)
-        if value is not None and abs(value - 1.0) > 1e-9:
-            return self.plural.get(l, {}).get(u, u)
-        return u
+        if value is None:
+            return u
+        plural = value > 1.0 if code_of(system) == System.IMPERIAL.value \
+            else abs(value - 1.0) > 1e-9
+        return self.plural.get(l, {}).get(u, u) if plural else u
 
     def is_already_in_system(self, unit: str, system: str) -> bool:
         """True if the unit can already be executed in the target system, and is therefore to
@@ -806,17 +829,30 @@ _FRACTIONS_AS_TEXT = {
 }
 
 
-def format_number(value: float | None, system: str = System.METRIC) -> str:
-    """The number as a recipe would write it, in the requested system.
+def format_number(value: float | None, system: str = System.METRIC,
+                  language: str = Language.IT) -> str:
+    """The number as a recipe would write it: the shape from the system, the separator from
+    the language.
 
-    In metric: decimals with a comma, without pointless zeros — "1,5". In imperial:
-    **fractions**, because "0,75 cup" is on no measuring cup while "3/4 cup" is, and mixed
-    numbers are written as "1 1/2".
+    In metric: decimals without pointless zeros — "1,5". In imperial: **fractions**, because
+    "0,75 cup" is on no measuring cup while "3/4 cup" is, and mixed numbers are written as
+    "1 1/2".
+
+    The two axes are not the same one, and reading the separator off the system was wrong in
+    both directions. Metric is not Italian: an English reader cooking in grams — which is the
+    default this project ships, and what the UK, Ireland, Australia, Canada and India do — was
+    getting "0,5 g" on the card. Imperial is not English either: an Italian asking for cups got
+    "1.33" on the fallback decimal. The fraction-or-decimal decision stays the system's, since
+    that is about the measuring cup; the comma is the language's, since that is about reading.
     """
     if value is None:
         return ""
     if abs(value - round(value)) < 1e-9:
         return str(int(round(value)))
+
+    # English is named, not assumed: an unforeseen language falls back to Italian here as it
+    # does in `text_from`, so a card cannot come out with Italian words and English numbers.
+    separator = "." if code_of(language) == Language.EN.value else ","
 
     if code_of(system) == System.IMPERIAL.value:
         whole = int(value)
@@ -826,9 +862,9 @@ def format_number(value: float | None, system: str = System.METRIC) -> str:
                 return f"{whole} {text}" if whole else text
         # No kitchen fraction comes close: better an honest decimal than an invented fraction
         # that then cannot be measured.
-        return f"{value:.2f}".rstrip("0").rstrip(".")
+        return f"{value:.2f}".rstrip("0").rstrip(".").replace(".", separator)
 
-    return f"{value:.2f}".rstrip("0").rstrip(".").replace(".", ",")
+    return f"{value:.2f}".rstrip("0").rstrip(".").replace(".", separator)
 
 
 # --------------------------------------------------------------------------------------
@@ -1077,8 +1113,19 @@ def _normalise_ingredient(
             number, unit = split_off
 
     # 3. Eyeball measures with a typical value ("un pizzico", "un filo d'olio").
-    if outcome := _try_vague(name, original, number, unit_raw, quantity_raw, notes, group,
-                             t, system, language):
+    #
+    #    A recognised counting unit is NOT one of them, even when `vague.yaml` also knows the
+    #    word: "spicchio" and "fetta" are in both tables on purpose, because the count is the
+    #    datum and the typical weight is the comment `_as_count` adds. Without this guard the
+    #    two tables were read in the wrong order and the same ingredient came out three ways
+    #    depending on how the model inflected the unit — "2 spicchi" as a count ("2 cloves,
+    #    ≈ 10 g"), "2 spicchio" as an estimate in grams, presented as the primary quantity.
+    #    An estimate standing where a count was available is the swap AGENTS.md §3 forbids,
+    #    and here it was decided by a plural.
+    if unit not in t.count and (
+        outcome := _try_vague(name, original, number, unit_raw, quantity_raw, notes, group,
+                              t, system, language)
+    ):
         return outcome
 
     # 3-bis. An unrecognised unit that only repeats the name is not a unit: the model copied
@@ -1148,7 +1195,8 @@ def _normalise_ingredient(
         # "Declared" only if the starting unit is already the arriving one: otherwise a
         # conversion took place, and that has to be said.
         prov = Provenance.DECLARED if unit == u else Provenance.CONVERTED_UNIT
-        return _finalise(name, val_min, val_max, u, prov, original, notes, group, system)
+        return _finalise(name, val_min, val_max, u, prov, original, notes, group, system,
+                         language, t)
 
     # 9. Volume.
     if unit in t.volume:
@@ -1158,7 +1206,8 @@ def _normalise_ingredient(
             val_min, u = unit_for_volume(ml_min, system, t)
             val_max, _ = unit_for_volume(ml_max, system, t)
             prov = Provenance.DECLARED if unit == u else provenance
-            return _finalise(name, val_min, val_max, u, prov, original, notes, group, system)
+            return _finalise(name, val_min, val_max, u, prov, original, notes, group, system,
+                             language, t)
 
         # 9a. Already executable in the requested system: "500 ml" for someone cooking in
         #     metric and "1 cup" for someone cooking in imperial are used exactly as they are.
@@ -1180,7 +1229,8 @@ def _normalise_ingredient(
         if code_of(system) == System.METRIC.value and (found := t.density_for(name)) is not None:
             g_per_ml, _ = found
             return _finalise(name, ml_min * g_per_ml, ml_max * g_per_ml, "g",
-                             Provenance.CONVERTED_DENSITY, original, notes, group, system)
+                             Provenance.CONVERTED_DENSITY, original, notes, group, system,
+                             language, t)
 
         # 9d. Density unknown: the volume is kept and the gap is declared. Here we do NOT
         #     invent a plausible density.
@@ -1205,10 +1255,25 @@ def _finalise(
     original: str, notes: str | None, group: str | None,
     system: str = System.METRIC, language: str = Language.IT, tables: Tables | None = None,
 ) -> Ingredient:
-    """Rounds to kitchen precision and builds the final ingredient."""
+    """Rounds to kitchen precision and builds the final ingredient.
+
+    The label is applied **after** rounding, and for two reasons in that order: the arithmetic
+    and `round_for_kitchen` both key off the canonical unit, and the plural depends on the
+    rounded number — "0,5 cups" rounded to 1 is "1 cup", not "1 cups".
+
+    `tables` is optional because this used to be the branch that skipped the label entirely.
+    It skipped it in silence: `plural.en` declared `cup: cups` and every imperial English
+    recipe still read "2 cup", because only the spoon and count branches ever asked for a
+    label. The same hole hid `labels.it`'s `lb: libbra`, so an Italian imperial recipe said
+    "2 lb". Both tables were right and unreachable, which is the failure a table cannot
+    report on its own.
+    """
+    value_min = round_for_kitchen(value_min, unit)
+    value_max = round_for_kitchen(value_max, unit)
+    shown = tables.label(unit, value_max, language, system) if tables is not None else unit
     q = Quantity(
-        round_for_kitchen(value_min, unit), unit, provenance, original,
-        value_max=round_for_kitchen(value_max, unit), system=code_of(system),
+        value_min, shown, provenance, original,
+        value_max=value_max, system=code_of(system),
     )
     return Ingredient(name, q, notes, group)
 
@@ -1238,9 +1303,9 @@ def _as_spoon_measure(
         eq_max, _ = unit_for_volume(ml_max, system, tables)
     eq_min, eq_max = round_for_kitchen(eq_min, eq_unit), round_for_kitchen(eq_max, eq_unit)
 
-    eq_text = format_number(eq_min, system)
+    eq_text = format_number(eq_min, system, language)
     if eq_max != eq_min:
-        eq_text = f"{eq_text}-{format_number(eq_max, system)}"
+        eq_text = f"{eq_text}-{format_number(eq_max, system, language)}"
 
     # The equivalent is only worth having if it adds something: for someone cooking in
     # imperial, "2 tbsp (≈ 2 tbsp)" is noise. It is shown when the equivalent's unit differs
@@ -1248,7 +1313,7 @@ def _as_spoon_measure(
     note = f"≈ {eq_text} {eq_unit}" if eq_unit != unit else None
 
     q = Quantity(
-        minimum, tables.label(unit, maximum, language), Provenance.DECLARED, original,
+        minimum, tables.label(unit, maximum, language, system), Provenance.DECLARED, original,
         value_max=maximum, note=note, system=code_of(system),
     )
     return Ingredient(name, q, notes, group)
@@ -1267,8 +1332,8 @@ def _as_count(
         if (typical := _vague_value(definition, system)) is not None:
             typical_quantity, u = typical
             total = round_for_kitchen(typical_quantity * maximum, u)
-            note = f"≈ {format_number(total, system)} {u}"
-    label = tables.label(unit, maximum, language) if unit else raw
+            note = f"≈ {format_number(total, system, language)} {u}"
+    label = tables.label(unit, maximum, language, system) if unit else raw
     q = Quantity(minimum, label, Provenance.COUNT, original,
                  value_max=maximum, note=note, system=code_of(system))
     return Ingredient(name, q, notes, group)
@@ -1299,7 +1364,7 @@ def _vague_note(definition: dict, value: float, unit: str, system: str, language
     """
     names = definition.get("name") or {}
     expression_name = names.get(code_of(language)) or names.get(Language.IT.value) or ""
-    return f"{expression_name} ≈ {format_number(value, system)} {unit}".strip()
+    return f"{expression_name} ≈ {format_number(value, system, language)} {unit}".strip()
 
 
 def _try_indeterminate(
