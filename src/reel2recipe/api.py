@@ -33,6 +33,7 @@ import json
 import tempfile
 import threading
 import uuid
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -174,16 +175,27 @@ class CookRequest(BaseModel):
 
 
 def create_app(db: str | None = None, ollama_url: str = "http://localhost:11434") -> FastAPI:
-    app = FastAPI(title="Reel2Recipe", version="0.1.0")
     registry: JobRegistry | None = None
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI):
+        """The job registry needs the running loop, so it cannot be built at import time.
+
+        This was an `@app.on_event("startup")` handler, which FastAPI has deprecated and warns
+        about on every application built — including one per test, which is how a suite ends up
+        printing thirty-four warnings a run and nobody reads any of them any more. A lifespan
+        handler is the same thing with a defined end: what precedes the `yield` runs at
+        startup, what follows it at shutdown. There is nothing to tear down here — the queues
+        die with the process — so the second half stays empty rather than acquire a job.
+        """
+        nonlocal registry
+        registry = JobRegistry(asyncio.get_running_loop())
+        yield
+
+    app = FastAPI(title="Reel2Recipe", version="0.1.0", lifespan=lifespan)
 
     def library() -> Library:
         return Library(db)
-
-    @app.on_event("startup")
-    async def _startup():
-        nonlocal registry
-        registry = JobRegistry(asyncio.get_running_loop())
 
     # ---- diagnostics -----------------------------------------------------------------
 
