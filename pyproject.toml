@@ -1,6 +1,6 @@
 [project]
 name = "reel2recipe"
-version = "1.0.0"
+version = "1.1.0"
 description = "Extracts recipes from Instagram Reels (audio + caption) and exports them in Mela format. Entirely local: no online AI, no API key, no cost."
 requires-python = ">=3.12,<3.14"
 license = "MIT"
