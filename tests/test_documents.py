@@ -189,6 +189,16 @@ def test_the_file_name_is_readable_and_safe():
         == "tiramisu-al-pistacchio"
 
 
+@pytest.mark.parametrize("language, expected", [("it", "ricetta"), ("en", "recipe")])
+def test_the_file_name_falls_back_in_the_recipes_own_language(language, expected):
+    """A title in a non-Latin script leaves nothing to derive a name from, and the fallback is
+    the one word here we choose rather than derive. An English library should not acquire an
+    Italian file in it."""
+    recipe = from_draft({"title": "日本語", "ingredients": [], "method": [],
+                         "confidence": {}, "gaps": []}, language=language)
+    assert recipe.file_name() == expected
+
+
 def test_the_english_export_translates_the_wrapper(tmp_path):
     """The wrapper — sections, attribution, footer — follows the recipe's language.
 

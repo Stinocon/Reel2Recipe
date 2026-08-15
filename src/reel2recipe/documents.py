@@ -160,7 +160,7 @@ def _warnings(recipe: Recipe) -> list[str]:
     """
     lines = list(recipe.gaps)
     estimated = [
-        text(recipe.language, "estimate", name=i.name, quantity=i.quantity.text())
+        text(recipe.language, "estimate", name=i.name, quantity=i.quantity.text(recipe.language))
         for i in recipe.ingredients
         if i.quantity.provenance in UNCERTAIN_PROVENANCES and i.quantity.value is not None
     ]

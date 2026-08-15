@@ -129,7 +129,7 @@ def test_grams_stay_grams(t):
     ],
 )
 def test_a_unit_stuck_to_the_quantity(t, quantity_raw, name, value, unit):
-    """The unit left inside `quantita_raw` must not be lost.
+    """The unit left inside `quantity_raw` must not be lost.
 
     The model does not always separate the two fields. Before this recovery the unit vanished
     and the number was read as a count of pieces: "80g di maiale" became "80 maiale", i.e.
@@ -313,6 +313,16 @@ def test_the_name_is_not_repeated_with_the_counting_unit(t):
     assert i.mela_line() == "2 uova"
 
 
+@pytest.mark.parametrize("unit_raw, name", [("uovo", "uova"), ("carota", "carote")])
+def test_the_repetition_is_caught_across_the_inflection_too(t, unit_raw, name):
+    """The guard compares up to singular and plural, and its two directions did not generate
+    the same endings: `-i` reached `-o`, `-a` and `-e`, while `-o` never reached `-a`. So
+    "uovo" never matched "uova" — the pair the helper's own docstring named — and "1 uovo"
+    beside the name "uova" printed "1 uovo uova"."""
+    i = normalise_ingredient(name, "1", unit_raw, tables=t)
+    assert i.mela_line() == f"1 {name}"
+
+
 def test_a_whole_name_copied_into_the_unit_field_is_dropped(t):
     """A model does not only repeat one word: it copies the whole name into the unit field.
     "2 cipolle piccole cipolle piccole" came out of a real reel, with a gap complaining about
@@ -489,6 +499,63 @@ def test_every_density_cites_a_named_source(t):
         )
 
 
+# The measures a source states its figure in, in millilitres. "quarter cup" has to be tried
+# before "cup", or it matches as "cup" and the check compares the wrong volume.
+_PER_MEASURE = [
+    ("quarter cup", 236.5882365 / 4),
+    ("half cup", 236.5882365 / 2),
+    ("half", 236.5882365 / 2),
+    ("cup", 236.5882365),
+    ("tablespoon", 14.78676478125),
+    ("teaspoon", 4.92892159375),
+    ("quart", 946.352946),
+]
+_STATED_FIGURE = re.compile(
+    r"(\d+(?:[.,]\d+)?)\s*g\s+per\s+(?:one-)?(" +
+    "|".join(m for m, _ in _PER_MEASURE) + r")"
+)
+
+
+def test_every_density_agrees_with_the_figure_its_source_states(t):
+    """The citation has to hold up arithmetically, not just be present.
+
+    Naming a source makes a number checkable; it does not make it right. `g_per_ml` is derived
+    by hand from a figure the chart states per cup or per spoon, and a derivation done by hand
+    can land on the wrong row — this project has already shipped `lievito di birra` carrying
+    the density of **beer**, and the source field looked perfectly respectable next to it. The
+    check recomputes the stated figure from the density and refuses a disagreement, so a
+    mis-typed number and a mis-read row both stop here instead of at a wrong weight in
+    somebody's kitchen.
+    """
+    unchecked = []
+    for key, source in t.density_source.items():
+        found = _STATED_FIGURE.search(source)
+        if not found:
+            unchecked.append(key)
+            continue
+        stated = float(found.group(1).replace(",", "."))
+        ml = dict(_PER_MEASURE)[found.group(2)]
+        computed = t.density[key] * ml
+        # The tolerance covers the rounding of a hand-derived density, no more: the figures
+        # are whole grams or one decimal, and a wrong row misses by far more than this.
+        assert abs(computed - stated) <= max(0.55, stated * 0.02), (
+            f"«{key}»: the source states {stated} g per {found.group(2)}, but g_per_ml="
+            f"{t.density[key]} gives {computed:.2f}. One of the two is wrong."
+        )
+
+    # Water is the one entry with no figure to recompute, because there is nothing to look up:
+    # 1 ml = 1 g is the gram's definition. Anything else landing here has a source that reads
+    # like a citation without stating a number, which is the shape that made this check
+    # necessary in the first place. (`density_source` is keyed by every spelling, so water
+    # arrives once per alias.)
+    assert all(t.density_source[k].startswith("definizione:") for k in unchecked), (
+        f"these densities state no checkable figure: "
+        f"{[k for k in unchecked if not t.density_source[k].startswith('definizione:')]}. "
+        f"Every source but water's quotes a weight per measure, and that is what makes it "
+        f"verifiable."
+    )
+
+
 # ----------------------------------------------------------------------------------
 # Bidirectionality: two axes, language and system
 # ----------------------------------------------------------------------------------
@@ -501,16 +568,32 @@ def test_every_density_cites_a_named_source(t):
         # already executable and stays as it was.
         ("farina 00", "1", "cup", "1 cup farina 00"),
         # A weight stays a weight, expressed in ounces. It does not become 1.67 cup.
-        ("farina 00", "200", "g", "7 oz farina 00"),
+        # These read in Italian, hence "once": `labels.it` already said `libbra` and
+        # `oncia liquida`, and `oz` was the one that had been left untranslated, so the same
+        # word was Italian or English within one recipe depending on which it was.
+        ("farina 00", "200", "g", "7 once farina 00"),
         # A metric volume becomes an imperial volume, written as a fraction.
         ("latte", "500", "ml", "2 1/8 cup latte"),
         # Below the pound ounces are used; above it, pounds.
-        ("burro", "8", "oz", "8 oz burro"),
+        ("burro", "8", "oz", "8 once burro"),
     ],
 )
 def test_the_imperial_system(t, name, quantity_raw, unit_raw, expected):
     i = normalise_ingredient(name, quantity_raw, unit_raw, tables=t,
                              system=System.IMPERIAL)
+    assert i.mela_line() == expected
+
+
+@pytest.mark.parametrize(
+    "quantity_raw, unit_raw, expected",
+    [("200", "g", "7 oz farina 00"), ("2", "lb", "2 lb farina 00")],
+)
+def test_the_imperial_system_reads_in_english_as_it_was_written(t, quantity_raw, unit_raw,
+                                                                expected):
+    """The counterpart of the above: the symbols are what an English reader expects, and the
+    Italian names must not leak into the English rendering."""
+    i = normalise_ingredient("farina 00", quantity_raw, unit_raw, tables=t,
+                             system=System.IMPERIAL, language=Language.EN)
     assert i.mela_line() == expected
 
 
@@ -547,6 +630,98 @@ def test_the_unit_labels_are_symmetric(t):
 
 
 @pytest.mark.parametrize(
+    "quantity, system, language, expected",
+    [
+        ("2", System.IMPERIAL, Language.EN, "2 cups farina 00"),
+        ("1", System.IMPERIAL, Language.EN, "1 cup farina 00"),
+        ("1 1/2", System.IMPERIAL, Language.EN, "1 1/2 cups farina 00"),
+        # A proper fraction is a part of one cup, and English says "1/2 cup".
+        ("1/2", System.IMPERIAL, Language.EN, "1/2 cup farina 00"),
+    ],
+)
+def test_the_converted_branch_labels_its_unit_too(t, quantity, system, language, expected):
+    """The label used to be applied only by the spoon and count branches. Everything that went
+    through a conversion kept the canonical unit, so `plural.en`'s `cup: cups` was declared and
+    unreachable and every imperial English recipe read "2 cup"."""
+    i = normalise_ingredient("farina 00", quantity, "cup", tables=t,
+                             system=system, language=language)
+    assert i.mela_line() == expected
+
+
+def test_a_weight_label_reaches_the_other_language(t):
+    """The mirror of the above on the weight branch: `labels.it` has `lb: libbra`, and it was
+    just as unreachable — an Italian reading an imperial recipe got "2 lb"."""
+    i = normalise_ingredient("burro", "2", "lb", tables=t,
+                             system=System.IMPERIAL, language=Language.IT)
+    assert i.mela_line() == "2 libbre burro"
+    one = normalise_ingredient("burro", "1", "lb", tables=t,
+                               system=System.IMPERIAL, language=Language.IT)
+    assert one.mela_line() == "1 libbra burro"
+
+
+def test_every_label_we_write_is_a_unit_we_can_read_back(t):
+    """Whatever we print we have to be able to parse again.
+
+    The tables are two halves of one loop — `labels`/`plural` write, `alias` reads — and
+    nothing forced them to agree. `labels.it` printed "once liquide" while `alias` had never
+    heard of it, so an exported quantity came back as an unrecognised unit: our own output,
+    unreadable to us. The check does not demand the same canonical unit back (a label is a
+    translation, and "tbsp" legitimately reads back as "cucchiaio"); it demands that it still
+    be a unit at all.
+    """
+    units = sorted(set(t.volume) | set(t.weight) | set(t.count))
+    for language in (Language.IT, Language.EN):
+        for system in (System.METRIC, System.IMPERIAL):
+            for unit in units:
+                for value in (1.0, 2.0, 0.5):
+                    label = t.label(unit, value, language, system)
+                    assert t.canonical_unit(label) is not None, (
+                        f"«{unit}» is written {label!r} in {language}/{system}, and that "
+                        f"spelling is in no alias: we cannot read our own output."
+                    )
+
+
+def test_the_plural_follows_the_system_and_not_the_language(t):
+    """The same value is written 0,5 in metric and 1/2 in imperial, and the writing governs
+    agreement: "0,5 cucchiai" but "1/2 tbsp". Getting this from the language instead would be
+    right in one system and wrong in the other."""
+    assert t.label("cucchiaio", 0.5, Language.IT, System.METRIC) == "cucchiai"
+    assert t.label("cup", 0.5, Language.EN, System.IMPERIAL) == "cup"
+    assert t.label("cup", 2.0, Language.EN, System.IMPERIAL) == "cups"
+
+
+@pytest.mark.parametrize("unit", ["spicchio", "spicchi", "clove", "cloves"])
+def test_a_counting_unit_counts_however_the_model_inflected_it(t, unit):
+    """The same ingredient used to come out three ways depending on the inflection: "2 spicchi"
+    as a count, "2 spicchio" and "2 clove" as an estimate in grams — because `vague.yaml` also
+    knows the word and was consulted first. An estimate standing in for an available count is
+    the swap AGENTS.md §3 forbids, and a plural was deciding it."""
+    i = normalise_ingredient("aglio", "2", unit, tables=t, language=Language.IT)
+    assert i.quantity.provenance is Provenance.COUNT
+    assert i.mela_line() == "2 spicchi aglio (≈ 10 g)"
+
+
+@pytest.mark.parametrize(
+    "unit, name, expected",
+    [
+        ("cloves", "garlic", "2 cloves garlic (≈ 10 g)"),
+        ("slices", "bread", "2 slices bread (≈ 50 g)"),
+        ("eggs", "eggs", "2 eggs"),
+        ("leaves", "basil", "2 leaves basil"),
+    ],
+)
+def test_an_english_counting_unit_is_a_unit_on_the_way_in_too(t, unit, name, expected):
+    """`labels.en` turned `spicchio` into "clove" on the way out, but the same word coming in
+    was not a unit at all: an English caption's "2 cloves garlic" fell through to the
+    unknown-unit branch, reported as unreadable and with no typical weight. A table that
+    translates one way only is half a table."""
+    i = normalise_ingredient(name, "2", unit, tables=t, language=Language.EN)
+    assert i.quantity.provenance is Provenance.COUNT
+    assert i.gap is None
+    assert i.mela_line() == expected
+
+
+@pytest.mark.parametrize(
     "value, expected",
     [(0.125, "1/8"), (0.25, "1/4"), (1 / 3, "1/3"), (0.75, "3/4"),
      (1.5, "1 1/2"), (2 + 2 / 3, "2 2/3"), (2.0, "2")],
@@ -562,6 +737,33 @@ def test_metric_stays_in_decimals_with_a_comma():
     assert format_number(1.5, System.METRIC) == "1,5"
 
 
+@pytest.mark.parametrize(
+    "system, language, expected",
+    [
+        (System.METRIC, Language.IT, "0,5 g sale (un pizzico ≈ 0,5 g)"),
+        (System.METRIC, Language.EN, "0.5 g sale (a pinch ≈ 0.5 g)"),
+    ],
+)
+def test_the_decimal_separator_follows_the_language_not_the_system(t, system, language,
+                                                                   expected):
+    """Metric is not Italian. The separator was read off the system, so an English reader
+    cooking in grams — the default this project ships, and what the UK, Ireland, Australia,
+    Canada and India do — got "0,5 g" on the card. The shape of the number is the system's
+    business (fraction or decimal, because that is about the measuring cup); the comma is the
+    language's, because that is about reading."""
+    i = normalise_ingredient("sale", "un pizzico", None, tables=t,
+                             system=system, language=language)
+    assert i.mela_line(language) == expected
+
+
+def test_the_separator_is_wrong_in_the_other_direction_too():
+    """The mirror: an Italian asking for cups hit the fallback decimal — the branch taken when
+    no kitchen fraction is close — and got the English point."""
+    assert format_number(1.33, System.METRIC, Language.EN) == "1.33"
+    assert format_number(0.07, System.IMPERIAL, Language.IT) == "0,07"
+    assert format_number(0.07, System.IMPERIAL, Language.EN) == "0.07"
+
+
 def test_the_note_of_an_estimate_does_not_contradict_the_number(t):
     """The note is composed from the value, not written into the table. Written by hand it
     depended on the language while the number depends on the system, and out came "0,5 g (a
@@ -571,8 +773,9 @@ def test_the_note_of_an_estimate_does_not_contradict_the_number(t):
             i = normalise_ingredient("sale", "un pizzico", None, tables=t,
                                      system=system, language=language)
             assert i.quantity.note is not None
-            # The number quoted in the note is exactly the quantity's.
-            assert format_number(i.quantity.value, system) in i.quantity.note
+            # The number quoted in the note is exactly the quantity's — written the way the
+            # reader's language writes it, which is the axis this check used to leave out.
+            assert format_number(i.quantity.value, system, language) in i.quantity.note
             assert i.quantity.unit in i.quantity.note
 
 

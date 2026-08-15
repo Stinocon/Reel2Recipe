@@ -51,7 +51,7 @@ from dataclasses import dataclass
 
 import httpx
 
-from .units import Catalogue, code_of, load_tables, text_from
+from .units import Catalogue, Language, code_of, load_tables, text_from
 
 DEFAULT_OLLAMA_URL = "http://localhost:11434"
 
@@ -108,28 +108,76 @@ class ExtractionError(RuntimeError):
 # --------------------------------------------------------------------------------------
 # The draft schema
 #
-# The field names are English; the `description` strings are Italian. The split is not
-# sloppiness: the names are structure, and the model is asked for them as JSON keys, where
-# English is what it has overwhelmingly seen. The descriptions are instructions in prose, and
-# they sit next to an Italian system prompt whose examples they extend ('4 persone',
-# 'un pizzico'). Both were re-verified against the gate after the rename.
+# The field names are English; the `description` strings are not. The split is not sloppiness:
+# the names are structure, and the model is asked for them as JSON keys, where English is what
+# it has overwhelmingly seen. The descriptions are instructions in prose, and prose goes in the
+# language the model is being spoken to — the same reason there are two system prompts.
+#
+# That last half was written before it was true. There was one schema, in Italian, and it went
+# out with the English prompt as well: the descriptions carried Italian examples ('4 persone',
+# '6 burger') into the field an English extraction fills, contradicting the prompt beside them
+# in the one place where the schema, not the prompt, is the mechanical constraint. The
+# descriptions now live in `SCHEMA_PROSE`, keyed by field, and `draft_schema()` inserts the
+# ones for the language in use. **One structure, two sets of words** — not two schemas: a
+# second copy diverges at the first field anyone adds, which is the lesson `LEGACY_KEYS`
+# already paid for.
 # --------------------------------------------------------------------------------------
 
-DRAFT_SCHEMA: dict = {
+SCHEMA_PROSE: dict[str, dict[str, dict[str, str]]] = {
+    "it": {
+        "top": {
+            "is_a_recipe": "false se il contenuto non è una ricetta di cucina",
+            "servings": ("Solo la resa, come si scriverebbe su un ricettario: "
+                         "'4 persone', '6 burger', '5 vasetti'. Mai una frase. "
+                         "Stringa vuota se il materiale non la dichiara."),
+            "method": "Passi riformulati con parole tue, uno per elemento",
+            "notes": ("I rimandi utili dell'autore, in particolare i link a una ricetta "
+                      "collegata. Non i saluti, gli hashtag o gli inviti a seguire."),
+            "gaps": "Ciò che il materiale non permetteva di determinare",
+        },
+        "ingredient": {
+            "quantity_raw": ("La quantità ESATTAMENTE come appare: '1', '1/2', '2-3', "
+                             "'q.b.'. Stringa vuota se assente."),
+            "unit_raw": ("L'unità ESATTAMENTE come appare: 'g', 'cup', 'cucchiaio', "
+                         "'spicchi'. Stringa vuota se assente."),
+            "name": "Il nome dell'ingrediente, senza la quantità",
+            "notes": "Es. 'a temperatura ambiente', 'tritato'",
+            "group": ("Es. 'Per la base', 'Per la crema'. Stringa VUOTA se la ricetta non "
+                      "raggruppa gli ingredienti."),
+        },
+    },
+    "en": {
+        "top": {
+            "is_a_recipe": "false if the content is not a cooking recipe",
+            "servings": ("The yield alone, as a cookbook would write it: 'serves 4', "
+                         "'6 burgers', '5 jars'. Never a sentence. Empty string if the "
+                         "material does not state it."),
+            "method": "Steps rephrased in your own words, one per element",
+            "notes": ("The author's useful pointers, in particular links to a related "
+                      "recipe. Not greetings, hashtags or follow invitations."),
+            "gaps": "What the material did not allow to be determined",
+        },
+        "ingredient": {
+            "quantity_raw": ("The quantity EXACTLY as it appears: '1', '1/2', '2-3', "
+                             "'to taste'. Empty string if absent."),
+            "unit_raw": ("The unit EXACTLY as it appears: 'g', 'cup', 'tbsp', 'cloves'. "
+                         "Empty string if absent."),
+            "name": "The ingredient's name, without the quantity",
+            "notes": "E.g. 'at room temperature', 'chopped'",
+            "group": ("E.g. 'For the base', 'For the cream'. EMPTY string if the recipe "
+                      "does not group its ingredients."),
+        },
+    },
+}
+
+
+_DRAFT_SCHEMA_SHAPE: dict = {
     "type": "object",
     "properties": {
-        "is_a_recipe": {
-            "type": "boolean",
-            "description": "false se il contenuto non è una ricetta di cucina",
-        },
+        "is_a_recipe": {"type": "boolean"},
         "title": {"type": "string"},
         "description": {"type": "string"},
-        "servings": {
-            "type": "string",
-            "description": ("Solo la resa, come si scriverebbe su un ricettario: "
-                            "'4 persone', '6 burger', '5 vasetti'. Mai una frase. "
-                            "Stringa vuota se il materiale non la dichiara."),
-        },
+        "servings": {"type": "string"},
         # Nullable, and not out of fussiness: a plain integer field has no way of saying
         # "not stated". Strings manage with "", an integer cannot, and all that is left to the
         # model is to omit the field — which is what it always did, stated times included.
@@ -141,17 +189,11 @@ DRAFT_SCHEMA: dict = {
             "items": {
                 "type": "object",
                 "properties": {
-                    "quantity_raw": {
-                        "type": "string",
-                        "description": "La quantità ESATTAMENTE come appare: '1', '1/2', '2-3', 'q.b.'. Stringa vuota se assente.",
-                    },
-                    "unit_raw": {
-                        "type": "string",
-                        "description": "L'unità ESATTAMENTE come appare: 'g', 'cup', 'cucchiaio', 'spicchi'. Stringa vuota se assente.",
-                    },
-                    "name": {"type": "string", "description": "Il nome dell'ingrediente, senza la quantità"},
-                    "notes": {"type": "string", "description": "Es. 'a temperatura ambiente', 'tritato'"},
-                    "group": {"type": "string", "description": "Es. 'Per la base', 'Per la crema'. Stringa VUOTA se la ricetta non raggruppa gli ingredienti."},
+                    "quantity_raw": {"type": "string"},
+                    "unit_raw": {"type": "string"},
+                    "name": {"type": "string"},
+                    "notes": {"type": "string"},
+                    "group": {"type": "string"},
                 },
                 # `group` is deliberately NOT required, and that is a measured decision rather
                 # than an oversight. The Italian output was keeping half the sections it had
@@ -172,11 +214,7 @@ DRAFT_SCHEMA: dict = {
                 "required": ["name", "quantity_raw", "unit_raw"],
             },
         },
-        "method": {
-            "type": "array",
-            "items": {"type": "string"},
-            "description": "Passi riformulati con parole tue, uno per elemento",
-        },
+        "method": {"type": "array", "items": {"type": "string"}},
         "notes": {"type": "array", "items": {"type": "string"}},
         "categories": {"type": "array", "items": {"type": "string"}},
         "confidence": {
@@ -188,11 +226,7 @@ DRAFT_SCHEMA: dict = {
             },
             "required": ["ingredients", "method"],
         },
-        "gaps": {
-            "type": "array",
-            "items": {"type": "string"},
-            "description": "Ciò che il materiale non permetteva di determinare",
-        },
+        "gaps": {"type": "array", "items": {"type": "string"}},
     },
     # `servings` and `cook_time_min` are among the required ones for a measured reason:
     # with schema-constrained output the model is free to omit an optional field, and
@@ -218,6 +252,55 @@ DRAFT_SCHEMA: dict = {
 }
 
 
+def draft_schema(language: str = Language.IT) -> dict:
+    """The draft schema with its prose in `language`.
+
+    The shape above is the single copy; only the `description` strings are looked up, so the
+    two languages cannot drift into two schemas — the divergence `LEGACY_KEYS` already paid
+    for. A field with no entry in `SCHEMA_PROSE` simply carries no description, which is how
+    the fields that never had one stay as they are.
+
+    `SCHEMA_PROSE` is keyed by **level** and not flat, and that is not tidiness. `notes` exists
+    at both levels and means different things at each — the recipe's pointers to the author's
+    other posts, and one ingredient's "at room temperature". Flat, the first draft of this
+    function gave the recipe's `notes` the ingredient's description, i.e. it fed the model a
+    contradiction in exactly the place this whole change existed to remove one. It is the same
+    trap `test_store.py` guards `LEGACY_KEYS` against, and it was walked into again the same
+    day.
+    """
+    prose = SCHEMA_PROSE.get(code_of(language), SCHEMA_PROSE["it"])
+    schema = json.loads(json.dumps(_DRAFT_SCHEMA_SHAPE))
+
+    def describe(properties: dict, level: str) -> None:
+        for name, description in prose[level].items():
+            if name in properties:
+                properties[name]["description"] = description
+
+    describe(schema["properties"], "top")
+    describe(schema["properties"]["ingredients"]["items"]["properties"], "ingredient")
+    return schema
+
+
+# --------------------------------------------------------------------------------------
+# The system prompts
+#
+# **The caption's precedence extends to the STRUCTURE, and that sentence did not do what it
+# was written for.** It exists because a real reel loses a whole named section from the
+# ingredient list while still describing it in the method, and invents a section out of a
+# method paragraph — and the cause was isolated to the transcript: with the caption alone the
+# section survives about half the time, with the speech added never. The rule was the obvious
+# next move, since the prompt already said the caption wins on the *values*.
+#
+# Measured before and after, two runs each: **the sections stayed at 0%**, with the same group
+# invented both times. It moved nothing. Kept because it is the shape the whole configuration
+# was measured in — `it-section`'s units went 50% → 100% and `en-bilingual` went to 100% on
+# every axis — and swapping the prompt after the measurement would mean quoting numbers for a
+# tree that was never run. What it must NOT be read as is a fix: for this project's own rule,
+# a defect that survives two rounds on the same mechanism means the mechanism is wrong, and
+# the prompt has now had its two. The next attempt belongs upstream, at what of the transcript
+# reaches the model and with what weight — not at another sentence in here.
+# --------------------------------------------------------------------------------------
+
 SYSTEM_PROMPT_IT = """\
 Sei un estrattore di ricette di cucina. Ricevi la didascalia, la trascrizione audio e a \
 volte i commenti dell'autore di un video di cucina, e ne ricavi una ricetta strutturata.
@@ -225,7 +308,11 @@ volte i commenti dell'autore di un video di cucina, e ne ricavi una ricetta stru
 {language_directive}
 
 La didascalia è di solito la fonte più precisa: quando dice qualcosa di diverso dall'audio, \
-prevale la didascalia.
+prevale la didascalia. Vale per i VALORI e vale per la STRUTTURA. L'elenco degli ingredienti \
+e le sue sezioni sono quelli che la didascalia scrive: né uno in più né uno in meno. Il \
+parlato racconta il montaggio del piatto e spesso nomina un'intera sezione come se fosse un \
+ingrediente solo ("poi la salsa"): non è un motivo per fondere quella sezione, e una frase \
+del procedimento non diventa un gruppo perché l'audio la mette in evidenza.
 
 REGOLE NON NEGOZIABILI
 
@@ -311,7 +398,11 @@ sometimes the author's comments of a cooking video, and you turn them into a str
 {language_directive}
 
 The caption is usually the most reliable source: when it says something different from the \
-audio, the caption wins.
+audio, the caption wins. This holds for the VALUES and it holds for the STRUCTURE. The \
+ingredient list and its sections are the ones the caption writes: not one more, not one \
+fewer. The spoken track narrates how the dish is assembled and often names a whole section as \
+if it were a single ingredient ("then the sauce"): that is no reason to merge that section, \
+and a sentence of the method does not become a group because the audio dwells on it.
 
 NON-NEGOTIABLE RULES
 
@@ -684,7 +775,9 @@ def extract_draft(
              "content": _build_message(caption, transcript, title,
                                        author_comments, speaking)},
         ],
-        "format": DRAFT_SCHEMA,
+        # The schema is spoken in the same language as the prompt above, for the same
+        # reason: it is prose the model reads, and it is the half that binds mechanically.
+        "format": draft_schema(speaking),
         "stream": False,
         "options": {
             # Recipes are made of facts, not of creativity: the model is kept on rails, or it

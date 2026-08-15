@@ -16,8 +16,7 @@
 > Extraction is automatic and can get things wrong. The project is built to make its
 > uncertainties visible rather than hide them, but **read the recipe before you cook it**,
 > weights and times above all; and if you have allergies, go back to the original source,
-> which is always cited. Details in [`docs/terms-of-use.md`](docs/terms-of-use.md)
-> (Italian).
+> which is always cited. Details in [`docs/terms-of-use.md`](docs/terms-of-use.md).
 
 **From Instagram cooking reels to a tidy recipe book you can import into
 [Mela](https://mela.recipes).** Paste a link, press *Cook*, and you get a clean recipe —
@@ -54,9 +53,11 @@ original word rather than guess a similar one. The numbers never move either way
 > **A note on this documentation.** This README and the add-on's are kept in English and
 > Italian, as two copies that move together. Everything else exists in one language only,
 > chosen by its audience: [`docs/architecture.md`](docs/architecture.md) is in English,
-> because it explains code whose identifiers and comments are English. The two legal
-> documents stay **authoritative in Italian**, with a non-binding English summary at the top:
-> two published legal versions that drift apart are a real problem, not a stylistic one.
+> because it explains code whose identifiers and comments are English. The two legal documents
+> are the exception: each exists in full in both languages, with a **prevalence clause**
+> naming the Italian authoritative. Two published legal versions that drift apart are a real
+> problem, and the clause does not deny it — it gives it a defined resolution, which is what
+> bilingual legal texts do.
 
 ---
 
@@ -180,6 +181,14 @@ language, English meaning cups and ounces, and that was wrong for most of the pe
 applied to: recipes are read in English in the United Kingdom, Ireland, Australia, Canada and
 India, and cooked in grams in all of them.
 
+The split runs all the way down to how a number is written. The system decides its **shape** —
+a fraction in imperial, because "3/4 cup" is on a measuring cup and "0,75 cup" is not — and the
+language decides its **separator**, because reading is what a comma or a point is for. Those
+two used to be one: metric was treated as Italian, so an English reader cooking in grams got
+"0,5 g" on the card, and an Italian asking for cups got "1.33" wherever no kitchen fraction
+was close. The plural goes with the shape rather than the language, which is why "1/2 cup" is
+singular and "0,5 cucchiai" is not.
+
 There is no interface on the command line, so there the axes are two and start from the
 recipe:
 
@@ -230,7 +239,7 @@ time, and that is the weakest part — see the note below.
 > would buy the wrong thing.
 >
 > So the names it gets wrong are no longer its to decide. `data/ingredients.yaml` holds them —
-> 156 ingredients and 14 group headings, in both languages — and the code translates the ones
+> 158 ingredients and 14 group headings, in both languages — and the code translates the ones
 > it knows without the model seeing the word, exactly as `densities.yaml` keeps weights out of
 > its hands.
 >

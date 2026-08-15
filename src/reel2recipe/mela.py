@@ -104,7 +104,7 @@ def ingredient_lines(recipe: Recipe) -> list[str]:
             lines.append(f"# {group}")
         for ingredient in recipe.ingredients:
             if ingredient.group == group:
-                lines.append(ingredient.mela_line())
+                lines.append(ingredient.mela_line(recipe.language))
     return lines
 
 

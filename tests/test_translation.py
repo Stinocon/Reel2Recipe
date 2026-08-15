@@ -726,3 +726,81 @@ def test_a_recipe_is_translated_even_when_the_model_ignores_the_schema(offline):
     out = extract.translate_draft(draft, language="it")
     assert out["method"] == ["Friggi la pancetta.", "Monta le uova."]
     assert not out.get("gaps"), "a complete translation should declare nothing"
+
+
+# ----------------------------------------------------------------------------------
+# The draft schema: one structure, one set of words per language
+# ----------------------------------------------------------------------------------
+
+
+def test_the_schema_speaks_the_language_the_prompt_speaks():
+    """The schema is prose too, and it is the half that binds mechanically.
+
+    There was one schema, written in Italian, and it went out with the English prompt as well:
+    an English extraction was told to fill `servings` with something shaped like "4 persone"
+    while the prompt beside it asked for English. The prompt asks and the schema constrains, so
+    of the two contradicting each other this is the wrong one to leave in the other language.
+    """
+    it = extract.draft_schema("it")["properties"]
+    en = extract.draft_schema("en")["properties"]
+    assert "persone" in it["servings"]["description"]
+    assert "serves" in en["servings"]["description"].lower()
+    assert "cucchiaio" in (
+        it["ingredients"]["items"]["properties"]["unit_raw"]["description"])
+    assert "tbsp" in (
+        en["ingredients"]["items"]["properties"]["unit_raw"]["description"])
+
+
+def test_the_two_languages_share_one_structure():
+    """Two sets of words, never two schemas. A second copy of the shape diverges at the first
+    field anyone adds — the lesson `LEGACY_KEYS` already paid for — so the check strips the
+    descriptions and demands that nothing else differ, `required` lists included."""
+    def without_prose(node):
+        if isinstance(node, dict):
+            return {k: without_prose(v) for k, v in node.items() if k != "description"}
+        if isinstance(node, list):
+            return [without_prose(x) for x in node]
+        return node
+
+    assert without_prose(extract.draft_schema("it")) == without_prose(
+        extract.draft_schema("en"))
+
+
+def test_neither_language_is_missing_a_description_the_other_has():
+    """A field described in one language and bare in the other is a half-translated
+    instruction, which is the shape this pass exists to remove."""
+    for level in ("top", "ingredient"):
+        assert set(extract.SCHEMA_PROSE["it"][level]) == set(
+            extract.SCHEMA_PROSE["en"][level])
+
+    for language in ("it", "en"):
+        schema = extract.draft_schema(language)
+        levels = {
+            "top": schema["properties"],
+            "ingredient": schema["properties"]["ingredients"]["items"]["properties"],
+        }
+        for level, properties in levels.items():
+            described = set(extract.SCHEMA_PROSE[language][level])
+            present = {n for n, spec in properties.items() if "description" in spec}
+            assert described == present, (
+                f"{language}/{level}: prose is declared for {sorted(described - present)} "
+                f"but no field carries it, and {sorted(present - described)} carry one from "
+                f"nowhere."
+            )
+
+
+def test_the_prose_is_keyed_by_level_because_notes_exists_at_both():
+    """`notes` means different things at the two levels — the recipe's pointers to the
+    author's other posts, and one ingredient's "at room temperature" — and a flat table of
+    descriptions gave the recipe's field the ingredient's wording. That is a contradiction fed
+    to the model in the very place this schema change existed to remove one. It is the trap
+    `test_store.py` guards `LEGACY_KEYS` against, walked into again the same day.
+    """
+    for language in ("it", "en"):
+        schema = extract.draft_schema(language)
+        top = schema["properties"]["notes"]["description"]
+        ingredient = schema["properties"]["ingredients"]["items"]["properties"]["notes"]
+        assert top != ingredient["description"], (
+            f"{language}: both `notes` fields carry the same description, so one of the two "
+            f"is being told what the other one means."
+        )
