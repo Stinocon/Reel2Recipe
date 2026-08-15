@@ -243,16 +243,30 @@ time, and that is the weakest part — see the note below.
 > it knows without the model seeing the word, exactly as `densities.yaml` keeps weights out of
 > its hands.
 >
-> Measured, in every language combination: **the terms are at 100% and stay there across runs,
-> and so do the amounts.**
+> Measured over two runs of every language combination: **terms, amounts, units and sections
+> are all at 100% — except on the one case that carries a transcript**, where terms sit at 88%
+> and amounts at 75%. That exception is the open defect described below, and it is the reason
+> this paragraph does not say "solved". An earlier version of it claimed 100% everywhere; the
+> next measurement disproved it, which is worth remembering before trusting a number in a
+> README over the tool that produces it.
 >
 > The **group headings** were the last thing to give way, and the cause turned out to sit
 > upstream of any translation: a section holding a single ingredient — "Per la copertura: cacao
 > amaro" — was losing that ingredient, and the heading went with it. The cocoa still turned up
 > in the method, so the recipe knew about it and the shopping list did not, which is the worst
-> shape a defect can take here. That is fixed, and the headings are now also normalised to one
-> spelling per language, so two recipes in your library do not head the same section
-> differently.
+> shape a defect can take here. **That case** is fixed, and the headings are now also
+> normalised to one spelling per language, so two recipes in your library do not head the same
+> section differently.
+>
+> **A second one is not, and it is the open defect.** When the reel is *spoken* as well as
+> captioned, a whole named section can still vanish from the ingredient list while the method
+> goes on describing it, and a paragraph of the method can be promoted to a group that was
+> never there. Sections score **0%** on that case. The cause is isolated and it is the
+> transcript: with the caption alone the section survives about half the time, with the speech
+> added never — the speech narrates the assembly and names a whole section as one component,
+> and the model reorganises the recipe around the story rather than the written list. Two
+> attempts at fixing it from the prompt have now failed to move that number, so the next one
+> will not be a third sentence in the prompt.
 >
 > Run `uv run python tools/benchmark-translation.py` and see the current numbers rather than
 > trusting these: they are what one machine measured on one day.

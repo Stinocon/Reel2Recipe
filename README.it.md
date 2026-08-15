@@ -241,16 +241,31 @@ ed è la parte meno solida — vedi la nota qui sotto.
 > traduce il codice senza che il modello veda la parola, esattamente come `densities.yaml`
 > tiene i pesi fuori dalla sua portata.
 >
-> Misurato, in ogni combinazione di lingue: **i termini sono al 100% e ci restano giro dopo
-> giro, e così le quantità.**
+> Misurato su due giri di ogni combinazione di lingue: **termini, quantità, unità e sezioni
+> sono tutti al 100% — tranne sull'unico caso che porta con sé una trascrizione**, dove i
+> termini stanno all'88% e le quantità al 75%. Quell'eccezione è il difetto aperto descritto
+> qui sotto, ed è la ragione per cui questo paragrafo non dice «risolto». Una versione
+> precedente dichiarava 100% ovunque: la misura successiva l'ha smentita, e vale la pena
+> ricordarlo prima di fidarsi di un numero in un README invece che dello strumento che lo
+> produce.
 >
 > Le **intestazioni dei gruppi** sono state l'ultima cosa a cedere, e la causa stava a monte di
 > qualsiasi traduzione: una sezione con un solo ingrediente — «Per la copertura: cacao amaro» —
 > perdeva quell'ingrediente, e l'intestazione se ne andava con lui. Il cacao compariva lo stesso
 > nel procedimento, quindi la ricetta lo sapeva e la lista della spesa no: la forma peggiore che
-> un difetto possa prendere qui. È risolto, e le intestazioni sono ora anche normalizzate a una
-> sola grafia per lingua, così due ricette nella tua libreria non intitolano la stessa sezione
-> in modi diversi.
+> un difetto possa prendere qui. **Quel caso** è risolto, e le intestazioni sono ora anche
+> normalizzate a una sola grafia per lingua, così due ricette nella tua libreria non intitolano
+> la stessa sezione in modi diversi.
+>
+> **Un secondo caso invece no, ed è il difetto aperto.** Quando il reel è anche *parlato* e non
+> solo scritto, una sezione intera può ancora sparire dall'elenco degli ingredienti mentre il
+> procedimento continua a descriverla, e un paragrafo del procedimento può essere promosso a
+> gruppo che non è mai esistito. Su quel caso le sezioni stanno allo **0%**. La causa è isolata
+> ed è la trascrizione: con la sola didascalia la sezione sopravvive circa una volta su due, col
+> parlato aggiunto mai — il parlato racconta il montaggio e nomina un'intera sezione come un
+> componente solo, e il modello riorganizza la ricetta attorno al racconto invece che
+> sull'elenco scritto. Due tentativi di correggerlo dal prompt non hanno spostato quel numero,
+> quindi il prossimo non sarà una terza frase nel prompt.
 >
 > I numeri di adesso, non questi, li fai tu: `uv run python tools/benchmark-translation.py` —
 > questi sono quel che una macchina ha misurato un giorno.
