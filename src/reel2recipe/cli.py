@@ -388,7 +388,7 @@ def check_command(args) -> int:
          "" if state["ollama_up"] else "down → ollama serve")
     line("LLM models", bool(state["llm_models"]),
          ", ".join(state["llm_models"]) if state["llm_models"]
-         else f"none → ollama pull {state['modello_consigliato']}")
+         else f"none → ollama pull {state['recommended_model']}")
 
     print()
     if state["ready"]:

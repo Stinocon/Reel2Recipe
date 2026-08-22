@@ -204,3 +204,42 @@ def test_the_addon_sanity_check_actually_passes():
 
     assert (REPO_ROOT / "web" / "index.html").is_file(), REPO_ROOT
     assert load_tables().density, "the tables load but come out empty"
+
+
+# --------------------------------------------------------------------------------------
+# `r2r check` has to degrade instead of raising when there is no local model
+# --------------------------------------------------------------------------------------
+
+
+def test_check_command_without_a_model_hints_the_model_instead_of_crashing(monkeypatch, capsys):
+    """The diagnostics read the key the environment actually returns.
+
+    `pipeline.check_environment` returns `recommended_model`, and a stale Italian key in
+    `check_command` used to make `r2r check` raise a KeyError exactly when it was most useful —
+    with Ollama down and no model installed. The command has to report that, not crash
+    spelling a key nobody returns.
+    """
+    from types import SimpleNamespace
+
+    import reel2recipe.cli as cli
+    import reel2recipe.pipeline as pipeline
+
+    state = {
+        "ffmpeg": True,
+        "yt_dlp": True,
+        "asr_backend": [],
+        "asr_ready": False,
+        "ollama_up": False,
+        "llm_models": [],
+        "recommended_model": "qwen2.5:7b",
+        "llm_ready": False,
+        "ready": False,
+    }
+    monkeypatch.setattr(pipeline, "check_environment", lambda _url: state)
+
+    rc = cli.check_command(SimpleNamespace(ollama="http://localhost:11434"))
+    out = capsys.readouterr().out
+
+    assert rc == 1, "with no LLM the environment is not ready"
+    assert "ollama pull qwen2.5:7b" in out, "the hint names the recommended model"
+    assert "KeyError" not in out
