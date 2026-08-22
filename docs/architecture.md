@@ -246,6 +246,17 @@ the narration, and no sentence added to the prompt has reached that. **When two 
 same instrument leave a number untouched, the instrument is the thing to change** — the next
 attempt belongs upstream, at what of the transcript reaches the model and with what weight.
 
+**The structural fix was tried, verified, and deferred on cost.** The upstream move is a
+two-call split: the ingredient list and its sections come from a pass that sees the caption
+only, the transcript never reaching the call that decides them — the §3 non-exposure principle
+applied to structure. On the spoken `it-section` case it worked: the four "salsa" ingredients
+stayed in the list (3/3) and the invented "cipolle caramellate" group stopped being emitted
+(3/3). What stopped it is the hardware this runs on: two calls double the latency, and a
+single body-pass carrying the transcript went past 1500 s on qwen2.5:14b on a 16 GB Mac. The
+shape is proven, the cost is not yet affordable; this note records it so the next attempt, on
+a faster model or accelerator, starts from a known-working split instead of a re-litigated
+prompt. Until then the defect stays open and `extract_draft` stays unified.
+
 
 
 `servings` and the times always came out empty, even from sources saying "Serves 2" or "180° per
