@@ -39,6 +39,24 @@ else
   ko "some tests are failing"
 fi
 
+# ------------------------------------------------------------ 1-b. CLI diagnostics run
+section "r2r check (CLI diagnostics)"
+# The command reports whether the machine is ready (exit 0) or not (exit 1) — both are fine.
+# What is not fine is a traceback: a diagnostic that crashes is a defect on its own, and it
+# is the exact defect that shipped (KeyError in check_command) because no test reached that
+# branch. This step only fails on a crash, whatever the readiness.
+if out="$(uv run r2r check 2>&1)"; then
+  ok "r2r check ran cleanly (environment ready)"
+else
+  rc=$?
+  if printf '%s' "$out" | grep -qE 'Traceback|KeyError'; then
+    ko "r2r check crashed with a traceback (a diagnostic must not)"
+    printf '%s\n' "$out" | sed 's/^/    /' | tail -8
+  else
+    ok "r2r check reports not-ready (exit $rc) without crashing"
+  fi
+fi
+
 # ------------------------------------------------------------ 2. conversion tables
 section "Conversion tables (data/)"
 if uv run python -c "from reel2recipe.units import load_tables; t=load_tables(); assert t.density and t.volume and t.vague" 2>/dev/null; then
