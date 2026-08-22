@@ -143,7 +143,7 @@ Keep that split: a rename that also fixes something is a rename nobody can revie
 
 ### The five ways a rename hides
 
-The migration produced six real defects across its stages, and every one of them was invisible
+The migration produced seven real defects across its stages, and every one of them was invisible
 to `./check.sh`. They fall into five kinds, and the countermeasure for each is now in the repo
 rather than in someone's memory. The first three were enough to learn the
 shape; the last two were found later, and only by sweeping the whole artefact rather than the
@@ -203,6 +203,16 @@ string — a test locking a defect in place. Which is the argument for the strin
 extracting every literal from `src/` before and after, and reading the difference. It caught
 four Italian sentences a regex had walked into, a non-breaking space lost by a hand-rewrite,
 and a help line that had started advertising a database file that does not exist.
+
+**6. A key renamed with one reader left behind.** `check_environment` now returns
+`recommended_model`, but `check_command` still read the Italian synonym
+`modello_consigliato` — a `KeyError` on exactly the branch (`r2r check` with no model
+installed) where the command is meant to say what to pull down. No test reached that branch,
+so the defect shipped green. It is kind 2 again: a rename whose EN sweep missed one reader, in
+a branch the suite does not touch. The countermeasure is
+`test_check_command_without_a_model_hints_the_model_instead_of_crashing`, which keeps the
+no-model branch exercised, plus the `r2r check` step now in `check.sh` — a diagnostic that
+crashes is a defect, whether or not the machine is ready.
 
 ## What is still Italian, and why
 
